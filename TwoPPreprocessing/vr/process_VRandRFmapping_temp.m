@@ -46,7 +46,9 @@ for thisMouse = 1:size(mouseInfo,1)
             findBonsaiPeripheralLag(sessionFileInfo, 1, 60, vrStimName);
             % Merge Bonsai and Suite2p files; all general
             sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
+
             %-------- VR ------------
+
             % Align bonsai to peripheral data 
             [vrbonsaiData, sessionFileInfo]  = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
             % Interpolate VR data streams 
@@ -61,6 +63,7 @@ for thisMouse = 1:size(mouseInfo,1)
             plotSortedPopulationResponse_OddEven(sessionFileInfo, vrresponse, true)
 
             %--------- RF -------------
+
             % Get stimulus events from Bonsai file
             [rfbonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFileInfo, rfStimName, 'StimulusParams');
             % Get stimulus times
@@ -77,9 +80,10 @@ for thisMouse = 1:size(mouseInfo,1)
             plotRFGrid_byPosition_ROIs(sessionFileInfo, rfStimName);
             
             % ---- VR+RF Plotting -----
+
             % Combined RF and VR roi-wise summary plot
             plotROISummary_VRAndRFHeatmaps(sessionFileInfo, vrStimName, rfStimName)
-
+            
             fprintf('    Done!\n'); 
         catch ME
             warning('    Error processing %s %s: %s', mousenumber, sessionName, ME.message);

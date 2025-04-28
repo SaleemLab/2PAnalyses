@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.ML.Visualizers</id>
+    <version>0.1.0</version>
+    <title>Bonsai.ML.Visualizers</title>
+    <authors>Bonsai</authors>
+    <license type="file">LICENSE</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+    <icon>icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://bonsai-rx.org/machinelearning</projectUrl>
+    <description>A package for the Bonsai visual programming language.</description>
+    <copyright>Copyright © Bonsai Foundation CIC and Contributors 2024</copyright>
+    <tags>Bonsai Rx ML Machine Learning Visualizers</tags>
+    <repository type="git" url="https://github.com/bonsai-rx/machinelearning.git" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.7.2">
+        <dependency id="Bonsai.ML.LinearDynamicalSystems" version="0.1.0" exclude="Build,Analyzers" />
+        <dependency id="Bonsai.Core" version="2.8.1" exclude="Build,Analyzers" />
+        <dependency id="Bonsai.Design" version="2.8.0" exclude="Build,Analyzers" />
+        <dependency id="OxyPlot.Core" version="2.1.2" exclude="Build,Analyzers" />
+        <dependency id="OxyPlot.WindowsForms" version="2.1.2" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

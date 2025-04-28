@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.Cmt</id>
+    <version>0.1.0</version>
+    <title>Bonsai - CMT Library</title>
+    <authors>Gonçalo Lopes</authors>
+    <owners>Gonçalo Lopes</owners>
+    <licenseUrl>https://raw.githubusercontent.com/glopesdev/CMT.NET/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/glopesdev/CMT.NET</projectUrl>
+    <iconUrl>https://bitbucket.org/horizongir/bonsai/raw/7aacc64dc4647e57362ab310238591dc197fef0d/Resources/Bonsai.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Bonsai Tracking Library containing the CMT self-supervised tracking algorithm.</description>
+    <copyright>Gonçalo Lopes © 2015</copyright>
+    <tags>Bonsai Tracking CMT</tags>
+    <dependencies>
+      <dependency id="Cmt.Net" version="0.1.0" />
+      <dependency id="Bonsai.Vision" version="2.2.0" />
+    </dependencies>
+  </metadata>
+</package>

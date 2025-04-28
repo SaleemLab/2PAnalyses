@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        "Cmt.Net"
+    </assembly>
+    <members>
+        <member name="M:cvSetIdentity(System.Void*,CvScalar)">
+* Finds selected eigen values and vectors of a symmetric matrix */
+</member>
+        <member name="P:Cmt.Net.TrackerCmt.ActivePoints">
+            <summary>
+Gets the currently active points for visualization purposes.
+</summary>
+        </member>
+        <member name="P:Cmt.Net.TrackerCmt.Confidence">
+            <summary>
+Gets the confidence level for the currently tracked bounding box.
+</summary>
+        </member>
+        <member name="P:Cmt.Net.TrackerCmt.BoundingBox">
+            <summary>
+Gets the currently tracked bounding box.
+</summary>
+        </member>
+        <member name="P:Cmt.Net.TrackerCmt.EstimateRotation">
+            <summary>
+Gets or sets a value indicating whether to estimate the rotation of the tracked object.
+</summary>
+        </member>
+        <member name="P:Cmt.Net.TrackerCmt.EstimateScale">
+            <summary>
+Gets or sets a value indicating whether to estimate the scale of the tracked object.
+</summary>
+        </member>
+        <member name="M:Cmt.Net.TrackerCmt.ProcessFrame(OpenCV.Net.Arr)">
+            <summary>
+Updates the state of the tracker with a new image.
+</summary>
+            <param name="image">The source image on which to look for the target.</param>
+        </member>
+        <member name="M:Cmt.Net.TrackerCmt.Initialize(OpenCV.Net.Arr,OpenCV.Net.Rect)">
+            <summary>
+Initializes the tracker with the given image and bounding box.
+</summary>
+            <param name="image">The source image representing the initial state of tracking.</param>
+            <param name="rect">The bounding box representing the initial state of tracking.</param>
+        </member>
+        <member name="M:Cmt.Net.TrackerCmt.#ctor">
+            <summary>
+Initializes a new instance of the <see cref="T:Cmt.Net.TrackerCmt" /> class.
+</summary>
+        </member>
+        <member name="T:Cmt.Net.TrackerCmt">
+            <summary>
+Represents the consensus based matching and tracking algorithm.
+</summary>
+        </member>
+        <member name="M:cv.Hamming.op_FunctionCall(System.Byte!System.Runtime.CompilerServices.IsConst*,System.Byte!System.Runtime.CompilerServices.IsConst*,System.Int32)">
+this will count the bits in a ^ b
+
+</member>
+        <member name="M:cv.BriefDescriptorExtractor.info">
+@todo read and write for brief
+</member>
+        <member name="T:cv.StarAdjuster">
+An adjuster for StarFeatureDetector, this one adjusts the responseThreshold for now
+ * TODO find a faster way to converge the parameters for Star - use CvStarDetectorParams
+
+</member>
+        <member name="M:cv.FastAdjuster.#ctor(System.Int32,System.Boolean,System.Int32,System.Int32)">
+\param init_thresh the initial threshold to start with, default = 20
+     * \param nonmax whether to use non max or not for fast feature detection
+
+</member>
+        <member name="T:cv.FastAdjuster">
+\brief an adjust for the FAST detector. This will basically decrement or increment the
+ * threshold by 1
+
+</member>
+        <member name="M:cv.DynamicAdaptedFeatureDetector.#ctor(cv.Ptr&lt;cv.AdjusterAdapter&gt;!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Int32,System.Int32,System.Int32)">
+\param adjuster an AdjusterAdapter that will do the detection and parameter adjustment
+     *  \param max_features the maximum desired number of features
+     *  \param max_iters the maximum number of times to try to adjust the feature detector params
+     *          for the FastAdjuster this can be high, but with Star or Surf this can get time consuming
+     *  \param min_features the minimum desired features
+
+</member>
+        <member name="M:cv.AdjusterAdapter.good">
+are params maxed out or still valid?
+     * \return false if the parameters can't be adjusted any more
+
+</member>
+        <member name="M:cv.AdjusterAdapter.tooMany(System.Int32,System.Int32)">
+too many features were detected so, adjust the detector params accordingly
+     * \param max the maximum number of desired features
+     * \param n_detected the number previously detected
+
+</member>
+        <member name="M:cv.AdjusterAdapter.tooFew(System.Int32,System.Int32)">
+too few features were detected so, adjust the detector params accordingly
+     * \param min the minimum number of desired features
+     * \param n_detected the number previously detected
+
+</member>
+        <member name="M:cv.AdjusterAdapter.Dispose">
+pure virtual interface
+
+</member>
+        <member name="T:cv.AdjusterAdapter">
+\brief A feature detector parameter adjuster, this is used by the DynamicAdaptedFeatureDetector
+ *  and is a wrapper for FeatureDetector that allow them to be adjusted after a detection
+
+</member>
+        <member name="M:cv.FREAK.selectPairs(std.vector&lt;cv.Mat&gt;!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;std.vector&lt;cv.KeyPoint&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Double!System.Runtime.CompilerServices.IsConst,System.Boolean)">
+select the 512 "best description pairs"
+         * @param images grayscale images set
+         * @param keypoints set of detected keypoints
+         * @param corrThresh correlation threshold
+         * @param verbose print construction information
+         * @return list of best pair indexes
+
+</member>
+        <member name="M:cv.FREAK.descriptorType">
+returns the descriptor type 
+</member>
+        <member name="M:cv.FREAK.descriptorSize">
+returns the descriptor length in bytes 
+</member>
+        <member name="M:cv.FREAK.#ctor(System.Boolean,System.Boolean,System.Single,System.Int32,std.vector&lt;System.Int32&gt;!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Constructor
+         * @param orientationNormalized enable orientation normalization
+         * @param scaleNormalized enable scale normalization
+         * @param patternScale scaling of the description pattern
+         * @param nbOctave number of octaves covered by the detected keypoints
+         * @param selectedPairs (optional) user defined selected pairs
+
+</member>
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'T:cv.DynamicAdaptedFeatureDetector'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'T:cv.DynamicAdaptedFeatureDetector'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'T:cv.DynamicAdaptedFeatureDetector'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+    </members>
+</doc>

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Ode.Net.Double</id>
+    <version>0.1.3</version>
+    <title>ODE.NET - Double Precision</title>
+    <authors>Gonçalo Lopes</authors>
+    <owners>Gonçalo Lopes</owners>
+    <licenseUrl>https://bitbucket.org/horizongir/ode.net/raw/34365190e26179538165489f43adf36289daff06/COPYING</licenseUrl>
+    <projectUrl>http://bitbucket.org/horizongir/ode.net</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A .NET interface for the popular ODE physics engine.</description>
+    <copyright>Gonçalo Lopes © 2014</copyright>
+    <tags>ODE Open Dynamics Engine Physics Wrapper</tags>
+    <dependencies />
+  </metadata>
+</package>

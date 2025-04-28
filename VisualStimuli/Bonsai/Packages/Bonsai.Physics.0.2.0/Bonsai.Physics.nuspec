@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.Physics</id>
+    <version>0.2.0</version>
+    <title>Bonsai - Physics Library</title>
+    <authors>Gonçalo Lopes</authors>
+    <owners>Gonçalo Lopes</owners>
+    <licenseUrl>https://bitbucket.org/horizongir/bonsai.physics/raw/17a95ccf8a540fffd1b81f69e661d0c6d03b25f9/LICENSE</licenseUrl>
+    <projectUrl>https://bitbucket.org/horizongir/bonsai.physics</projectUrl>
+    <iconUrl>https://bitbucket.org/horizongir/bonsai/raw/7aacc64dc4647e57362ab310238591dc197fef0d/Resources/Bonsai.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Bonsai Physics Library containing modules for creating reactive 3D physics simulations.</description>
+    <copyright>Gonçalo Lopes © 2016</copyright>
+    <tags>Bonsai Physics ODE</tags>
+    <dependencies>
+      <dependency id="Bonsai.Core" version="2.2.0" />
+      <dependency id="Ode.Net.Double" version="0.1.3" />
+      <dependency id="OpenTK" version="1.1.1589.5942" />
+    </dependencies>
+  </metadata>
+</package>

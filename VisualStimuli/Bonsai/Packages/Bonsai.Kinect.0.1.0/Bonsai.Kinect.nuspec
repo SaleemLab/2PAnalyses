@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.Kinect</id>
+    <version>0.1.0</version>
+    <title>Bonsai - Kinect Library</title>
+    <authors>Gonçalo Lopes</authors>
+    <owners>Gonçalo Lopes</owners>
+    <licenseUrl>https://bitbucket.org/horizongir/bonsai.kinect/raw/fb0f3b442d57b982e8c74da3500d4ff9ad2d10d7/LICENSE</licenseUrl>
+    <projectUrl>https://bitbucket.org/horizongir/bonsai.kinect</projectUrl>
+    <iconUrl>https://bitbucket.org/horizongir/bonsai/raw/7aacc64dc4647e57362ab310238591dc197fef0d/Resources/Bonsai.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Bonsai library containing modules for interfacing with Kinect depth sensors.</description>
+    <copyright>Gonçalo Lopes © 2016</copyright>
+    <tags>Bonsai Kinect 3D Depth Camera</tags>
+    <dependencies>
+      <dependency id="Bonsai.Core" version="2.2.0" />
+      <dependency id="Microsoft.Kinect" version="2.0.1410.19000" />
+      <dependency id="OpenCV.Net" version="3.3.0" />
+    </dependencies>
+  </metadata>
+</package>

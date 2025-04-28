@@ -1,0 +1,341 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Bonsai.ML.LinearDynamicalSystems</name>
+    </assembly>
+    <members>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.CreateModelReference">
+            <summary>
+            Represents an operator that creates a reference for a named model.
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.CreateModelReference.Name">
+            <summary>
+            Gets or sets the name of the model to reference.
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.CreateModelReference.Process">
+            <summary>
+            Generates an observable sequence that contains the model reference object.
+            </summary>
+            <returns>
+            A sequence containing a single instance of the <see cref="T:Bonsai.ML.LinearDynamicalSystems.ModelReference"/>
+            class.
+            </returns>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.DeserializeFromJson">
+            <summary>
+            Deserializes a sequence of JSON strings into data model objects.
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.DeserializeFromJson.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Bonsai.ML.LinearDynamicalSystems.DeserializeFromJson"/> class.
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.DeserializeFromJson.Type">
+            <summary>
+            Gets or sets the type of the object to deserialize.
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.DeserializeFromJson.Build(System.Collections.Generic.IEnumerable{System.Linq.Expressions.Expression})">
+            <inheritdoc/>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters">
+            <summary>
+            Model parameters for a Kalman Filter Kinematics python class
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Pos_x0">
+            <summary>
+            x position at time 0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Pos_y0">
+            <summary>
+            y position at time 0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Vel_x0">
+            <summary>
+            x velocity at time 0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Vel_y0">
+            <summary>
+            y velocity at time 0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Acc_x0">
+            <summary>
+            x acceleration at time 0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Acc_y0">
+            <summary>
+            x velocity at time 0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Sigma_a">
+            <summary>
+            covariance of a
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Sigma_x">
+            <summary>
+            covariance of x
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Sigma_y">
+            <summary>
+            covariance of y
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Sqrt_diag_V0_value">
+            <summary>
+            v0
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Fps">
+            <summary>
+            frames per second
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters"/> class.
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Process">
+            <summary>
+            Generates parameters for a Kalman Filter Kinematics Model
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Process(System.IObservable{Python.Runtime.PyObject})">
+            <summary>
+            Gets the model parameters from a PyObject of a Kalman Filter Kinematics Model
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.Process``1(System.IObservable{``0})">
+            <summary>
+            Generates parameters for a Kalman Filter Kinematics Model on each input
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters.ToString">
+            <inheritdoc/>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent">
+            <summary>
+            State components of a Kalman Filter Kinematics model
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent.X">
+            <summary>
+            x state component
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent.Y">
+            <summary>
+            y state component
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent.Covariance">
+            <summary>
+            covariance between state components
+            </summary>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState">
+            <summary>
+            State of a Kalman filter model representing kinematics of position, velocity, and acceleration
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState.Position">
+            <summary>
+            position kinematic component
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState.Velocity">
+            <summary>
+            velocity kinematic components
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState.Acceleration">
+            <summary>
+            acceleration kinematic components
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.State})">
+            <summary>
+            Converts the full state of a Kalman filter (mean vector and covariance matrix) into a KinematicState object representing position, velocity, and acceleration
+            </summary>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D">
+            <summary>
+            Observation2D of data used by Kalman Filter python class (point(x, y))
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D.X">
+            <summary>
+            x coordinate
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D.Y">
+            <summary>
+            y coordinate
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D.Process">
+            <summary>
+            Generates a 2D observation
+            </summary>    
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D.Process``1(System.IObservable{``0})">
+            <summary>
+            Generates a 2D observation on each input
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D.ToString">
+            <inheritdoc/>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.ModelReference">
+            <summary>
+            Bonsai LDS model reference base class
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.ModelReference.Name">
+            <summary>
+            Gets or sets the name of the referenced model.
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.ModelReference.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Bonsai.ML.LinearDynamicalSystems.ModelReference"/> class
+            with the specified name.
+            </summary>
+            <param name="name">The name of the referenced model.</param>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.SerializeToJson">
+            <summary>
+            Serializes a sequence of data model objects into JSON strings.
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.SerializeToJson.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters})">
+            <summary>
+            Serializes each <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters"/> object in the sequence to
+            a JSON string.
+            </summary>
+            <param name="source">
+            A sequence of <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters"/> objects.
+            </param>
+            <returns>
+            A sequence of JSON strings representing the corresponding
+            <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KFModelParameters"/> object.
+            </returns>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.SerializeToJson.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D})">
+            <summary>
+            Serializes each <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D"/> object in the sequence to
+            a JSON string.
+            </summary>
+            <param name="source">
+            A sequence of <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D"/> objects.
+            </param>
+            <returns>
+            A sequence of JSON strings representing the corresponding
+            <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.Observation2D"/> object.
+            </returns>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.SerializeToJson.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.State})">
+            <summary>
+            Serializes each <see cref="T:Bonsai.ML.LinearDynamicalSystems.State"/> object in the sequence to
+            a JSON string.
+            </summary>
+            <param name="source">
+            A sequence of <see cref="T:Bonsai.ML.LinearDynamicalSystems.State"/> objects.
+            </param>
+            <returns>
+            A sequence of JSON strings representing the corresponding
+            <see cref="T:Bonsai.ML.LinearDynamicalSystems.State"/> object.
+            </returns>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.SerializeToJson.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.StateComponent})">
+            <summary>
+            Serializes each <see cref="T:Bonsai.ML.LinearDynamicalSystems.StateComponent"/> object in the sequence to
+            a JSON string.
+            </summary>
+            <param name="source">
+            A sequence of <see cref="T:Bonsai.ML.LinearDynamicalSystems.StateComponent"/> objects.
+            </param>
+            <returns>
+            A sequence of JSON strings representing the corresponding
+            <see cref="T:Bonsai.ML.LinearDynamicalSystems.StateComponent"/> object.
+            </returns>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.SerializeToJson.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState})">
+            <summary>
+            Serializes each <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState"/> object in the sequence to
+            a JSON string.
+            </summary>
+            <param name="source">
+            A sequence of <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState"/> objects.
+            </param>
+            <returns>
+            A sequence of JSON strings representing the corresponding
+            <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicState"/> object.
+            </returns>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.SerializeToJson.Process(System.IObservable{Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent})">
+            <summary>
+            Serializes each <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent"/> object in the sequence to
+            a JSON string.
+            </summary>
+            <param name="source">
+            A sequence of <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent"/> objects.
+            </param>
+            <returns>
+            A sequence of JSON strings representing the corresponding
+            <see cref="T:Bonsai.ML.LinearDynamicalSystems.Kinematics.KinematicComponent"/> object.
+            </returns>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.State">
+            <summary>
+            State of a Kalman Filter (mean vector and covariance matrix)
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.State.X">
+            <summary>
+            Mean vector - n x 1 dimensional matrix where n is number of features
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.State.P">
+            <summary>
+            Covariance matrix - n x n dimensional matrix where n is number of features
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.State.Process(System.IObservable{Python.Runtime.PyObject})">
+            <summary>
+            Grabs the state of a Kalman Filter from a type of PyObject
+            /// </summary>
+        </member>
+        <member name="T:Bonsai.ML.LinearDynamicalSystems.StateComponent">
+            <summary>
+            State component of a Kalman Filter
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.StateComponent.Mean">
+            <summary>
+            mean
+            </summary>
+        </member>
+        <member name="P:Bonsai.ML.LinearDynamicalSystems.StateComponent.Variance">
+            <summary>
+            variance
+            </summary>
+        </member>
+        <member name="M:Bonsai.ML.LinearDynamicalSystems.StateComponent.#ctor(System.Double[0:,0:],System.Double[0:,0:],System.Int32)">
+            <summary>
+            Extracts a single state compenent from the full state
+            </summary>
+        </member>
+    </members>
+</doc>

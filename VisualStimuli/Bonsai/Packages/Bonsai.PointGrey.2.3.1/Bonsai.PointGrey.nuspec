@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.PointGrey</id>
+    <version>2.3.1</version>
+    <title>Bonsai - PointGrey Library</title>
+    <authors>Gonçalo Lopes</authors>
+    <owners>Gonçalo Lopes</owners>
+    <licenseUrl>https://bitbucket.org/horizongir/bonsai.pointgrey/raw/262bcdfa7ad80861addbd5f1197b6f973845747c/LICENSE</licenseUrl>
+    <projectUrl>https://bitbucket.org/horizongir/bonsai.pointgrey</projectUrl>
+    <iconUrl>https://bitbucket.org/horizongir/bonsai/raw/7aacc64dc4647e57362ab310238591dc197fef0d/Resources/Bonsai.png</iconUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Bonsai Library containing modules for acquiring images from PointGrey cameras.</description>
+    <copyright>Gonçalo Lopes © 2017</copyright>
+    <tags>Bonsai PointGrey FlyCapture</tags>
+    <dependencies>
+      <dependency id="Bonsai.Core" version="2.3.0" />
+      <dependency id="OpenCV.Net" version="3.3.1" />
+    </dependencies>
+  </metadata>
+</package>

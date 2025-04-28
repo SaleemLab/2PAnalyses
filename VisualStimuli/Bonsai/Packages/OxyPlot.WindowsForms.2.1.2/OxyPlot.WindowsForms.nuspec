@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>OxyPlot.WindowsForms</id>
+    <version>2.1.2</version>
+    <authors>OxyPlot.WindowsForms</authors>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <icon>OxyPlot_128.png</icon>
+    <projectUrl>https://oxyplot.github.io/</projectUrl>
+    <description>OxyPlot is a plotting library for .NET. This package targets Windows Forms applications.</description>
+    <copyright>Copyright (c) 2014 OxyPlot contributors</copyright>
+    <tags>plotting plot charting chart</tags>
+    <repository type="git" url="https://github.com/oxyplot/oxyplot.git" commit="976b84dbf60e142cf47cf0a7ad9f76b25b51ae03" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.0">
+        <dependency id="OxyPlot.Core" version="2.1.2" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETFramework4.5">
+        <dependency id="OxyPlot.Core" version="2.1.2" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETCoreApp3.1">
+        <dependency id="OxyPlot.Core" version="2.1.2" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+    <frameworkReferences>
+      <group targetFramework=".NETCoreApp3.1">
+        <frameworkReference name="Microsoft.WindowsDesktop.App.WindowsForms" />
+      </group>
+      <group targetFramework=".NETFramework4.0" />
+      <group targetFramework=".NETFramework4.5" />
+    </frameworkReferences>
+  </metadata>
+</package>

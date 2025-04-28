@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.ML.LinearDynamicalSystems</id>
+    <version>0.1.0</version>
+    <title>Bonsai.ML.LinearDynamicalSystems</title>
+    <authors>Bonsai</authors>
+    <license type="file">LICENSE</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+    <icon>icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://bonsai-rx.org/machinelearning</projectUrl>
+    <description>A Bonsai package for implementing the Kalman Filter using python.</description>
+    <copyright>Copyright © Bonsai Foundation CIC and Contributors 2024</copyright>
+    <tags>Bonsai Rx ML KalmanFilter LinearDynamicalSystems</tags>
+    <repository type="git" url="https://github.com/bonsai-rx/machinelearning.git" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.7.2">
+        <dependency id="Bonsai.Core" version="2.8.1" exclude="Build,Analyzers" />
+        <dependency id="Bonsai.Scripting.Python" version="0.2.1" exclude="Build,Analyzers" />
+        <dependency id="Newtonsoft.Json" version="13.0.3" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="Bonsai.Core" version="2.8.1" exclude="Build,Analyzers" />
+        <dependency id="Bonsai.Scripting.Python" version="0.2.1" exclude="Build,Analyzers" />
+        <dependency id="Newtonsoft.Json" version="13.0.3" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

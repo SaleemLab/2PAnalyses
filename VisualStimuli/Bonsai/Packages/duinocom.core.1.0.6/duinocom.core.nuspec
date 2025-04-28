@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>duinocom.core</id>
+    <version>1.0.6</version>
+    <authors>compulsivecoder</authors>
+    <owners>compulsivecoder</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://github.com/CompulsiveCoder/duinocom.core</projectUrl>
+    <description>An arduino serial communication library.</description>
+    <releaseNotes>Added SerialPortDetector</releaseNotes>
+    <copyright>Copyright 2017</copyright>
+    <tags>arduino iot</tags>
+  </metadata>
+</package>

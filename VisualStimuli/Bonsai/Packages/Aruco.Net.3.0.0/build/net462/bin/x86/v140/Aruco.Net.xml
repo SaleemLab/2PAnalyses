@@ -1,0 +1,1138 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        "Aruco.Net"
+    </assembly>
+    <members>
+        <member name="M:Aruco.Net.MarkerDetector.Threshold(Aruco.Net.ThresholdMethod,OpenCV.Net.Arr,OpenCV.Net.Arr,System.Double,System.Double)">
+            <summary>
+Thresholds the grayscale image with the specified method.
+</summary>
+            <param name="method">The threshold method to use.</param>
+            <param name="grayscale">The source grayscale image.</param>
+            <param name="threshold">The destination thresholded binary image.</param>
+            <param name="param1">The first parameter of the threshold method.</param>
+            <param name="param2">The second parameter of the threshold method.</param>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.Detect(OpenCV.Net.Arr,OpenCV.Net.Mat,OpenCV.Net.Mat,System.Single,System.Boolean)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="input">The source image on which to look for markers.</param>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <param name="markerSizeMeters">The size of the marker sides, in meters.</param>
+            <param name="setYPerpendicular">
+A value indicating which axis represents the surface normal. If true, the Y axis
+will be set perpendicular to the surface; otherwise, the Z axis will be used.
+</param>
+            <returns>
+A list of detected fiducial markers in the specified image.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.Detect(OpenCV.Net.Arr,OpenCV.Net.Mat,OpenCV.Net.Mat,System.Single)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="input">The source image on which to look for markers.</param>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <param name="markerSizeMeters">The size of the marker sides, in meters.</param>
+            <returns>
+A list of detected fiducial markers in the specified image.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.Detect(OpenCV.Net.Arr,OpenCV.Net.Mat,OpenCV.Net.Mat)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="input">The source image on which to look for markers.</param>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <returns>
+A list of detected fiducial markers in the specified image.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.Detect(OpenCV.Net.Arr,Aruco.Net.CameraParameters,System.Single,System.Boolean)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="input">The source image on which to look for markers.</param>
+            <param name="parameters">The intrinsic camera parameters.</param>
+            <param name="markerSizeMeters">The size of the marker sides, in meters.</param>
+            <param name="setYPerpendicular">
+A value indicating which axis represents the surface normal. If true, the Y axis
+will be set perpendicular to the surface; otherwise, the Z axis will be used.
+</param>
+            <returns>
+A list of detected fiducial markers in the specified image.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.Detect(OpenCV.Net.Arr,Aruco.Net.CameraParameters,System.Single)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="input">The source image on which to look for markers.</param>
+            <param name="parameters">The intrinsic camera parameters.</param>
+            <param name="markerSizeMeters">The size of the marker sides, in meters.</param>
+            <returns>
+A list of detected fiducial markers in the specified image.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.Detect(OpenCV.Net.Arr,Aruco.Net.CameraParameters)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="input">The source image on which to look for markers.</param>
+            <param name="parameters">The intrinsic camera parameters.</param>
+            <returns>
+A list of detected fiducial markers in the specified image.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.CopyThresholdedImage(OpenCV.Net.Arr)">
+            <summary>
+Copies the thresholding result into the specified image for visualization and
+calibration purposes.
+</summary>
+            <param name="image">The destination image for the thresholding result.</param>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.DesiredSpeed">
+            <summary>
+Gets or sets the desired speed of internal processes. If you need maximum speed at
+the cost of a lower detection rate set it to 3, otherwise use 0 for a precise but
+slow detection.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.ErosionEnabled">
+            <summary>
+Gets or sets a value indicating whether the erosion process will be applied.
+This property must be set to <b>true</b> for chessboard like boards.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.CornerRefinement">
+            <summary>
+Gets or sets the corner refinement method.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.MaxSize">
+            <summary>
+Gets or sets the maximum marker size as a fraction of the image size.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.MinSize">
+            <summary>
+Gets or sets the minimum marker size as a fraction of the image size.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.Param2">
+            <summary>
+Gets or sets the second parameter of the threshold method.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.Param1">
+            <summary>
+Gets or sets the first parameter of the threshold method.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerDetector.ThresholdMethod">
+            <summary>
+Gets or sets the threshold method.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.MarkerDetector.#ctor">
+            <summary>
+Initializes a new instance of the <see cref="T:Aruco.Net.MarkerDetector" /> class.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.MarkerDetector">
+            <summary>
+Represents the marker detection procedure.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.CornerRefinementMethod">
+            <summary>
+Specifies the available methods for corner refinement.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.CornerRefinementMethod.Lines">
+            <summary>
+Specifies a corner refinement method based on interpolating contour lines.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.CornerRefinementMethod.SubPix">
+            <summary>
+Specifies a corner refinement method with sub-pixel accuracy.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.CornerRefinementMethod.Harris">
+            <summary>
+Specifies a corner refinement method based on the Harris operator.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.CornerRefinementMethod.None">
+            <summary>
+Specifies that no corner refinement should be performed.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.ThresholdMethod">
+            <summary>
+Specifies the available image thresholding methods.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.ThresholdMethod.Canny">
+            <summary>
+Specifies a segmentation method based on the Canny edge detector.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.ThresholdMethod.AdaptiveThreshold">
+            <summary>
+Specifies a segmentation method based on an adaptive threshold.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.ThresholdMethod.FixedThreshold">
+            <summary>
+Specifies a segmentation method based on a fixed threshold.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.DrawingUtils.Draw3dCube(OpenCV.Net.Arr,Aruco.Net.Board,Aruco.Net.CameraParameters)">
+            <summary>
+Draws a 3D reference cube on top of the input image.
+</summary>
+            <param name="image">The image on which to draw the cube.</param>
+            <param name="board">The marker board used to compute the cube position and orientation.</param>
+            <param name="parameters">The camera intrinsic parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.DrawingUtils.Draw3dCube(OpenCV.Net.Arr,Aruco.Net.Marker,Aruco.Net.CameraParameters)">
+            <summary>
+Draws a 3D reference cube on top of the input image.
+</summary>
+            <param name="image">The image on which to draw the cube.</param>
+            <param name="marker">The marker used to compute the cube position and orientation.</param>
+            <param name="parameters">The camera intrinsic parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.DrawingUtils.Draw3dAxis(OpenCV.Net.Arr,Aruco.Net.Board,Aruco.Net.CameraParameters)">
+            <summary>
+Draws a 3D reference axis on top of the input image.
+</summary>
+            <param name="image">The image on which to draw the axis.</param>
+            <param name="board">The marker board used to compute the axis position and orientation.</param>
+            <param name="parameters">The camera intrinsic parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.DrawingUtils.Draw3dAxis(OpenCV.Net.Arr,Aruco.Net.Marker,Aruco.Net.CameraParameters)">
+            <summary>
+Draws a 3D reference axis on top of the input image.
+</summary>
+            <param name="image">The image on which to draw the axis.</param>
+            <param name="marker">The marker used to compute the axis position and orientation.</param>
+            <param name="parameters">The camera intrinsic parameters.</param>
+        </member>
+        <member name="T:Aruco.Net.DrawingUtils">
+            <summary>
+Specifies visualization and debugging drawing methods.
+</summary>
+        </member>
+        <member name="M:aruco.BoardDetector.set_repj_err_thres(System.Single)">
+Sets the threshold for reprjection test. Pixels that after  estimating the camera location
+     * projects 'repj_err_thres' pixels farther from its original location are discarded as outliers.
+     * By default it is set to -1, meaning that not reprojection test is performed
+
+</member>
+        <member name="M:aruco.BoardDetector.setYPerpendicular(System.Boolean)">
+By default, the Y axis is set to point up. However this is not the default
+operation mode of opencv, which produces the Z axis pointing up instead.
+So, to achieve this change, we have to rotate the X axis.
+
+</member>
+        <member name="M:aruco.BoardDetector.detect(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,aruco.BoardConfiguration!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,aruco.CameraParameters!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Single)">
+Static version (all in one). Detects the board indicated
+   * @param Image input image
+   * @param bc the board you want to see if is present
+   * @param cp camera parameters
+   * @param markerSizeMeters size of the marker sides expressed in meters (not needed in the board is expressed in meters)
+   * @return Board detected
+
+</member>
+        <member name="M:aruco.BoardDetector.detect(std.vector&lt;aruco.Marker,std.allocator&lt;aruco.Marker&gt;&gt;!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,aruco.BoardConfiguration!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,aruco.Board*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat,cv.Mat,System.Single)">
+Given the markers detected, determines if there is the board passed
+    * @param detectedMarkers result provided by aruco::ArMarkerDetector
+    * @param BConf the board you want to see if is present
+    * @param Bdetected output information of the detected board
+    * @param camMatrix camera matrix with intrinsics
+    * @param distCoeff camera distorsion coeff
+    * @param camMatrix intrinsic camera information.
+    * @param distCoeff camera distorsion coefficient. If set Mat() if is assumed no camera distorion
+    * @param markerSizeMeters size of the marker sides expressed in meters
+    * @return value indicating  the  likelihood of having found the marker
+
+</member>
+        <member name="M:aruco.BoardDetector.getDetectedMarkers">
+Returns the vector of markers detected
+
+</member>
+        <member name="M:aruco.BoardDetector.getMarkerDetector">
+Returns a reference to the internal marker detector
+
+</member>
+        <member name="M:aruco.BoardDetector.getDetectedBoard">
+Returns a reference to the board detected
+
+</member>
+        <member name="M:aruco.BoardDetector.detect(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Detect markers, and then, look for the board indicated in setParams()
+@return value indicating  the  likelihood of having found the marker
+
+</member>
+        <member name="M:aruco.BoardDetector.setParams(aruco.BoardConfiguration!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,aruco.CameraParameters!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Single)">
+Use if you plan to let this class to perform marker detection too
+
+</member>
+        <member name="M:aruco.BoardDetector.#ctor(System.Boolean)">
+See discussion in @see enableRotateXAxis.
+     * Do not change unless you know what you are doing
+
+</member>
+        <member name="T:aruco.BoardDetector">
+\brief This class detects AR boards
+ * Version 1.2
+ * There are two modes for board detection.
+ * First, the old way. (You first detect markers with MarkerDetector and then call to detect in this class.
+ *
+ * Second: New mode, marker detection is included in the class
+ * \code
+
+  CameraParameters CP;
+  CP.readFromFile(path_cp)
+  BoardConfiguration BC;
+  BC.readFromFile(path_bc);
+  BoardDetector BD;
+  BD.setParams(BC,CP); //or only BD.setParams(BC)
+  //capture image
+  cv::Mat im;
+  capture_image(im);
+
+  float prob=BD.detect(im);
+  if (prob&gt;0.3)
+        CvDrawingUtils::draw3DAxis(im,BD.getDetectedBoard(),CP);
+
+ \endcode
+ *
+
+</member>
+        <member name="M:Aruco.Net.BoardDetector.Detect(System.Collections.Generic.IList`1{Aruco.Net.Marker},Aruco.Net.BoardConfiguration,OpenCV.Net.Mat,OpenCV.Net.Mat,System.Single)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="detectedMarkers">The list of previously detected fiducial markers.</param>
+            <param name="boardConfiguration">The configuration of the marker board.</param>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <param name="markerSizeMeters">The size of the marker sides, in meters.</param>
+            <returns>
+The detected marker board.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.BoardDetector.Detect(System.Collections.Generic.IList`1{Aruco.Net.Marker},Aruco.Net.BoardConfiguration,OpenCV.Net.Mat,OpenCV.Net.Mat)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="detectedMarkers">The list of previously detected fiducial markers.</param>
+            <param name="boardConfiguration">The configuration of the marker board.</param>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <returns>
+The detected marker board.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.BoardDetector.Detect(System.Collections.Generic.IList`1{Aruco.Net.Marker},Aruco.Net.BoardConfiguration,Aruco.Net.CameraParameters,System.Single)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="detectedMarkers">The list of previously detected fiducial markers.</param>
+            <param name="boardConfiguration">The configuration of the marker board.</param>
+            <param name="parameters">The intrinsic camera parameters.</param>
+            <param name="markerSizeMeters">The size of the marker sides, in meters.</param>
+            <returns>
+The detected marker board.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.BoardDetector.Detect(System.Collections.Generic.IList`1{Aruco.Net.Marker},Aruco.Net.BoardConfiguration,Aruco.Net.CameraParameters)">
+            <summary>
+Detects fiducial markers in the specified image.
+</summary>
+            <param name="detectedMarkers">The list of previously detected fiducial markers.</param>
+            <param name="boardConfiguration">The configuration of the marker board.</param>
+            <param name="parameters">The intrinsic camera parameters.</param>
+            <returns>
+The detected marker board.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.BoardDetector.#ctor">
+            <summary>
+Initializes a new instance of the <see cref="T:Aruco.Net.BoardDetector" /> class.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.BoardDetector">
+            <summary>
+Represents the marker board detection procedure.
+</summary>
+        </member>
+        <member name="M:aruco.MarkerDetector.detectRectangles(std.vector&lt;cv.Mat,std.allocator&lt;cv.Mat&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;aruco.MarkerDetector.MarkerCandidate,std.allocator&lt;aruco.MarkerDetector.MarkerCandidate&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Detection of candidates to be markers, i.e., rectangles.
+This function returns in candidates all the rectangles found in a thresolded image
+
+</member>
+        <member name="M:aruco.MarkerDetector.glGetProjectionMatrix(aruco.CameraParameters*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Size_&lt;System.Int32&gt;,cv.Size_&lt;System.Int32&gt;,System.Double*,System.Double,System.Double,System.Boolean)">
+DEPRECATED!!! Use the member function in CameraParameters
+     *
+     * Given the intrinsic camera parameters returns the GL_PROJECTION matrix for opengl.
+     * PLease NOTE that when using OpenGL, it is assumed no camera distorsion! So, if it is not true, you should have
+     * undistor image
+     *
+     * @param CamMatrix  arameters of the camera specified.
+     * @param orgImgSize size of the original image
+     * @param size of the image/window where to render (can be different from the real camera image). Please not that it must be related to CamMatrix
+     * @param proj_matrix output projection matrix to give to opengl
+     * @param gnear,gfar: visible rendering range
+     * @param invert: indicates if the output projection matrix has to yield a horizontally inverted image because image data has not been stored in the order
+     *of glDrawPixels: bottom-to-top.
+
+</member>
+        <member name="M:aruco.MarkerDetector.refineCandidateLines(aruco.MarkerDetector.MarkerCandidate*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Refine MarkerCandidate Corner using LINES method
+     * @param candidate candidate to refine corners
+
+</member>
+        <member name="M:aruco.MarkerDetector.warp(cv.Mat*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Size_&lt;System.Int32&gt;,std.vector&lt;cv.Point_&lt;System.Single&gt;,std.allocator&lt;cv.Point_&lt;System.Single&gt;&gt;&gt;)">
+Given the iput image with markers, creates an output image with it in the canonical position
+     * @param in input image
+     * @param out image with the marker
+     * @param size of out
+     * @param points 4 corners of the marker in the image in
+     * @return true if the operation succeed
+
+</member>
+        <member name="M:aruco.MarkerDetector.getCandidates">
+Returns a list candidates to be markers (rectangles), for which no valid id was found after calling detectRectangles
+
+</member>
+        <member name="M:aruco.MarkerDetector.detectRectangles(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;std.vector&lt;cv.Point_&lt;System.Single&gt;,std.allocator&lt;cv.Point_&lt;System.Single&gt;&gt;&gt;,std.allocator&lt;std.vector&lt;cv.Point_&lt;System.Single&gt;,std.allocator&lt;cv.Point_&lt;System.Single&gt;&gt;&gt;&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Detection of candidates to be markers, i.e., rectangles.
+This function returns in candidates all the rectangles found in a thresolded image
+
+</member>
+        <member name="M:aruco.MarkerDetector.thresHold(System.Int32,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Double,System.Double)">
+-------------------------------------------------
+Methods you may not need
+Thesde methods do the hard work. They have been set public in case you want to do customizations
+-------------------------------------------------
+Thesholds the passed image with the specified method.
+
+</member>
+        <member name="M:aruco.MarkerDetector.pyrDown(System.UInt32)">
+Deprecated
+     *
+     * Use an smaller version of the input image for marker detection.
+     * If your marker is small enough, you can employ an smaller image to perform the detection without noticeable reduction in the precision.
+     * Internally, we are performing a pyrdown operation
+     *
+     * @param level number of times the image size is divided by 2. Internally, we are performing a pyrdown.
+
+</member>
+        <member name="M:aruco.MarkerDetector.setWarpSize(System.Int32)">
+Specifies the size for the canonical marker image. A big value makes the detection slower than a small value.
+Minimun value is 10. Default value is 56.
+
+</member>
+        <member name="M:aruco.MarkerDetector.setDesiredSpeed(System.Int32)">
+ Specifies a value to indicate the required speed for the internal processes. If you need maximum speed (at the cost of a lower detection rate),
+ use the value 3, If you rather a more precise and slow detection, set it to 0.
+
+ Actually, the main differences are that in highspeed mode, we employ setCornerRefinementMethod(NONE) and internally, we use a small canonical
+ image to detect the marker. In low speed mode, we use setCornerRefinementMethod(HARRIS) and a bigger size for the canonical marker image
+
+</member>
+        <member name="M:aruco.MarkerDetector.enableErosion(System.Boolean)">
+Deprecated!!!
+     *
+     * Enables/Disables erosion process that is REQUIRED for chessboard like boards.
+     * By default, this property is enabled
+
+</member>
+        <member name="M:aruco.MarkerDetector.getMinMaxSize(System.Single*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Single*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+reads the min and max sizes employed
+     * @param min output size of the contour to consider a possible marker as valid (0,1]
+     * @param max output size of the contour to consider a possible marker as valid [0,1)
+     *
+
+</member>
+        <member name="M:aruco.MarkerDetector.setMinMaxSize(System.Single,System.Single)">
+Specifies the min and max sizes of the markers as a fraction of the image size. By size we mean the maximum
+     * of cols and rows.
+     * @param min size of the contour to consider a possible marker as valid (0,1]
+     * @param max size of the contour to consider a possible marker as valid [0,1)
+     *
+
+</member>
+        <member name="T:aruco.MarkerDetector.CornerRefinementMethod">
+Methods for corner refinement
+
+</member>
+        <member name="M:aruco.MarkerDetector.getThresholdedImage">
+Returns a reference to the internal image thresholded. It is for visualization purposes and to adjust manually
+     * the parameters
+
+</member>
+        <member name="M:aruco.MarkerDetector.getThresholdParams(System.Double*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Double*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Set the parameters of the threshold method
+We are currently using the Adptive threshold ee opencv doc of adaptiveThreshold for more info
+  param1: blockSize of the pixel neighborhood that is used to calculate a threshold value for the pixel
+  param2: The constant subtracted from the mean or weighted mean
+
+</member>
+        <member name="M:aruco.MarkerDetector.enableLockedCornersMethod(System.Boolean)">
+ This method assumes that the markers may have some of its corners joined either to another marker
+ in a chessboard like pattern) or to a rectangle. This is the case in which the subpixel refinement
+ method in opencv work best.
+
+ Enabling this does not force you to use locked corners, normals markers will be detected also. However,
+ when using locked corners, enabling this option will increase robustness in detection at the cost of
+ higher computational time.
+ ,
+ Note for developer: Enabling this option forces a call to findCornerMaxima
+
+</member>
+        <member name="M:aruco.MarkerDetector.setThresholdParamRange(System.UInt32,System.UInt32)">
+Allows for a parallel search of several values of the param1 simultaneously (in different threads)
+     * The param r1 the indicates how many values around the current value of param1 are evaluated. In other words
+     * if r1&gt;0, param1 is searched in range [param1- r1 ,param1+ r1 ]
+     *
+     * r2 unused yet. Added in case of future need.
+
+</member>
+        <member name="M:aruco.MarkerDetector.setThresholdParams(System.Double,System.Double)">
+Set the parameters of the threshold method
+We are currently using the Adptive threshold ee opencv doc of adaptiveThreshold for more info
+  @param param1: blockSize of the pixel neighborhood that is used to calculate a threshold value for the pixel
+  @param param2: The constant subtracted from the mean or weighted mean
+
+</member>
+        <member name="M:aruco.MarkerDetector.getThresholdMethod">
+Returns the current threshold method
+
+</member>
+        <member name="M:aruco.MarkerDetector.setThresholdMethod(aruco.MarkerDetector.ThresholdMethods)">
+Sets the threshold method
+
+</member>
+        <member name="T:aruco.MarkerDetector.ThresholdMethods">
+This set the type of thresholding methods available
+
+</member>
+        <member name="M:aruco.MarkerDetector.detect(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;aruco.Marker,std.allocator&lt;aruco.Marker&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,aruco.CameraParameters,System.Single,System.Boolean)">
+Detects the markers in the image passed
+     *
+     * If you provide information about the camera parameters and the size of the marker, then, the extrinsics of the markers are detected
+     *
+     * @param input input color image
+     * @param detectedMarkers output vector with the markers detected
+     * @param camParams Camera parameters
+     * @param markerSizeMeters size of the marker sides expressed in meters
+     * @param setYPerperdicular If set the Y axis will be perpendicular to the surface. Otherwise, it will be the Z axis
+
+</member>
+        <member name="M:aruco.MarkerDetector.detect(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;aruco.Marker,std.allocator&lt;aruco.Marker&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat,cv.Mat,System.Single,System.Boolean)">
+Detects the markers in the image passed
+     *
+     * If you provide information about the camera parameters and the size of the marker, then, the extrinsics of the markers are detected
+     *
+     * @param input input color image
+     * @param detectedMarkers output vector with the markers detected
+     * @param camMatrix intrinsic camera information.
+     * @param distCoeff camera distorsion coefficient. If set Mat() if is assumed no camera distorion
+     * @param markerSizeMeters size of the marker sides expressed in meters
+     * @param setYPerperdicular If set the Y axis will be perpendicular to the surface. Otherwise, it will be the Z axis
+
+</member>
+        <member name="M:aruco.MarkerDetector.#ctor">
+See
+
+</member>
+        <member name="T:aruco.MarkerDetector">
+\brief Main class for marker detection
+ *
+
+</member>
+        <member name="M:aruco.Board.draw(cv.Mat*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Scalar_&lt;System.Double&gt;,System.Int32,System.Boolean)">
+Draws the detected markers
+
+</member>
+        <member name="M:aruco.Board.readFromFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Read  this from a file
+
+</member>
+        <member name="M:aruco.Board.saveToFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Save this from a file
+
+</member>
+        <member name="M:aruco.Board.OgreGetPoseParameters(System.Double*,System.Double*)">
+Returns position vector and orientation quaternion for an Ogre scene node or entity.
+	Use:
+...
+Ogre::Vector3 ogrePos (position[0], position[1], position[2]);
+Ogre::Quaternion  ogreOrient (orientation[0], orientation[1], orientation[2], orientation[3]);
+mySceneNode-&gt;setPosition( ogrePos  );
+mySceneNode-&gt;setOrientation( ogreOrient  );
+...
+
+</member>
+        <member name="M:aruco.Board.glGetModelViewMatrix(System.Double*)">
+Given the extrinsic camera parameters returns the GL_MODELVIEW matrix for opengl.
+    * Setting this matrix, the reference corrdinate system will be set in this board
+
+</member>
+        <member name="M:aruco.BoardConfiguration.readFromFile(cv.FileStorage*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Reads board info from a file
+
+</member>
+        <member name="M:aruco.BoardConfiguration.saveToFile(cv.FileStorage*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Saves the board info to a file
+
+</member>
+        <member name="M:aruco.BoardConfiguration.getIdList(std.vector&lt;System.Int32,std.allocator&lt;System.Int32&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Boolean)">
+Set in the list passed the set of the ids
+
+</member>
+        <member name="M:aruco.BoardConfiguration.getMarkerInfo(System.Int32)">
+Returns the Info of the marker with id specified. If not in the set, throws exception
+
+</member>
+        <member name="M:aruco.BoardConfiguration.getIndexOfMarkerId(System.Int32)">
+Returns the index of the marker with id indicated, if is in the list
+
+</member>
+        <member name="M:aruco.BoardConfiguration.isExpressedInPixels">
+Indicates if the corners are expressed in meters
+
+</member>
+        <member name="M:aruco.BoardConfiguration.isExpressedInMeters">
+Indicates if the corners are expressed in meters
+
+</member>
+        <member name="M:aruco.BoardConfiguration.readFromFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Reads board info from a file
+
+</member>
+        <member name="M:aruco.BoardConfiguration.saveToFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Saves the board info to a file
+
+</member>
+        <member name="M:aruco.BoardConfiguration.#ctor(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Loads from file
+     * @param filePath to the config file
+
+</member>
+        <member name="T:aruco.BoardConfiguration">
+\brief This class defines a board with several markers.
+ * A Board contains several markers so that they are more robustly detected.
+ *
+ * In general, a board is a set of markers. So BoardConfiguration is only a list
+ * of the id of the markers along with the position of their corners.
+ *
+ * The position of the corners can be specified either in pixels (in a non-specific size) or in meters.
+ * The first is the typical case in which you generate the image of  board  and the print it. Since you do not know in advance the real
+ * size of the markers, their corners are specified in pixels, and then, the translation to meters can be made once you know the real size.
+ *
+ * On the other hand, you may want to have the information of your boards in meters. The BoardConfiguration allows you to do so.
+ *
+ * The point is in the mInfoType variable. It can be either PIX or METERS according to your needs.
+ *
+
+</member>
+        <member name="T:aruco.MarkerInfo">
+3d representation of a marker
+
+</member>
+        <member name="M:Aruco.Net.BoardConfiguration.ReadFromFile(System.String)">
+            <summary>
+Reads the marker board configuration from a file saved with <see cref="M:Aruco.Net.BoardConfiguration.SaveToFile(System.String)" />.
+</summary>
+            <param name="fileName">The file containing the board configuration.</param>
+        </member>
+        <member name="M:Aruco.Net.BoardConfiguration.SaveToFile(System.String)">
+            <summary>
+Saves the marker board configuration to a file.
+</summary>
+            <param name="fileName">The file on which to save the board configuration.</param>
+        </member>
+        <member name="P:Aruco.Net.BoardConfiguration.Markers">
+            <summary>
+Gets the configuration list of markers contained in the marker board.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.BoardConfiguration.MarkerInfoType">
+            <summary>
+Gets the units used to specify each marker position.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.BoardConfiguration">
+            <summary>
+Represents the 3D configuration of a marker board.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.MarkerInfoType">
+            <summary>
+Specifies the units that marker position information is expressed in
+for internal processing.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.MarkerInfoType.Meters">
+            <summary>
+Specifies that the marker position information is expressed in meters.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.MarkerInfoType.Pixels">
+            <summary>
+Specifies that the marker position information is expressed in pixels.
+</summary>
+        </member>
+        <member name="F:Aruco.Net.MarkerInfoType.None">
+            <summary>
+Specifies that the units of marker position are not specified.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.GetEnumerator">
+            <summary>
+Returns an enumerator that iterates through the marker corners.
+</summary>
+            <returns>
+An enumerator instance that can be used to iterate through the marker corners.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.CopyTo(OpenCV.Net.Point3f[],System.Int32)">
+            <summary>
+Copies the corners in the marker definition to an <see cref="!:System.Array" />,
+starting at a particular <see cref="!:System.Array" /> index.
+</summary>
+            <param name="array">
+The one-dimensional <see cref="!:System.Array" /> that is the destination of
+the corner positions copied from the marker definition.
+</param>
+            <param name="arrayIndex">The zero-based index in array at which copying begins.</param>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.RemoveAt(System.Int32)">
+            <summary>
+Removes the corner at the specified index.
+</summary>
+            <param name="index">The zero-based index of the corner to remove.</param>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.Insert(System.Int32,OpenCV.Net.Point3f)">
+            <summary>
+Inserts a corner in the marker definition at the specified index.
+</summary>
+            <param name="index">The zero-based index at which the corner should be inserted.</param>
+            <param name="position">The position of the corner to insert into the definition.</param>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.IndexOf(OpenCV.Net.Point3f)">
+            <summary>
+Determines the index of a specific corner in the marker definition.
+</summary>
+            <param name="position">The position of the corner to locate in the definition.</param>
+            <returns>
+The index of the corner if found in the marker definition; otherwise, -1.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.Contains(OpenCV.Net.Point3f)">
+            <summary>
+Determines whether the marker definition contains the specified corner position.
+</summary>
+            <param name="position">The position of the corner to locate in the definition.</param>
+            <returns>
+                <b>true</b> if the corner was found in the marker definition; otherwise, false.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.Remove(OpenCV.Net.Point3f)">
+            <summary>
+Removes a corner from the marker definition.
+</summary>
+            <param name="position">The position of the corner to remove from the definition.</param>
+            <returns>
+                <b>true</b> if the corner was successfully removed from the marker definition;
+otherwise, false.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.Add(OpenCV.Net.Point3f)">
+            <summary>
+Adds a corner to the marker definition.
+</summary>
+            <param name="position">The position of the corner to add to the definition.</param>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.Clear">
+            <summary>
+Removes all corners from the marker.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerInfo.Count">
+            <summary>
+Gets the number of corners contained in the marker.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerInfo.default(System.Int32)">
+            <summary>
+Gets or sets the corner at the specified index.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.MarkerInfo.Id">
+            <summary>
+Gets or sets the id of the marker.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.MarkerInfo.#ctor">
+            <summary>
+Initializes a new instance of the <see cref="T:Aruco.Net.MarkerInfo" /> class.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.MarkerInfo">
+            <summary>
+The 3D representation of a marker in a marker board.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.Resize(OpenCV.Net.Size)">
+            <summary>
+Adjusts the parameters to the specified image size.
+</summary>
+            <param name="size">The image resolution used to scale the camera parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.ReadFromXmlFile(System.String)">
+            <summary>
+Reads the camera parameters from a YAML file generated with the OpenCV
+calibration utility.
+</summary>
+            <param name="fileName">The file containing the camera parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.SaveToFile(System.String,System.Boolean)">
+            <summary>
+Saves the camera parameters to a file.
+</summary>
+            <param name="fileName">The file on which to save the camera parameters.</param>
+            <param name="inXml">A value indicating whether to use an XML format to save the file.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.SaveToFile(System.String)">
+            <summary>
+Saves the camera parameters to a file.
+</summary>
+            <param name="fileName">The file on which to save the camera parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.ReadFromFile(System.String)">
+            <summary>
+Reads the camera parameters from a file saved with <see cref="M:Aruco.Net.CameraParameters.SaveToFile(System.String)" />.
+</summary>
+            <param name="fileName">The file containing the camera parameters.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.SetParameters(OpenCV.Net.Mat,OpenCV.Net.Mat,OpenCV.Net.Size)">
+            <summary>
+Sets the camera parameters.
+</summary>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <param name="size">The resolution of the camera.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.CopyParameters(OpenCV.Net.Mat,OpenCV.Net.Mat,OpenCV.Net.Size@)">
+            <summary>
+Gets a copy of the camera parameters.
+</summary>
+            <param name="cameraMatrix">The 3x3 camera matrix.</param>
+            <param name="distortion">The 4x1 lens distortion matrix.</param>
+            <param name="size">The resolution of the camera.</param>
+        </member>
+        <member name="M:Aruco.Net.CameraParameters.#ctor">
+            <summary>
+Initializes a new instance of the <see cref="T:Aruco.Net.CameraParameters" /> class.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.CameraParameters">
+            <summary>
+Represents the set of camera intrinsic parameters.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.Board.GetGLModelViewMatrix">
+            <summary>
+Returns the modelview matrix for the marker board given the extrinsic camera
+parameters in OpenGL format.
+</summary>
+            <returns>
+The modelview matrix for the marker board given the extrinsic camera parameters.
+</returns>
+        </member>
+        <member name="P:Aruco.Net.Board.Markers">
+            <summary>
+Gets the list of markers contained in the marker board.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Board.Likelihood">
+            <summary>
+Gets the likelihood of having found the marker board.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.Board">
+            <summary>
+Represents a marker board, defined by a collection of fiducial markers.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.Marker.ToString">
+            <summary>
+Returns the string representation of the marker instance.
+</summary>
+            <returns>
+The string representation of the marker instance.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.Marker.GetGLModelViewMatrix">
+            <summary>
+Returns the modelview matrix for the marker given the extrinsic camera
+parameters in OpenGL format.
+</summary>
+            <returns>
+The modelview matrix for the marker given the extrinsic camera parameters.
+</returns>
+        </member>
+        <member name="M:Aruco.Net.Marker.Draw(OpenCV.Net.Arr,OpenCV.Net.Scalar,System.Int32,System.Boolean)">
+            <summary>
+Draws this marker in the input image.
+</summary>
+            <param name="image">The image on which to draw the marker.</param>
+            <param name="color">The color used to draw the marker.</param>
+            <param name="lineWidth">The width of the lines used to draw the marker.</param>
+            <param name="writeId">A value indicating whether to draw the marker id.</param>
+        </member>
+        <member name="M:Aruco.Net.Marker.Draw(OpenCV.Net.Arr,OpenCV.Net.Scalar,System.Int32)">
+            <summary>
+Draws this marker in the input image.
+</summary>
+            <param name="image">The image on which to draw the marker.</param>
+            <param name="color">The color used to draw the marker.</param>
+            <param name="lineWidth">The width of the lines used to draw the marker.</param>
+        </member>
+        <member name="M:Aruco.Net.Marker.Draw(OpenCV.Net.Arr,OpenCV.Net.Scalar)">
+            <summary>
+Draws this marker in the input image.
+</summary>
+            <param name="image">The image on which to draw the marker.</param>
+            <param name="color">The color used to draw the marker.</param>
+        </member>
+        <member name="P:Aruco.Net.Marker.Area">
+            <summary>
+Gets the area of the marker.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.Perimeter">
+            <summary>
+Gets the perimeter of the marker.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.Center">
+            <summary>
+Gets the centroid of the marker in image space.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.IsValid">
+            <summary>
+Gets a value indicating whether the marker is valid.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.Size">
+            <summary>
+Gets the size of the marker sides, in meters.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.Id">
+            <summary>
+Gets the id of the marker.
+</summary>
+        </member>
+        <member name="M:Aruco.Net.Marker.GetEnumerator">
+            <summary>
+Returns an enumerator that iterates through the marker corners.
+</summary>
+            <returns>
+An enumerator instance that can be used to iterate through the marker corners.
+</returns>
+        </member>
+        <member name="P:Aruco.Net.Marker.Count">
+            <summary>
+Gets the number of corners contained in the marker.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.default(System.Int32)">
+            <summary>
+Gets the corner at the specified index.
+</summary>
+        </member>
+        <member name="P:Aruco.Net.Marker.Empty">
+            <summary>
+Returns a marker instance with no corner data.
+</summary>
+        </member>
+        <member name="T:Aruco.Net.Marker">
+            <summary>
+Represents a fiducial marker, defined by a vector of its four corners.
+</summary>
+        </member>
+        <member name="M:aruco.Marker.getArea">
+Returns the area
+
+</member>
+        <member name="M:aruco.Marker.getPerimeter">
+Returns the perimeter of the marker
+
+</member>
+        <member name="M:aruco.Marker.getCenter">
+Returns the centroid of the marker
+
+</member>
+        <member name="M:aruco.Marker.OgreGetPoseParameters(System.Double*,System.Double*)">
+Returns position vector and orientation quaternion for an Ogre scene node or entity.
+	Use:
+...
+Ogre::Vector3 ogrePos (position[0], position[1], position[2]);
+Ogre::Quaternion  ogreOrient (orientation[0], orientation[1], orientation[2], orientation[3]);
+mySceneNode-&gt;setPosition( ogrePos  );
+mySceneNode-&gt;setOrientation( ogreOrient  );
+...
+
+</member>
+        <member name="M:aruco.Marker.glGetModelViewMatrix(System.Double*)">
+Given the extrinsic camera parameters returns the GL_MODELVIEW matrix for opengl.
+     * Setting this matrix, the reference coordinate system will be set in this marker
+
+</member>
+        <member name="M:aruco.Marker.calculateExtrinsics(System.Single,cv.Mat,cv.Mat,System.Boolean)">
+Calculates the extrinsics (Rvec and Tvec) of the marker with respect to the camera
+     * @param markerSize size of the marker side expressed in meters
+     * @param CameraMatrix matrix with camera parameters (fx,fy,cx,cy)
+     * @param Distorsion matrix with distorsion parameters (k1,k2,p1,p2)
+     * @param setYPerpendicular If set the Y axis will be perpendicular to the surface. Otherwise, it will be the Z axis
+
+</member>
+        <member name="M:aruco.Marker.calculateExtrinsics(System.Single,aruco.CameraParameters!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Boolean)">
+Calculates the extrinsics (Rvec and Tvec) of the marker with respect to the camera
+     * @param markerSize size of the marker side expressed in meters
+     * @param CP parmeters of the camera
+     * @param setYPerpendicular If set the Y axis will be perpendicular to the surface. Otherwise, it will be the Z axis
+
+</member>
+        <member name="M:aruco.Marker.draw(cv.Mat*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Scalar_&lt;System.Double&gt;,System.Int32,System.Boolean)">
+Draws this marker in the input image
+
+</member>
+        <member name="M:aruco.Marker.isValid">
+Indicates if this object is valid
+
+</member>
+        <member name="T:aruco.Marker">
+\brief This class represents a marker. It is a vector of the fours corners ot the marker
+ *
+
+</member>
+        <member name="M:aruco.CameraParameters.getRTMatrix(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Int32)">
+Returns the 4x4 homogeneous transform matrix from the R and T vectors computed
+
+</member>
+        <member name="M:aruco.CameraParameters.OgreGetProjectionMatrix(cv.Size_&lt;System.Int32&gt;,cv.Size_&lt;System.Int32&gt;,System.Double*,System.Double,System.Double,System.Boolean)">
+setup camera for an Ogre project.
+	Use:
+...
+Ogre::Matrix4 PM(proj_matrix[0], proj_matrix[1], ... , proj_matrix[15]);
+yourCamera-&gt;setCustomProjectionMatrix(true, PM);
+yourCamera-&gt;setCustomViewMatrix(true, Ogre::Matrix4::IDENTITY);
+...
+As in OpenGL, it assumes no camera distorsion
+
+</member>
+        <member name="M:aruco.CameraParameters.glGetProjectionMatrix(cv.Size_&lt;System.Int32&gt;,cv.Size_&lt;System.Int32&gt;,System.Double*,System.Double,System.Double,System.Boolean)">
+Given the intrinsic camera parameters returns the GL_PROJECTION matrix for opengl.
+    * PLease NOTE that when using OpenGL, it is assumed no camera distorsion! So, if it is not true, you should have
+    * undistor image
+    *
+    * @param orgImgSize size of the original image
+    * @param size of the image/window where to render (can be different from the real camera image). Please not that it must be related to CamMatrix
+    * @param proj_matrix output projection matrix to give to opengl
+    * @param gnear,gfar: visible rendering range
+    * @param invert: indicates if the output projection matrix has to yield a horizontally inverted image because image data has not been stored in the order of
+    *glDrawPixels: bottom-to-top.
+
+</member>
+        <member name="M:aruco.CameraParameters.getCameraLocation(cv.Mat,cv.Mat)">
+Returns the location of the camera in the reference system given by the rotation and translation vectors passed
+     * NOT TESTED
+
+</member>
+        <member name="M:aruco.CameraParameters.resize(cv.Size_&lt;System.Int32&gt;)">
+Adjust the parameters to the size of the image indicated
+
+</member>
+        <member name="M:aruco.CameraParameters.readFromXMLFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Reads from a YAML file generated with the opencv2.2 calibration utility
+
+</member>
+        <member name="M:aruco.CameraParameters.saveToFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;,System.Boolean)">
+Saves this to a file
+
+</member>
+        <member name="M:aruco.CameraParameters.readFromFile(std.basic_string&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte},std.allocator&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte&gt;&gt;)">
+Reads the camera parameters from a file generated using saveToFile.
+
+</member>
+        <member name="M:aruco.CameraParameters.op_Assign(aruco.CameraParameters!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Assign operator
+
+</member>
+        <member name="M:aruco.CameraParameters.isValid">
+Indicates whether this object is valid
+
+</member>
+        <member name="M:aruco.CameraParameters.#ctor(aruco.CameraParameters!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+Copy constructor
+
+</member>
+        <member name="M:aruco.CameraParameters.setParams(cv.Mat,cv.Mat,cv.Size_&lt;System.Int32&gt;)">
+Sets the parameters
+     * @param cameraMatrix 3x3 matrix (fx 0 cx, 0 fy cy, 0 0 1)
+     * @param distorsionCoeff 4x1 matrix (k1,k2,p1,p2)
+     * @param size image size
+
+</member>
+        <member name="M:aruco.CameraParameters.#ctor(cv.Mat,cv.Mat,cv.Size_&lt;System.Int32&gt;)">
+Creates the object from the info passed
+     * @param cameraMatrix 3x3 matrix (fx 0 cx, 0 fy cy, 0 0 1)
+     * @param distorsionCoeff 4x1 matrix (k1,k2,p1,p2)
+     * @param size image size
+
+</member>
+        <member name="M:aruco.CameraParameters.#ctor">
+Empty constructor
+
+</member>
+        <member name="T:aruco.CameraParameters">
+\brief Parameters of the camera
+
+</member>
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:aruco.MarkerDetector.setMakerDetectorFunction(=FUNC:System.Int32(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Int32*!System.Runtime.CompilerServices.IsImplicitlyDereferenced))'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:aruco.MarkerDetector.setMakerDetectorFunction(=FUNC:System.Int32(cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Int32*!System.Runtime.CompilerServices.IsImplicitlyDereferenced))'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Mat!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+        <!-- Discarding badly formed XML document comment for member 'M:cv.op_LeftShift(std.basic_ostream<System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}>*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,cv.Formatted!System.Runtime.CompilerServices.IsConst*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)'. -->
+    </members>
+</doc>

@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Bonsai.DeepLabCut</id>
+    <version>0.3.0</version>
+    <title>Bonsai - DeepLabCut Library</title>
+    <authors>Gonçalo Lopes</authors>
+    <licenseUrl>https://bonsai-rx.org/license</licenseUrl>
+    <projectUrl>https://github.com/bonsai-rx/deeplabcut</projectUrl>
+    <iconUrl>https://github.com/bonsai-rx/deeplabcut/raw/master/icon.png</iconUrl>
+    <description>Bonsai Library for real-time markerless pose estimation using DeepLabCut. TensorFlow 2.8.0 or compatible is required.</description>
+    <copyright>Copyright © Gonçalo Lopes 2022</copyright>
+    <tags>Bonsai Rx Dlc DeepLabCut Markerless Pose Tracking</tags>
+    <dependencies>
+      <group targetFramework=".NETFramework4.7.2">
+        <dependency id="Bonsai.Core" version="2.6.0" exclude="Build,Analyzers" />
+        <dependency id="OpenCV.Net" version="3.3.1" exclude="Build,Analyzers" />
+        <dependency id="TensorFlowSharp-Lite" version="2.8.0" exclude="Build,Analyzers" />
+        <dependency id="YamlDotNet" version="11.2.1" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

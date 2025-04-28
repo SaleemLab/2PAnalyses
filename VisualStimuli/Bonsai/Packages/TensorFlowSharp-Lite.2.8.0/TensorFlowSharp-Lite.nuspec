@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>TensorFlowSharp-Lite</id>
+    <version>2.8.0</version>
+    <authors>Miguel de Icaza</authors>
+    <licenseUrl>https://github.com/migueldeicaza/TensorFlowSharp/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/migueldeicaza/TensorFlowSharp/</projectUrl>
+    <description>.NET Bindings for TensorFlow</description>
+    <releaseNotes>2.8.0: Updated to TensorFlow 2.8.0; 1.15.3: Fixed libtensorflow.dll not being copied to output directory on .NET Core; 1.15.1: Add a Runner.Run method that does not allocate - contribution from Enrico Minack; 1.15.0: Updated to TensorFlow 1.15; 1.13.1: Fixes boolean and ushort tensor construction fixes from Enrico Minack;  Runner.AddInput fixes from Colin Versteeg; captainst provided a convenience function for the samples; Zeeshan Ahmed added AdamOptimizer; Kevin Malenfant fixes a few bugs; Enrico Minack added support for mutable tensors;  1.13.0: An optimization implementation now exists for C#, contributed by Zeeshan Ahmed from the Microsoft data science team (RMSProp, SGD optimizer bindings);  TFSession now has a static method for loading models;  New methods for loading strings into tensors (also Zeeshan)</releaseNotes>
+    <tags>machine-learning, tensorflow, xamarin, c#, f#</tags>
+    <dependencies>
+      <group targetFramework=".NETFramework4.7.2" />
+      <group targetFramework=".NETStandard2.0" />
+    </dependencies>
+  </metadata>
+</package>
