@@ -7,7 +7,7 @@ if nargin < 4
 end
 
 %% Output path
-figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures', 'PerROI_VRPSTHandHeatmaps_PeakRFGrid');
+figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures', 'PerROISummary_VR-PSTHandHeatmaps_PeakRFGrid');
 if ~exist(figSaveDir, 'dir')
     mkdir(figSaveDir);
 end

@@ -77,8 +77,9 @@ for thisMouse = 1:size(mouseInfo,1)
             plotRFGrid_byPosition_ROIs(sessionFileInfo, rfStimName);
             
             % ---- VR+RF Plotting -----
-            % Combined RF and VR roi-wise plot 
-            
+            % Combined RF and VR roi-wise summary plot
+            plotROISummary_VRAndRFHeatmaps(sessionFileInfo, vrStimName, rfStimName)
+
             fprintf('    Done!\n'); 
         catch ME
             warning('    Error processing %s %s: %s', mousenumber, sessionName, ME.message);
