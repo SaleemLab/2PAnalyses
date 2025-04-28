@@ -1,12 +1,12 @@
 function [response, sessionFileInfo] = getLapPositionActivityV2(sessionFileInfo, signalField, applySmoothing, VRStimName, onlyIncludeROIs, applyDeltaFoverF, applyNeuropilCorrection)
-%% Split the delta f/f into a different function and save this as a new session
+%% Split the delta f/f into a different function and save this as a new session; Using median as the metric. 
 % Handle optional inputs
 if nargin < 2 || isempty(signalField), signalField = 'F'; end
 if nargin < 3, applySmoothing = false; end
 if nargin < 4, error('VRStimName must be provided'); end
 if nargin < 5, onlyIncludeROIs = true; end
-if nargin < 6, applyDeltaFoverF = false; end
-if nargin < 7, applyNeuropilCorrection = false; end
+if nargin < 6, applyDeltaFoverF = true; end
+if nargin < 7, applyNeuropilCorrection = true; end
 
 %% Find VR stimulus
 for iStim = 1:length(sessionFileInfo.stimFiles)
@@ -74,7 +74,7 @@ for thisCell = 1:numCells
             frameIdx = response.lapPosition2PFrameIdx{roiIdx, lapIdx, binIdx};
             if ~isempty(frameIdx)
                 lapPositionActivity(thisCell, lapIdx, binIdx) = ...
-                    mean(signalMatrix(roiIdx, frameIdx));
+                    median(signalMatrix(roiIdx, frameIdx));
             end
         end
     end
