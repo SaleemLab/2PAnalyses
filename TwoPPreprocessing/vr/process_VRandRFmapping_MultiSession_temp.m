@@ -71,11 +71,14 @@ for thisMouse = 1:size(mouseInfo,1)
             [rfbonsaiData, sessionFileInfo] = getTrialGroupsV2(sessionFileInfo, rfStimName);
             % PSTHs
             [rfresponse, sessionFileInfo] = getTrialResponsePSTHsV4(sessionFileInfo, rfStimName, method, interpRate, frameRate, applyNeuropilCorrection, calculateDFF);
-            % Plot grid 
-            plotAllROIPSTHsByPosition(sessionFileInfo, rfresponse);
+            % Plot individual rois PSTH
+            %plotAllROIPSTHsByPosition(sessionFileInfo, rfresponse);
             % Plot per roi 
             plotRFGrid_byPosition_ROIs(sessionFileInfo, rfStimName);
-            %
+            
+            % ---- VR+RF Plotting -----
+            % Combined RF and VR roi-wise plot 
+            
             fprintf('    Done!\n'); 
         catch ME
             warning('    Error processing %s %s: %s', mousenumber, sessionName, ME.message);
