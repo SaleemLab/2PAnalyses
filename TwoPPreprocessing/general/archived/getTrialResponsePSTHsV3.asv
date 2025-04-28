@@ -1,0 +1,145 @@
+function psthData = getTrialResponsePSTHsV3(sessionFileInfo, stimName, method, interpRate)
+    if nargin < 4
+        interpRate = 60; 
+    end
+
+    % Locate the requested stimulus
+    isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
+    iStim = find(isStim, 1);
+    
+    if isempty(iStim)
+        error('Stimulus name "%s" not found in sessionFileInfo.', stimName);
+    end
+    
+    % Load Response Data
+    if exist(sessionFileInfo.stimFiles(iStim).Response, 'file') && ...
+            exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file')
+        load(sessionFileInfo.stimFiles(iStim).Response, 'response');
+        load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
+    else
+        error('Missing response or Bonsai data for stimulus "%s".', stimName);
+    end
+    
+    % Load Two-Photon Data
+    if exist(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'file')
+        load(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'twoPData');
+    else
+        error('Missing two-photon data for stimulus "%s".', stimName);
+    end
+    
+    % Initialize neuron-plane index storage
+    neuronPlaneIndex = []; % Stores which plane each neuron belongs to
+    allNeurons = [];       % Concatenated neuron activity matrix
+    
+    % Iterate through planes to merge neurons and track plane indices
+    for thisPlane = 1:length(twoPData)
+        isRoi = twoPData(thisPlane).isCell;
+        isRoiIdx = find(isRoi(:,1)==1);
+        fRois = twoPData(thisPlane).F(temp_idx,:);
+        numNeurons = size(fRois, 1);
+        allNeurons = [allNeurons; fRois];  % Merge neurons
+        neuronPlaneIndex = [neuronPlaneIndex; repmat(thisPlane, numNeurons, 1)]; % Track plane number
+    end
+    
+    totalNeurons = size(allNeurons, 1);
+    
+    % Initialize output structure
+    psthData = struct();
+    numStimuli = length(bonsaiData.trialGroups);
+    
+    for i = 1:numStimuli
+        % Get stimulus condition details
+        stimValue = bonsaiData.trialGroups(i).value;
+        trialIndices = bonsaiData.trialGroups(i).trials;
+        trialIndices = trialIndices(~isnan(trialIndices)); % Remove NaNs
+        numTrials = length(trialIndices);
+        
+        % Determine the max trial duration across all planes
+        allMaxTimes = [];
+        allMinTimes = [];
+        for thisPlane = 1:length(response)
+            maxTime = max(cellfun(@max, response(thisPlane).responseFrameRelTimes(trialIndices)));
+            minTime = min(cellfun(@min, response(thisPlane).responseFrameRelTimes(trialIndices)));
+            allMaxTimes = [allMaxTimes, maxTime];
+            allMinTimes = [allMinTimes, minTime];
+        end
+        maxTime = max(allMaxTimes);
+        minTime = min(allMinTimes);
+        timeVector = linspace(minTime, maxTime, interpRate);
+        
+        % Preallocate response matrix (Neurons x Time x Trials)
+        alignedResponses = NaN(totalNeurons, length(timeVector), numTrials);
+        
+        % Extract trial-aligned responses (Iterating through planes)
+        neuronOffset = 0; % To track neuron indices while looping through planes
+        for thisPlane = 1:length(twoPData)
+            isRoi = twoPData(thisPlane).iscell;
+            isRoiIdx = find(isRoi(:,1)==1);
+            fRois = twoPData(thisPlane).F(temp_idx,:);
+            numNeurons = size(fRois, 1);
+            
+            for t = 1:numTrials
+                trialIdx = trialIndices(t);
+                selectedFrames = response(thisPlane).responseFrameIdx{trialIdx};
+                trialData = fRois(:, selectedFrames);
+                trialTimes = response(thisPlane).responseFrameRelTimes{trialIdx};
+                
+                % Interpolate onto common time vector
+                for neuronIdx = 1:numNeurons
+                    globalNeuronIdx = neuronOffset + neuronIdx;
+                    alignedResponses(globalNeuronIdx, :, t) = interp1(trialTimes, trialData(neuronIdx, :), timeVector, 'linear', NaN);
+                end
+            end
+            neuronOffset = neuronOffset + numNeurons; % Update offset for next plane
+        end
+        
+        % Compute PSTH based on selected method
+        switch method
+            case 1 % Interpolate & average
+                psthMean = nanmean(alignedResponses, 3);
+                psthStd = nanstd(alignedResponses, 0, 3);
+            
+            case 2 % Temporal smoothing
+                w = gausswin(4); 
+                w = w / sum(w);
+                psthMean = nanmean(alignedResponses, 3);
+                nan_values = isnan(psthMean);
+                psthMean(nan_values) = nanmean(psthMean(:));              
+                psthMean = filtfilt(w, 1, psthMean')';
+                psthStd = nanstd(alignedResponses, 0, 3);
+                psthStd = filtfilt(w, 1, psthStd')';
+            
+            case 3 % Direct mean without interpolation
+                maxFrames = max(cellfun(@(x) sum(x), response(1).responseFrameIdx(trialIndices)));
+                directMeanResponse = NaN(totalNeurons, maxFrames, numTrials);
+                
+                for t = 1:numTrials
+                    trialIdx = trialIndices(t);
+                    selectedFrames = response(1).responseFrameIdx{trialIdx};
+                    trialData = allNeurons(:, selectedFrames);
+                    directMeanResponse(:, 1:size(trialData, 2), t) = trialData;
+                end
+                
+                psthMean = nanmean(directMeanResponse, 3);
+                psthStd = nanstd(directMeanResponse, 0, 3);
+            
+            otherwise
+                error('Invalid method. Choose 1 (Interpolate), 2 (Smooth), or 3 (Mean)');
+        end
+        
+        % Compute Standard Error of Mean (SEM)
+        psthSEM = psthStd ./ sqrt(sum(~isnan(alignedResponses), 3));
+        
+        % Store results in struct
+        psthData(i).stimValue = stimValue;
+        psthData(i).alignedResponses = alignedResponses;
+        psthData(i).meanResponse = psthMean;
+        psthData(i).stdResponse = psthStd;
+        psthData(i).semResponse = psthSEM;
+        psthData(i).timeVector = timeVector;
+        psthData(i).responseType = method;
+    end
+    
+    % **Save neuron-plane mapping as a simple array**
+    psthData(1).neuronPlaneIndex = neuronPlaneIndex;
+end

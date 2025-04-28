@@ -1,0 +1,33 @@
+function plotPSTHs(psthData)
+    % Function to plot the overall PSTHs for different stimulus conditions
+    %
+    % Inputs:
+    %   - psthData: Structure array containing PSTH results per stimulus type
+
+    numStimuli = length(psthData);
+    figure;
+    hold on;
+    
+    colors = lines(numStimuli); % Generate distinct colors for each stimulus
+    
+    for thisStim = 1:numStimuli
+        timeVector = psthData(thisStim).timeVector;
+        meanResponse = nanmean(psthData(thisStim).meanResponse, 1); % Average across neurons
+        semResponse = nanmean(psthData(thisStim).semResponse, 1);   % Average SEM across neurons
+        
+        % Plot mean response with shaded error bars
+%         fill([timeVector, fliplr(timeVector)], ...
+%              [meanResponse - semResponse, fliplr(meanResponse + semResponse)], ...
+%              colors(thisStim, :), 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+        
+        plot(timeVector, meanResponse, 'Color', colors(thisStim, :), 'LineWidth', , ...
+             'DisplayName', sprintf('Stimulus %d', psthData(thisStim).stimValue));
+    end
+    
+    hold off;
+    xlabel('Time (s)');
+    ylabel('Neural Response (AU)');
+    title('Overall PSTHs for Different Stimuli');
+    legend('show');
+    grid on;
+end

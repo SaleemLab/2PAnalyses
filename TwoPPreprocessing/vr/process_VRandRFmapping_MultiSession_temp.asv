@@ -1,0 +1,83 @@
+% process_all_mice_sessions.m
+% Script to process all mice and sessions
+
+clear; clc;
+
+% Define mouse and session information 
+mouseInfo = {
+    'M25037', {'20250428'}, {'M25037_VRCorr_20250428_00001', 'M25037_RFMapping_20250428_00001', 'M25037_GrayScreen_20250428_00001'};
+    'M25038', {'20250428'}, {'M25038_VRCorr_20250428_00001', 'M25038_RFMapping_20250428_00001', 'M25038_GrayScreen_20250428_00001'};
+};
+
+% Processing parameters 
+interpRate = 60;        % Hz
+preStimTime = 0.5;     % seconds
+planeNums = 8;      % original planes in recording
+channelsSaved = 2;       % Channel to align frame times to
+method = 2;            % Method for PSTH extraction
+frameRate = 7.28;       % Degrees/bin or other relevant stimulus unit
+applyNeuropilCorrection = true;
+calculateDFF = true;
+pdthreshold = 5;
+postStimTime = 3; 
+
+% Loop through each mouse
+for thisMouse = 1:size(mouseInfo,1)
+    
+    mousenumber = mouseInfo{thisMouse,1};
+    sessionNames = mouseInfo{thisMouse,2};
+    stimlists = mouseInfo{thisMouse,3};
+    fprintf('Processing mouse: %s\n', mousenumber);
+    for thisSession = 1:length(sessionNames)
+        sessionName = sessionNames{thisSession};
+        vrStimName = stimlists{1};
+        rfStimName = stimlists{2};
+        fprintf('  Session: %s | Stimulus: %s\n', sessionName, stimName);
+        try
+            % Get session file paths
+            sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, {stimName});
+            % Load metadata; all general
+            sessionFileInfo = get2PMetadata(sessionFileInfo);
+            % Get frame times for two channels; all general
+            sessionFileInfo = get2PFrameTimes_TwoChannels(sessionFileInfo, planeNums, channelsSaved);
+            % Process peripheral files (wheel, position etc); all general
+            sessionFileInfo = processPeripheralFiles(sessionFileInfo);
+            % Find VRLag
+            findBonsaiPeripheralLag(sessionFileInfo, 1, 60, vrStimName);
+            % Merge Bonsai and Suite2p files; all general
+            sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
+            %-------- VR ------------
+            % Align bonsai to peripheral data 
+            [vrbonsaiData, sessionFileInfo]  = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
+            % Interpolate VR data streams 
+            [vrprocessedTwoPData, vrbonsaiData, vrperipheralData, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', vrStimName, true);
+            % Extract VR peripheral data
+            [vrresponse, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo,   vrStimName, true);
+            % Get twopframe position bins 
+            [vrresponse, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
+            % 
+            %--------- RF -------------
+            % Get stimulus events from Bonsai file
+            [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFileInfo, stimName, 'StimulusParams');
+            % Get stimulus times
+            [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName, pdthreshold);
+            % Get 2P frames by trial
+            [response, sessionFileInfo] = get2PFramesByTrialV3(sessionFileInfo, stimName, postStimTime, preStimTime);
+            % Group trials
+            [bonsaiData, sessionFileInfo] = getTrialGroupsV2(sessionFileInfo, stimName);
+            % PSTHs
+            [response, sessionFileInfo] = getTrialResponsePSTHsV4(sessionFileInfo, stimName, method, interpRate, frameRate, applyNeuropilCorrection, calculateDFF);
+            %
+            plotAllROIPSTHsByPosition(sessionFileInfo, response);
+            % 
+            plotRFGrid_byPosition_ROIs(sessionFileInfo, stimName);
+            %
+            fprintf('    Done!\n'); 
+        catch ME
+            warning('    Error processing %s %s: %s', mousenumber, sessionName, ME.message);
+        end
+        
+    end
+end
+
+disp('All mice and sessions processed and figures saved in session-wise analysis folders');
