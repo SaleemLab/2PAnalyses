@@ -53,7 +53,7 @@ This is needed for the next steps, but it takes a long time to run.
 
 Usage: [sessionFileInfo] = get2PFrameTimes_TwoChannels(sessionFileInfo, nPlanesPreZCorrection, nChannels);
 
-Example: sessionFileInfo = get2PFrameTimes(sessionFileInfo, 8, 1);
+Example: sessionFileInfo = get2PFrameTimes_TwoChannels(sessionFileInfo, 8, 1);
 
 Output: Updates the stim frame run in the sessionFileInfo  
 
