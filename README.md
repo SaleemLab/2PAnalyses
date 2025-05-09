@@ -1,211 +1,350 @@
+# Pipeline for z-motion corrected boutons and somas for VR sessions (multi-plane; multi-channel-TODO) 
+
+## Step 0: Trim tif files and run Suite2P
+
+#### 0.1 processRawTifFile.m (general)
+
+ProcessRawTifFile. This loads the last tif file for each stim and trims the last tif to have equal number of frames for each channel and across planes. 
+Runs as an isolated function. 
+
+Finds root directories and trim tif file
+
+Usage: processRawTifFile('M25012', '20250210')
+
+Output: animalname_session_stim_0000x_trimmed.tif 
+
+This will also create an archived folder with two copies of the tif file that was 'opened' and the other copy is untouched. 
+<br> <br>
+
+#### 0.2 Run Suite2p z-registration 
+In Python, 'Data' repo to curate a single plane with the z-motion correction 
+<br> <br>
+
+## Step 1: SessionInfo and 2PFrame Times
+Get all the session information, pripheral information and metadata 
+
+#### 1.1 get2PsessionFilePaths.m   (general)
+
+Get all the file paths in the session
+
+Usage: [sessionFileInfo] = get2PsessionFilePaths(animal_name, session_name, stim_list, rerun_process, fileNameAddition)
+
+Example: sessionFileInfo = get2PsessionFilePaths('M24048', '20240816')
+
+Output: M24048_20240816_sessionFileInfo.mat 
+
+#### 1.2 get2PMetadata.m (general)
+
+Get 2P metadata from tif file. This will include the imaging parameters. 
+
+Usage: [sessionFileInfo] = get2PMetadata(sessionFileInfo)
+
+Example: sessionFileInfo = get2PMetadata(sessionFileInfo)
+
+Output: M24048_20240816_2PMetaData_StimName.mat (one file for each stim)
+
+#### 1.3 get2PFrameTimes_TwoChannels.m (general)
+
+Counts the length of tif files across all stim in one recording session
+
+This is needed for the next steps, but it takes a long time to run.
+
+### TODO: Change strategy here to the one used in processRawTifFiles.m to make it faster.
+
+Usage: [sessionFileInfo] = get2PFrameTimes_TwoChannels(sessionFileInfo, nPlanesPreZCorrection, nChannels);
+
+Example: sessionFileInfo = get2PFrameTimes_TwoChannels(sessionFileInfo, 8, 1);
+
+Output: Updates the stim frame run in the sessionFileInfo  
+
+<br> <br>
+
+## Step 2: Load, save and restructure data streams
+Load Suite2P, 2P-FrameTimes (saved in Bonsai), Bonsai and Peripheral Data 
+
+#### 2.1 processPeripheralFiles.m (general)
+
+Load the peripheral files that are common to all stimuli: Wheel, PD, Quad. 
+
+Usage: [sessionFileInfo] = processPeripheralFiles(sessionFileInfo)
+
+Example: sessionFileInfo = processPeripheralFiles(sessionFileInfo)
+
+Output: animalName_session_PeripheralData_stimName.mat 
+
+#### 2.2 getVRBonsaiFiles.m (vr) / temp include VRStim name
+
+Get the bonsai VR mouse position and trial info tables and saves in a 
+
+Usage: [bonsaiData, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, VRStimName)
+
+Example:  [bonsaiData, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, 'M25041_VRCorr_20250413_00001')
+
+Output: bonsaiData.mousePos; bonsaiData.trialInfo; bonsaiData.isVRStim 
+
+#### 2.3 mergeBonsaiSuite2pFiles.m (general function)
+
+Suite2P raw and trimmed to match length across planes (if multi)
+
+Usage: [sessionFileInfo] = mergeBonsaiSuite2pFiles(sessionFileInfo) 
+
+Example: sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo) 
+
+Output: animalName_session_2pData_stimName.mat
+<br> <br>
+
+## Step 3: Align to common time base (and correct bonsai lag)
+
+#### 3.1 findBonsaiPeripheralLag.m (general)
+
+[bonsaiData, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, method, sampling_rate)
+
+Usage: [bonsaiData, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, method, samplingRate, StimName)
+
+Example: [bonsaiData, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, 1, 60)
+
+Outputs: bonsaiData.LagInfo (depending on method used): 
+        .method         - Method used to find lag. 
+        .xcorrBestLag   - Frames to shift.  
+        .samplingRate   - Use as input in this function.
+
+#### 3.2 alignVRBonsaiToPeripheralData.m (Currently lag shifts only ArduinoTime)  (vr) / temp include VRStim name
+
+Usage: [bonsaiData, sessionFileInfo]  = alignVRBonsaiToPeripheralData(sessionFileInfo,VRStimName,plotFlag)
+
+Example: [bonsaiData, sessionFileInfo]  = alignVRBonsaiToPeripheralData(sessionFileInfo, 'M25041_VRCorr_20250413_00001')
+
+Outputs: 
+   - bonsaiData (struct):
+       - .MousePos / .Quadstate / .TrialInfo:
+           - .correctedArduinoTime: lag-corrected raw time vector.
+       - .LagInfo
+           - .lagShift: Lag shift used (in seconds). 
+<br> <br>
+
+
+## Step 4: Interpolate to common times
+\****** Aman - notes:
+
+A) Define sampling rate and times, and range for analyses 
+Start time: First 2p frame 
+
+End time: Last 2p frame 
+
+(calculate this across all planes)
+
+sampleTimes: startTime:(1/samplingRate):endTime
+
+
+Resample EVERYTHING
+Call the interpolation function in sequence
+
+
+mousepos: linear
+
+trailID: nearest
+
+photodiode:
+
+quad:
+
+Wheel:
+
+for each cell: F, Spks, Fneu
+
+interpolation function: Input: (ArduinoTime (rawSampleTime), Value, sampleTimes, Method): Output: NewValues (at sampleTimes) \******
+<br> <br>
+
+#### 4.1 resamplAndAlignVR_BonsaiPeripheralSuite2P.m (Resample all data streams to common time base) (vr)
+
+resamplAndAlignVR_BonsaiPeripheralSuite2P.m / temp stim name
+
+Usage: [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo, samplingRate, mainTimeToUse, VRStimName, plotFlag)
+
+Example: [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', 'M25041_VRCorr_20250413_00001', true) 
+
+Outputs:
+  processedTwoPData : struct
+  
+      Contains resampled F, Fneu, spks, frame times, and ROI metadata.
+      
+  bonsaiData : struct
+  
+      Bonsai-tracked signals (e.g., mouse position, trial info, quadstate), all corrected for lag and resampled.
+      
+  peripheralData : struct
+  
+      Peripheral signals (e.g., photodiode, wheel), resampled to the same timebase.
+      
+<br> <br>
+
+## Step 5: extractVRBonsaiPeripheralInfo.m (Split 5.0 into two functions? Bonsai / Peripheral and move peripheral to general?) (currently vr)
+
+Extracts wheel speed, virtual position, and lap-related info from aligned Bonsai and peripheral data during 2P-VR Aman's Classical Corridor.
+Handles lap classification (completed/aborted) and optionally plots lap timing.
+
+Usage: [response, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo,  VRStimName, plotFlag)
+
+Example:[response, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo,  'M25041_VRCorr_20250413_00001', true)
+
+response. : struct
+
+%       Contains key behavioral and timing variables for downstream lap-by-lap analysis:
+
+%       - wheelSpeed             : real-time wheel speed (cm/s)
+
+%       - mouseVirtualPosition   : virtual track position (1–140 cm)
+
+%       - trackIDFromMousePosition : track IDs inferred from mouse position (usually 1)
+
+%       - mouseRecordedPosition  : raw position signal (-1141 to -1000)
+
+%       - trackIDs               : track ID per lap (all 1s in classical VR corridor)
+
+%       - lapCount               : unified lap index
+
+%       - blockIDs               : cumulative index of track switches (e.g., block transitions; NA)
+
+%       - trialType              : task/trial type ID per lap 
+
+%                                  (0-NoTask; 1-Passive; 2-Hybrid)
+
+%       - completedLaps          : indices of completed laps
+
+%       - abortedLaps            : indices of aborted laps
+
+%       - startTimeAll           : Bonsai start times for all laps
+
+%       - endTimeAll             : parsed lap end time (based on position trace)
+
+%       - completedStartTimes    : start times for completed laps
+
+%       - completedEndTimes      : end times for completed laps
+
+%
+
+#### 5.1 get2PFrameLapPositionBins.m  (vr)
+
+   For each ROI, lap, and spatial bin (1 cm), this function finds the corresponding two-photon (2P) frame indices and relative times (from lap start). Only includes frames where wheel speed > 1 cm/s.
+   Both cells and non-cells are included here 
+
+Usage: [response, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, VRStimName)
+
+Example: [response, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, 'M25041_VRCorr_20250413_00001')
+
+Output:
+Output:
+
+  response : struct (updated)
+  
+      Adds:
+      
+        - lapPosition2PFrameIdx{ROI, lap, bin} : 2P frame indices per ROI per lap per bin
+        
+        - lapPositionRelativeTime{lap, bin}    : time relative to lap start (only once per bin) (could exclude)
+
+#### 5.2 getLapPositionActivity.m 
+
+  Extracts mean binned fluorescence/activity values per lap from 2P data.
+  Only includes ROIs labeled as "cells" and only for completed laps.
+  Optionally applies Gaussian temporal smoothing across position bins.
+
+Usage:  [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, signalField, applySmoothing, VRStimName, onlyIncludeROIs)
+
+Example: [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, 'F', false, 'M25041_VRCorr_20250413_00001', true)
+
+Outputs:
+  response : struct (updated)
+  
+      Adds the following fields:
+      
+        - lapPositionActivity : [nCells x nLaps x nBins] mean activity per bin
+        
+        - cellROIs             : indices of cell ROIs
+        
+        - signalUsed           : which signal type was used
+        
+        - smoothingApplied     : whether smoothing was applied
+
+#### 5.3 plotSortedPopulationResponse.m 
+
+plotSortedPopulationResponse(sessionFileInfo, response, applySmoothing)
+
+<br> <br>
+
 # 2PAnalyses
 Code for analysing 2 photon imaging data
-# Processing recordings in the Cylindrical Augmented Reality System (SCAR)
-#### By: Jork de Kok 
-#### Last update: 10/04/2025
+#### By: Sonali
+#### Last update: ???
 
-## 0. Extract async pulse, run compression and spike sorting with kilosort  
-For all these different steps use old script from Masa/Diao/Edd. 
-These scripts are accessible here: (link to github repo)
+## Step 0
+#### 0.1 Run Suite2p (concatenated across all stimuli recorded in one session)
+
+#### 0.2 Get all the session information.  
 <br> <br>
 
-#### 0.1. main_LFP_preprocessing_and_saving.m (VR_NPX_analysis)
-Run the first section (LFP -> Catgt) this extracts the async pulse and performs preprocessing 
-steps on the LFP signal. 
+## Step 1: Get all the session information.
+
+#### 1.1 Get all the file paths in the session
+get2PsessionFilePaths.m  
+Usage: [sessionFileInfo] = get2PsessionFilePaths(animal_name, session_name)
+Example: sessionFileInfo = get2PsessionFilePaths('M24048', '20240816')
+Output: M24048_20240816_sessionFileInfo.mat 
 <br> <br>
 
-#### 0.2. Run compression and spike sorting on a Linux computer 
-See https://github.com/SaleemLab/si_lab for documentation
+#### 1.2 Get 2P metadata from tif file. This will include the imaging parameters. 
+get2PMetadata.m
+Usage: [sessionFileInfo] = get2PMetadata(sessionFileInfo)
+Example: sessionFileInfo = get2PMetadata(sessionFileInfo)
+Output: M24048_20240816_2PMetaData_StimName.mat (one file for each stim)
 <br> <br>
 
-## 1. importing packages and loading in data 
-Fill the mouse, session and so on and get all the quality metrics, ephys, bonsai, SLEAP and metadata.
-<br> <br>
-<br> <br>
-## 2. extract and process async pulse 
-
-#### 2.1. rename_cols_SLEAP (processing_async)
-
-_Usage: rename_cols_SLEAP(SLEAP_df)_
-
-_Output: none_
+#### 1.3 Counts the length of tif files across all stim in one recording session
+This is needed for the next steps, but it takes a long time to run.
+### "TODO: Change strategy here to the one used in processRawTifFiles.m to make it faster."
+get2PFrameTimes.m 
+Usage: [sessionFileInfo] = get2PFrameTimes(sessionFileInfo);
+Example: sessionFileInfo = get2PFrameTimes(sessionFileInfo);
+Output: Updates the stim frame run in the sessionFileInfo  
 <br> <br>
 
-#### 2.2. rename_cols_bonsai (processing_async)
-
-_Usage: rename\_cols\_bonsai(bonsai\_df)_
-
-_Output: none_
+#### 1.4 Load the peripheral files that are common to all stimuli: Wheel, PD, Quad, 2P. Saves as a new .m file for each stimulus  
+processPeripheralFiles.m 
+Usage: [sessionFileInfo] = processPeripheralFiles(sessionFileInfo)
+Example: sessionFileInfo = processPeripheralFiles(sessionFileInfo)
+Output: animalName_session_PeripheralData_stimName.m 
 <br> <br>
 
-#### 2.3) process_async (processing_async)
 
-Converts timestamps to seconds, binairize the async signal and determines timepoints when async went on
-This function will also plot the signal before binarization and after. The input must be a dataframe with 
-a column called 'Timestamp'. The output of the function is a vector containing when the sync pulse went on 
-in seconds
+## Step 2: Get intermediate files with events for each stimulus and save
 
-_Usage: x\_async\_on = process\_async(x\_df)_
+#### 2.1 Gets all the times for all planes, also getting the F/fneu/ops/spks/iscell from suite2p for each stimulus; 
+Trims bonsai time to match the suite2p plane lengths. Saves one .m file for each stimulus.
 
-Example: SLEAP\_async\_on = process\_async(SLEAP\_df) 
+mergeBonsaiSuite2pFiles.m 
+Usage: [sessionFileInfo] = mergeBonsaiSuite2pFiles(sessionFileInfo) 
+Example: sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo) 
+Output: animalName_session_2pData_stimName.mat
 
-_Output: SLEAP\_async\_on_
+#### 2.1.1 Uses this function: [plane_data, plane_data_new] = get_bonsai_twopframetimes_by_planes(filepath, nplanes) to get the planetimes  
+
+
+#### 2.2.1 Gets additional bonsai data from csv files. Currently still raw and not interpolated. 
+getVRBonsaiFiles.m 
+Usage: VRInfo = getVRBonsaiFiles(sessionFileInfo)
+Output: VRInfo.mousePos; VRInfo.trialInfo; VRInfo.isVRStim
+
+------- CURRENTLY DONE UP TO HERE 18.2.25 ------------------------------
+
+
+#### 2.2.2 For DirTuning 
+
+#### 2.2.3 For Dot fields
+
+#### 2.2.4 For Sparse Noise 
+
+## Step 3: Getting into stim specific analyses
+
+For VR - interpolation is the first step
 <br> <br>
 
-#### 2.4) restructure_ephys_async (processing_async)
-
-Converts previously extracted async pulse to a dataframe 
-
-_Usage: ephys\_async\_on = restructure\_ephys\_async(ephys\_async\_on)_
-
-_output: ephys\_async\_on_
-<br> <br>
-<br> <br>
-
-##  Section 3: preprocess SLEAP data 
-
-#### 3.1) alignment_angle (circular_processing)
-
-determines angle of rotation that is necessary to align with virtual environment 
-based on if orthographic or cubemap view is used
-
-_Usage: alingment\_angle = find\_aligment\_angle(session\_meta\_data)_
-
-_Output: alingment\_angle_
-
-<br> <br>
-
-#### 3.2) process_trajectory_and_HD (circular_processing)
-
-input are sleap data, the data containing location, alignment angle and a radius (r_lim). 
-This function first plots the trajectory of the head of the animal. then applies radial 
-restriction and plots the same trajectory after that. After this the trajectory is rotated
-to the align with the virtual environment and the trajectory is plotted again. Lastly, 
-the head direction is calculated and plotted. (contains subfunctions in the same module)
-
-_Usage: process\_trajectory\_and\_HD(SLEAP\_df, columns\_containing\_trajectory\_data, alignment\_angle, r\_lim)_
-
-_Output: none_
-<br> <br>
-
-##  Section 4: dataframes on ephys time 
-
-#### 4.1) align_and_interpolate (align_and_interpolation_functions)
-
-performs crosscorrelation on 2 time vectors (ephys + bonsoi or SLEAP) that contain the time the async pulse went on
-then it determines the best lag and if one of the timevectors contains more time points, it will be 
-cut to be the same length as the other timevector. After that linear interpolation is applied to the input 
-dataframe based on the ephys time. 
-
-_Usage: align_and_interpolate(x_async_on, ephys_async_on, x_df)_
-
-Example: align_and_interpolate(SLEAP_async_on, ephys_async_on, SLEAP_df) 
-
-_Output: none_
-<br> <br>
-
-#### 4.2) apply_interpolation_based_on_new_tvec (align_and_interpolation_functions)
-
-creates a new time vector based on the start and end time of the SLEAP_df and bonsai_df and the sampling rate. 
-After that columns in SLEAP_df containing trajectory data (contain X or Z) are linearly interpolated and other 
-columns in SLEAP_df are interpolated based on the nearest value. Then for the bonsai_df the status_of_experiment
-column is converted from categorical value to numerical followed by interpolation based on the nearest value. After 
-that the status_of_experiment column is converted back to a categorical value. Lastly, spikes are binned based on 
-the new tvec. (contains subfuctions in the same module) 
-<br>
-
-_Usage: SLEAP_df, bonsai_df, spikes_df = apply_interpolation_based_on_new_tvec(SLEAP_df,bonsai_df,spikes_raw, sampling_rate)_
-
-_output: SLEAP_df, bonsai_df, spikes_df_
-<br> <br>
-
-##  Section 5: processing trajectory and HD 
-
-#### 5.1) interpolate_and_smooth (align_and_interpolation_functions)
-
-first plots trajectory of the implantX and Z then it perform interpolation over the columns containing trajectory data.
-then it plots the trajectory again and then smoothing is applied followed by plotting the trajectory again. Lastly, 
-the new head direction is calculated based on the interpolated and smoothed trajectory. By default the window size for 
-the smoothing is set to 3. 
-
-_Usage: interpolate_and_smooth(SLEAP_df, columns_containing_trajectory_data,window_size = 3)_
-
-Example: SLEAP_df = interpolate_and_smooth(SLEAP_df, columns_containing_trajectory_data)
-
-_output: SLEAP_df_
-<br> <br>
-
-#### 5.2) calc_distance_and_speed (binning_spikes)
-
-calculated the distance and speed of trajectory and also for the head direction. 
-
-_Usage: calc_distance_and_speed(SLEAP_df, sampling_rate)_
-
-_output: none_
-<br> <br>
-
-#### 5.3) landmark_rotation (circular_processing) 
-
-Calculated the global direction by equating the first baseline to 0 degrees. Then plots the trajectory of the implantX and Z
-of SLEAP_df after which the trajectory is rotated relative to the global direction and then the trajectory is plotted again. 
-After that a histogram of the HD is plotted followed by calculating the rotated head direction based on the landmark rotation.
-Lastly, the rotated HD is plotted. Bins can adjust the amount of bins in the histogram (contains subfunction in the same module)
-
-_Usage: landmark_rotation(SLEAP_df,global_direction, columns_containing_trajectory_data, bins =20)_
-
-Example: SLEAP_df, global_direction  landmark_rotation(SLEAP_df,global_direction, columns_containing_trajectory_data)
-
-_output: SLEAP_df, global_direction_
-<br> <br>
-
-##  Section 6: binning spikes based on HD 
-
-#### 6.1) create_HD_bins (binning_spikes)
-
-creates a new dataframe based which can be based on specific time range (list with start and end time). The new dataframe contains
-columns that contian the witdh of the HD bins, the midle of bins in rad, middle of the bins in degrees, the occupancy of HD and the 
-rotated (based on landmark) HD. Lastly, it plots the HD occupancy and the rotated HD occupancy. 
-
-_Usage: create_HD_bins(SLEAP_df, sampling_rate, num_bins=20, time_range=False)_
-
-Example: HD_bins = create_HD_bins(SLEAP_df, sampling_rate=1/30, num_bins=20, time_range=[0,900])
-
-_output: HD_bins_
-<br> <br>
-
-#### 6.2) apply_spikes_per_HD_bin (binning_spikes)
-
-calculculates spikes per bin which were defined HD_bins dataframe. The binning can be based on a specfic time range. (contains subfuctions)
-
-_Usage: apply_spikes_per_HD_bin(HD_bins, SLEAP_df, spikes_df, sampling_rate, num_bins, time_range=False)_
-
-Example: binned_spikes_HD = apply_spikes_per_HD_bin(HD_bins, SLEAP_df, spikes_df, sampling_rate=1/30,num_bins=20, time_range=[0,900])
-
-_output: binned_spikes_HD_
-<br> <br>
-
-#### 6.3) calc_neuron_characteristics (circular_processing)
-
-calculates max firing, absolute vector lenght, rayleigh vector lenght and preferred firing direction of all neurons. 
-
-_Usage: calc_neuron_characteristics(binned_spikes_HD,neurons)_
-
-Example: neuron_characteristics = calc_neuron_characteristics(binned_spikes_HD, neurons)
-
-_output: neuron_characteristics_
-<br> <br>
-
-##  Section 7: quality metrics 
-
-#### 7.1) quality_metrics_thresholds (metrics) 
-
-applied threshold on quality metrics and outputs all neurons that adhere to the thresholds. 
-
-_Usage: quality_metrics_thresholds(quality_metrics)_
-
-Example: valid_neurons_ids = metrics.quality_metrics_thresholds(quality_metrics=quality_metrics)
-
-_output: valid_neurons_ids_
-<br> <br>
-
-##  Section 8: plot binned HD spikes and heatmap 
