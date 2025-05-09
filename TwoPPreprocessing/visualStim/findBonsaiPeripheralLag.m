@@ -90,9 +90,9 @@ switch method
         
         figure;
         hold on;
-        plot(rawPDArduinoTime(1:100), rawPDValue(1:100), 'DisplayName', 'Original Photodiode Signal');
-        plot(rawQuadArduinoTime(1:100), 10*rawQuadValue(1:100), 'r', 'DisplayName', 'Uncorrected Quad');
-        plot(lagCorrArdinoTime(1:100), 12*rawQuadValue(1:100), 'g', 'DisplayName', 'Corrected Quad');
+        plot(rawPDArduinoTime(1:1000), rawPDValue(1:1000), 'DisplayName', 'Original Photodiode Signal');
+        plot(rawQuadArduinoTime(1:1000), 10*rawQuadValue(1:1000), 'r', 'DisplayName', 'Uncorrected Quad');
+        plot(lagCorrArdinoTime(1:1000), 12*rawQuadValue(1:1000), 'g', 'DisplayName', 'Corrected Quad');
         title('Using (xcorr) method 1: Photodiode vs Corrected/Uncorrected Quad Signal');
         legend();
         hold off;

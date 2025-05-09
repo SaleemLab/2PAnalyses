@@ -69,8 +69,8 @@ chigh = max(chigh,0);
 fig = figure('Units','normalized','Position',[0 0 1 1],'Color','w');
 figDir  = fullfile(sessionFileInfo.Directories.save_folder,'Figures');
 if ~exist(figDir,'dir'), mkdir(figDir); end
-pdfPath = fullfile(figDir, ...
-    [sessionFileInfo.animal_name '_' RFMappingStimName '_RFpositionGrid.pdf']);
+pngPath = fullfile(figDir, ...
+    [sessionFileInfo.animal_name '_' RFMappingStimName '_RFpositionGrid.png']);
 
 % tile layout with gutters
 gX = 0.02; gY = 0.04;
@@ -157,6 +157,6 @@ text(0.5, 0.98, RFMappingStimName, ...
 
 
 % save PDF
-exportgraphics(fig, pdfPath, 'ContentType','vector');
+exportgraphics(fig, pngPath, 'ContentType','vector');
 close(fig);
 end

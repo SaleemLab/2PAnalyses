@@ -215,7 +215,7 @@ function [response, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInf
     % Extract lap-wise variables for only completed laps
     response.completedStartTimes = response.startTimeAll(response.completedLaps);
     response.completedEndTimes   = response.endTimeAll(response.completedLaps);
-    
+    response.stimName = VRStimName; 
     % Final check to ensure all laps were accounted for
     assert(length(completedLaps) + length(abortedLaps) == length(trackIDs), ...
         'This is to keep Sonali sane: Some laps were not classified into completed or aborted.');

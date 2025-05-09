@@ -30,7 +30,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name 'ROISandNonROIS_SortedbyOdd_' response.signalUsed '.pdf']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name response.stimName 'ROISandNonROIS_SortedbyOdd_' response.signalUsed '.png']);
 
 %% Extract activity matrix
 lapActivity = response.lapPositionActivity;
@@ -116,5 +116,5 @@ colorbar; ylabel(colorbar, 'Activity (normalized)');
 set(gcf, 'PaperUnits', 'inches', ...
          'PaperPosition', [0 0 11 8.5], ...
          'PaperOrientation', 'landscape');
-print(gcf, filename, '-dpdf', '-r300');
+print(gcf, filename, '-dpng', '-r300');
 end

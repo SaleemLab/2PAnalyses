@@ -74,11 +74,11 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         else
             planeTimes_trim = planeTimes_table.(planeName)(1:trimLength, :);
         end
-        twoPData(iPlane).TwoPFrameTime = planeTimes_trim.TwoPFrameTime./1000;
+        twoPData(iPlane).TwoPFrameTime = planeTimes_trim.TwoPFrameTime;
         twoPData(iPlane).BonsaiTime = planeTimes_trim.BonsaiTime;
         twoPData(iPlane).RenderFrameCount = planeTimes_trim.RenderFrameCount;
         twoPData(iPlane).LastSyncPulseTime = planeTimes_trim.LastSyncPulseTime;
-        twoPData(iPlane).ArduinoTime = planeTimes_trim.ArduinoTime./1000;
+        twoPData(iPlane).ArduinoTime = planeTimes_trim.ArduinoTime;
     end
 
 save(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'twoPData');

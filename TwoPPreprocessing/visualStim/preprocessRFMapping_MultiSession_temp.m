@@ -5,8 +5,8 @@ clear; clc;
 
 % Define mouse and session information 
 mouseInfo = {
-    'M25037', {'20250425A', '20250425B', '20250426A', '20250426B'}, {'M25037_RFMapping_20250425_00001', 'M25037_RFMapping_20250425_00002', 'M25037_RFMapping_20250426_00001', 'M25037_RFMapping_20250426_00002'};
-    'M25038', {'20250423A','20250423B', '20250423C', '20250423D', '20250426A', '20250426B' }, {'M25038_RFMapping_20250423_00001', 'M25038_RFMapping_20250423_00003','M25038_RFMapping_20250423_00004' ,'M25038_RFMapping_20250423_00005', 'M25038_RFMapping_20250426_00001','M25038_RFMapping_20250426_00002'};
+    'M25040', {'20250506'}, {'M25040_RFMapping_20250506_00001'};
+%     'M25038', {'20250423A','20250423B', '20250423C', '20250423D', '20250426A', '20250426B' }, {'M25038_RFMapping_20250423_00001', 'M25038_RFMapping_20250423_00003','M25038_RFMapping_20250423_00004' ,'M25038_RFMapping_20250423_00005', 'M25038_RFMapping_20250426_00001','M25038_RFMapping_20250426_00002'};
 };
 
 % Processing parameters 
@@ -18,7 +18,7 @@ method = 2;            % Method for PSTH extraction
 frameRate = 7.28;       % Degrees/bin or other relevant stimulus unit
 applyNeuropilCorrection = true;
 calculateDFF = true;
-pdthreshold = 5;
+pdthreshold = 8;
 postStimTime = 3; 
 
 % === Loop through each mouse ===
@@ -54,9 +54,11 @@ for thisMouse = 1:size(mouseInfo,1)
             % PSTHs
             [response, sessionFileInfo] = getTrialResponsePSTHsV4(sessionFileInfo, stimName, method, interpRate, frameRate, applyNeuropilCorrection, calculateDFF);
             %
+            plotRFGrid_byPosition_ROIs(sessionFileInfo, stimName);
+            %
             plotAllROIPSTHsByPosition(sessionFileInfo, response);
             % 
-            plotRFGrid_byPosition_ROIs(sessionFileInfo, stimName);
+            
             %
             fprintf('    Done!\n'); 
         catch ME

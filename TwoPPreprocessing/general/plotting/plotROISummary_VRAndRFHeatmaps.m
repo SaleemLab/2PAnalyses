@@ -15,11 +15,11 @@ end
 %% Load VR data
 isVR = find(strcmp(VRCorrStimName, {sessionFileInfo.stimFiles.name}), 1);
 VRResponse = load(sessionFileInfo.stimFiles(isVR).Response, 'response');
-
+VRResponse = VRResponse.response;
 %% Load RF mapping data
 isRF = find(strcmp(RFMappingStimName, {sessionFileInfo.stimFiles.name}), 1);
 RFResponse = load(sessionFileInfo.stimFiles(isRF).Response, 'response');
-RFpsthData = RFResponse.psthData;
+RFpsthData = RFResponse.response.psthData;
 
 %% Build azimuth / elevation grids
 stimValues = vertcat(RFpsthData.stimValue);
@@ -123,13 +123,13 @@ for roiIdx = 1:nROIs
     colorbar;
 
     % --- Save
-    figName = sprintf('%s_%s_ROI%d_VR_RFpeak.pdf', ...
+    figName = sprintf('%s_%s_ROI%d_VR_RFpeak.png', ...
         sessionFileInfo.animal_name, sessionFileInfo.session_name, roiIdx);
     figPath = fullfile(figSaveDir, figName);
     set(gcf, 'PaperUnits', 'inches', ...
              'PaperPosition', [0 0 11 4], ...
              'PaperOrientation', 'landscape');
-    print(gcf, figPath, '-dpdf', '-r300');
+    print(gcf, figPath, '-dpng', '-r300');
     close(gcf);
 end
 
