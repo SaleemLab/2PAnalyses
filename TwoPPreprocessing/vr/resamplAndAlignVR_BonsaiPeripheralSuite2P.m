@@ -43,6 +43,7 @@ end
 iStim = find(bonsaiData.isVRstim==1);
 
 % Load data files
+
 if exist(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'file') && ...
         exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file') && ...
         exist(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'file')
