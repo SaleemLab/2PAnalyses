@@ -81,7 +81,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         twoPData(iPlane).ArduinoTime = planeTimes_trim.ArduinoTime;
     end
 
-save(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'twoPData');
-save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+    save(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'twoPData');
+    save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 
 end
