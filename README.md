@@ -124,40 +124,9 @@ Outputs:
 
 
 ## Step 4: Interpolate to common times
-\****** Aman - notes:
-
-A) Define sampling rate and times, and range for analyses 
-Start time: First 2p frame 
-
-End time: Last 2p frame 
-
-(calculate this across all planes)
-
-sampleTimes: startTime:(1/samplingRate):endTime
-
-
-Resample EVERYTHING
-Call the interpolation function in sequence
-
-
-mousepos: linear
-
-trailID: nearest
-
-photodiode:
-
-quad:
-
-Wheel:
-
-for each cell: F, Spks, Fneu
-
-interpolation function: Input: (ArduinoTime (rawSampleTime), Value, sampleTimes, Method): Output: NewValues (at sampleTimes) \******
-<br> <br>
-
 #### 4.1 resamplAndAlignVR_BonsaiPeripheralSuite2P.m (Resample all data streams to common time base) (vr)
 
-resamplAndAlignVR_BonsaiPeripheralSuite2P.m / temp stim name
+resamplAndAlignVR_BonsaiPeripheralSuite2P.m 
 
 Usage: [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo, samplingRate, mainTimeToUse, VRStimName, plotFlag)
 
@@ -176,9 +145,9 @@ Outputs:
   
       Peripheral signals (e.g., photodiode, wheel), resampled to the same timebase.
       
-<br> <br>
 
-## Step 5: extractVRBonsaiPeripheralInfo.m (Split 5.0 into two functions? Bonsai / Peripheral and move peripheral to general?) (currently vr)
+## Step 5: Extract VR Bonsai Peripheral Info
+#### 5.1 extractVRBonsaiPeripheralInfo.m 
 
 Extracts wheel speed, virtual position, and lap-related info from aligned Bonsai and peripheral data during 2P-VR Aman's Classical Corridor.
 Handles lap classification (completed/aborted) and optionally plots lap timing.
@@ -223,7 +192,7 @@ response. : struct
 
 %
 
-#### 5.1 get2PFrameLapPositionBins.m  (vr)
+#### 5.2 get2PFrameLapPositionBins.m  (vr)
 
    For each ROI, lap, and spatial bin (1 cm), this function finds the corresponding two-photon (2P) frame indices and relative times (from lap start). Only includes frames where wheel speed > 1 cm/s.
    Both cells and non-cells are included here 
@@ -243,7 +212,7 @@ Output:
         
         - lapPositionRelativeTime{lap, bin}    : time relative to lap start (only once per bin) (could exclude)
 
-#### 5.2 getLapPositionActivity.m 
+#### 5.3 getLapPositionActivity.m 
 
   Extracts mean binned fluorescence/activity values per lap from 2P data.
   Only includes ROIs labeled as "cells" and only for completed laps.
@@ -275,7 +244,7 @@ plotSortedPopulationResponse(sessionFileInfo, response, applySmoothing)
 # 2PAnalyses
 Code for analysing 2 photon imaging data
 #### By: Sonali
-#### Last update: ???
+#### Last update: 
 
 ## Step 0
 #### 0.1 Run Suite2p (concatenated across all stimuli recorded in one session)
@@ -333,8 +302,6 @@ Output: animalName_session_2pData_stimName.mat
 getVRBonsaiFiles.m 
 Usage: VRInfo = getVRBonsaiFiles(sessionFileInfo)
 Output: VRInfo.mousePos; VRInfo.trialInfo; VRInfo.isVRStim
-
-------- CURRENTLY DONE UP TO HERE 18.2.25 ------------------------------
 
 
 #### 2.2.2 For DirTuning 
