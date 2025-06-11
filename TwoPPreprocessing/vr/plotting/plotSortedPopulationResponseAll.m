@@ -19,7 +19,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_SortedAcrossAll_deltaFoverF_smoothed' response.signalUsed '.pdf']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_SortedAcrossAll_f_smoothed' response.signalUsed '.png']);
 
 %% Extract activity matrix
 lapActivity = response.lapPositionActivity;
@@ -60,24 +60,25 @@ else
 end
 
 %% Plot
-figure('Position', [100 100 700 500]);
+figure('Position', [100 100 300 1000]);  % [left bottom width height]
+  % [left bottom width height]
 imagesc(normAll(sortIdx, :));
 caxis([0 1]); colormap(flipud(gray));
-set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
-xline(50, 'k--', 'LineWidth', 1.5);
-xline(70, 'k--', 'LineWidth', 1.5);
-xline(90, 'k--', 'LineWidth', 1.5);
-xline(110, 'k--', 'LineWidth', 1.5);
+set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 18, 'YDir', 'normal');
+xline(50, 'k--', 'LineWidth', 2.5);
+xline(70, 'k--', 'LineWidth', 2.5);
+xline(90, 'k--', 'LineWidth', 2.5);
+xline(110, 'k--', 'LineWidth', 2.5);
 xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('ROIs');
 title([sessionFileInfo.animal_name ' - All laps sorted (' response.signalUsed ', ' smoothingLabel ')']);
-colorbar; ylabel(colorbar, 'Activity (normalized)');
+colorbar; ylabel(colorbar, 'Activity (normalised)');
 
 %% Save
 set(gcf, 'PaperUnits', 'inches', ...
-         'PaperPosition', [0 0 11 8.5], ...
-         'PaperOrientation', 'landscape');
-print(gcf, filename, '-dpdf', '-r300');
+         'PaperPosition', [0 0 8.5 11], ...
+         'PaperOrientation', 'portrait');
+print(gcf, filename, '-dpng', '-r300');
 end

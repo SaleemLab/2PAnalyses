@@ -79,7 +79,7 @@ for neuronIdx = 1:nROIs
     xline(50, 'k--'); xline(70, 'k--'); xline(90, 'k--'); xline(110, 'k--');
     xticks([0 50 70 90 110 140]);
     xticklabels({'0', '50', '70', '90', '110', '140'});
-    xlabel('Position (cm)'); ylabel(sprintf('Mean %s', response.signalUsed));
+    xlabel('Position (cm)'); ylabel(sprintf('Mean %s'), );
     title(sprintf('%s - ROI %d (%s)', ...
         sessionFileInfo.animal_name, neuronIdx, response.signalUsed));
     box off; set(gca, 'FontSize', 12);
@@ -92,8 +92,8 @@ for neuronIdx = 1:nROIs
     xticks([0 50 70 90 110 140]);
     xticklabels({'0', '50', '70', '90', '110', '140'});
     xlabel('Position (cm)'); ylabel('Lap #');
-    title('Lap-by-position activity (normalised)');
-    colorbar; ylabel(colorbar, sprintf('Activity (%s)', response.signalUsed));
+    title('Lap-by-position activity (normalized)');
+    colorbar; ylabel(colorbar, 'Activity (raw f)');
     set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
 
     % Save current page to multi-page PDF
