@@ -48,7 +48,7 @@ numPosBins = length(posBinCentres);
 numROIs = size(processedTwoPData.F, 1);
 nLaps = length(response.completedStartTimes);
 timeVec = processedTwoPData.(processedTwoPData.resample2PTimeUsed);
-speedFilter = response.wheelSpeed > 1 & response.wheelSpeed < 25;
+speedFilter = response.wheelSpeed > 1 & response.wheelSpeed < 100;
 
 lapPosition2PFrameIdx = cell(numROIs, nLaps, numPosBins);
 lapPositionRelativeTime = cell(nLaps, numPosBins);  % Only stored once per lap × bin
