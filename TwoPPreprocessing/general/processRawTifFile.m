@@ -50,18 +50,23 @@ for iStim = 1:length(tempsessionFileInfo.stimFiles)
     twopMetadata = parseMetadata(metadataStr);
 
     lastTifFile.close();
+
      % ---- Check if last grab was complete -----
 
-%     expectedFramesPerPlanePerChannel = totalFramesRecorded / (twopMetadata.numSlices * twopMetadata.channelSave);
     % 1 'grab' = twopMetadata.numSlices * twopMetadata.channelSave
-    % The frame numbers for both channels are saved the same. eg. last grab
-    % Ch1(last grab) 35002 
     % length(str2num(twopMetadata.channelSave))) 
-    framesToRemove = mod(totalFramesRecorded*length(str2num(twopMetadata.channelSave)), twopMetadata.numSlices *length(str2num(twopMetadata.channelSave))); 
+    
+    channelSave = str2num(twopMetadata.channelSave);  % handles both numeric (1 channel) and string (2 channels)
+    if isempty(channelSave)
+        error('channelSave could not be parsed. Check the format in twopMetadata.');
+    end
+
+    framesToRemove = mod(totalFramesRecorded*length(channelSave), twopMetadata.numSlices *length(channelSave)); 
+%   framesToRemove = mod(totalFramesRecorded*length(str2num(twopMetadata.channelSave)), twopMetadata.numSlices *length(str2num(twopMetadata.channelSave))); 
     
     if framesToRemove ~= 0 
-        fprintf('Last acquisition grab was incomplete! %d missing frames detected. Last grab will be removed.\n ', ...
-            twopMetadata.numSlices * length(twopMetadata.channelSave) - framesToRemove);
+        fprintf('Last acquisition grab was incomplete! Last grab will be removed.\n ', ...
+            twopMetadata.numSlices * length(channelSave) - framesToRemove);
         
         % Trim the incomplete grab
         trimmedTifPath = trimLastGrab(lastTiffilePath, framesToRemove, lastFrameNum);
