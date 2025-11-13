@@ -24,15 +24,14 @@ if ~exist(figSaveDir, 'dir')
     mkdir(figSaveDir);
 end
 
-pdfName = sprintf('%s_%s_AllROIs_%s_%s_MeansAndLapPositionHeatMap.pdf', ...
+pdfName = sprintf('%s_%s_AllROIs_%s_dFFNeuropilCorrected_MeansAndLapPositionHeatMap.pdf', ...
     sessionFileInfo.animal_name, ...
     sessionFileInfo.session_name, ...
-    response.stimName,...
-    response.signalUsed);
+    response.stimName);
 pdfPath = fullfile(figSaveDir, pdfName);
 
 %% Extract activity
-lapActivityFull = response.lapPositionActivity;
+lapActivityFull = response.lapPositionActivity.dFFNeuropilCorrected;
 nROIs = size(lapActivityFull, 1);
 
 fprintf('Generating ROI summary plots for %d ROIs...\n', nROIs);
@@ -47,7 +46,7 @@ for neuronIdx = 1:nROIs
 
     % Optional smoothing
     if applySmoothing
-        w = gausswin(9); w = w / sum(w);
+        w = gausswin(10); w = w / sum(w);
         for iLap = 1:size(roiActivity, 1)
             trace = roiActivity(iLap, :);
             if all(isnan(trace)), continue; end
@@ -79,9 +78,9 @@ for neuronIdx = 1:nROIs
     xline(50, 'k--'); xline(70, 'k--'); xline(90, 'k--'); xline(110, 'k--');
     xticks([0 50 70 90 110 140]);
     xticklabels({'0', '50', '70', '90', '110', '140'});
-    xlabel('Position (cm)'); ylabel(sprintf('Mean %s', response.signalUsed));
-    title(sprintf('%s - ROI %d (%s)', ...
-        sessionFileInfo.animal_name, neuronIdx, response.signalUsed));
+    xlabel('Position (cm)'); ylabel('Mean dFFNeuropilCorrected');
+    title(sprintf('%s - ROI %d ', ...
+        sessionFileInfo.animal_name, neuronIdx));
     box off; set(gca, 'FontSize', 12);
 
     % --- Heatmap ---
@@ -93,7 +92,7 @@ for neuronIdx = 1:nROIs
     xticklabels({'0', '50', '70', '90', '110', '140'});
     xlabel('Position (cm)'); ylabel('Lap #');
     title('Lap-by-position activity (normalised)');
-    colorbar; ylabel(colorbar, sprintf('Activity (%s)', response.signalUsed));
+    colorbar; ylabel(colorbar, sprintf('Activity dFFNeuropilCorrected'));
     set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
 
     % Save current page to multi-page PDF

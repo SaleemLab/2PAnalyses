@@ -1,0 +1,400 @@
+function figHandle = plotMouseBoutonAndSomaTuning(filteredTable, MouseID, varargin)
+% plotMouseBoutonAndSomaTuning Generates a 1x6 figure for a single mouse,
+% showing Bouton tuning for Days 1-5 and one concatenated Soma plot.
+%
+%   figHandle = plotMouseBoutonAndSomaTuning(filteredTable, MouseID, ...)
+%   Returns a handle to the generated figure.
+%
+%   Required Argument:
+%       filteredTable     - Table containing all data (boutons and somas).
+%       MouseID           - String, the MouseID to plot (e.g., 'M25041')
+%
+%   Additional parameters:
+%       'ImagedTypeColumn' - Column name for 'Boutons'/'Somas' (default: 'TypeImaged')
+%       'signalToUse'      - String, (default: 'dFFNeuropilCorrected')
+%       'applySmoothing'   - Logical, (default: true)
+%       'SavePath'         - String, full file path (e.g., 'C:\Fig.png')
+%                            If provided, saves the figure. (default: '')
+
+    %% Parse Inputs 
+    p = inputParser;
+    addRequired(p, 'filteredTable', @istable);
+    addRequired(p, 'MouseID', @ischar);
+
+    addParameter(p, 'ImagedTypeColumn', 'TypeImaged', @ischar);
+    addParameter(p, 'signalToUse', 'dFFNeuropilCorrected', @ischar);
+    addParameter(p, 'applySmoothing', true, @islogical);
+    addParameter(p, 'SavePath', '', @ischar);
+
+    parse(p, filteredTable, MouseID, varargin{:});
+
+    ImagedTypeColumn = p.Results.ImagedTypeColumn;
+    signalToUse = p.Results.signalToUse;
+    applySmoothing = p.Results.applySmoothing;
+    savePath = p.Results.SavePath;
+
+    %% Identify Grid Layout
+
+    requiredCols = {'MouseID', 'Session', 'DayOfExperience', ImagedTypeColumn};
+    if ~all(ismember(requiredCols, filteredTable.Properties.VariableNames))
+        error('filteredTable must contain: %s', strjoin(requiredCols, ', '));
+    end
+
+    boutonDays = [1, 2, 3, 4, 5];
+    numBoutonPlots = length(boutonDays);
+    numSomaPlots = 1;
+    numCols = numBoutonPlots + numSomaPlots; % 1x6 grid
+
+    figHandle = figure('Position', [100 100 300*numCols 400]);
+
+    tl = tiledlayout(figHandle, 1, numCols, ...
+        'TileSpacing', 'compact', 'Padding', 'compact');
+
+    if applySmoothing
+        w = gausswin(6);
+        w = w / sum(w);
+    end
+
+    ax = gobjects(1, numCols);
+
+    %% Plot Bouton Data (Plots 1-5) 
+
+    for iDay = 1:numBoutonPlots
+        dayNum = boutonDays(iDay);
+        ax(iDay) = nexttile;
+
+        sessionRow = filteredTable( ...
+            strcmp(filteredTable.MouseID, MouseID) & ...
+            filteredTable.DayOfExperience == dayNum & ...
+            strcmp(filteredTable.(ImagedTypeColumn), 'Boutons'), :);
+
+        if isempty(sessionRow)
+            title(['Day ' num2str(dayNum) ' Boutons']);
+            axis off;
+            continue;
+        end
+
+        if height(sessionRow) > 1
+             warning('Multiple Bouton entries for %s - Day %d. Using first.', MouseID, dayNum);
+             sessionRow = sessionRow(1, :);
+        end
+
+        sessionString_char = char(sessionRow.Session);
+
+        %  Load sessionFileInfo 
+        clear sessionFileInfo response
+        try
+            sessionFileInfoFilePath = findSessionFileInfoFilePath(MouseID, sessionString_char);
+            if ~isfile(sessionFileInfoFilePath)
+                warning('Info File Missing for %s, %s', MouseID, sessionString_char);
+                title(''); axis off; continue;
+            end
+            load(sessionFileInfoFilePath, 'sessionFileInfo');
+        catch ME
+            warning('Error loading sessionFileInfo for %s, %s: %s', MouseID, sessionString_char, ME.message);
+            title(''); axis off; continue;
+        end
+
+        % Find Response File Path 
+        stimNames = string({sessionFileInfo.stimFiles.name});
+        responseFileIdx = [];
+        idx_Combined = find(contains(stimNames, "VRCorr") & contains(stimNames, "CombinedRuns"));
+        idx_VrOnly = find(contains(stimNames, "VRCorr") & ~contains(stimNames, "CombinedRuns"));
+        if ~isempty(idx_Combined)
+            responseFileIdx = idx_Combined(1);
+        elseif ~isempty(idx_VrOnly)
+            responseFileIdx = idx_VrOnly(end);
+        end
+        if isempty(responseFileIdx)
+            warning('No valid VRCorr file found for %s, %s', MouseID, sessionString_char);
+            title(''); axis off; continue;
+        end
+
+        % Check if the selected stimFile entry has the 'Response' field 
+        if ~isfield(sessionFileInfo.stimFiles, 'Response') || isempty(sessionFileInfo.stimFiles(responseFileIdx).Response)
+             warning('Response field missing or empty for selected stimFile in %s, %s', MouseID, sessionString_char);
+             title(''); axis off; continue;
+        end
+
+        responseFilePath = sessionFileInfo.stimFiles(responseFileIdx).Response;
+
+        %  Load Response Data 
+        try
+            if ~isfile(responseFilePath)
+                 warning('Response file path found, but file not found at: %s', responseFilePath);
+                 title(''); axis off; continue;
+            end
+            load(responseFilePath, 'response');
+        catch ME
+            warning('Error loading response file for %s, %s: %s', MouseID, sessionString_char, ME.message);
+            title(''); axis off; continue;
+        end
+        if ~exist('response', 'var')
+            warning('File loaded, but ''response'' variable not found in: %s', responseFilePath);
+            title(''); axis off; continue;
+        end
+
+        %  Check & Process Data
+        if ~isfield(response, 'lapPositionActivity') || ...
+           ~isfield(response.lapPositionActivity, signalToUse) || ...
+           isempty(response.lapPositionActivity.(signalToUse))
+             warning('Data Missing in response file for %s, %s', MouseID, sessionString_char);
+             title(''); axis off; continue;
+        end
+        lapActivity_mouse = response.lapPositionActivity.(signalToUse);
+        if size(lapActivity_mouse, 2) < 2
+            warning('(<2 laps) for %s, %s', MouseID, sessionString_char);
+            title(''); axis off; continue;
+        end
+
+        %  Apply Spatial Smoothing 
+        if applySmoothing
+            for iCell = 1:size(lapActivity_mouse, 1)
+                for iLap = 1:size(lapActivity_mouse, 2)
+                    trace = squeeze(lapActivity_mouse(iCell, iLap, :));
+                    if all(isnan(trace)), continue; end
+                    nanMask = isnan(trace);
+                    trace(nanMask) = 0;
+                    smoothed = filtfilt(w, 1, trace);
+                    smoothed(nanMask) = NaN;
+                    lapActivity_mouse(iCell, iLap, :) = smoothed;
+                end
+            end
+        end
+
+        %  Process Laps (Using MEDIAN)
+        oddLaps = lapActivity_mouse(:, 1:2:end, :);
+        evenLaps = lapActivity_mouse(:, 2:2:end, :);
+        medianOdd = squeeze(median(oddLaps, 2, 'omitnan')); % Changed to median
+        medianEven = squeeze(median(evenLaps, 2, 'omitnan'));% Changed to median
+        if size(lapActivity_mouse, 1) == 1
+            medianOdd = reshape(medianOdd, 1, []);
+            medianEven = reshape(medianEven, 1, []);
+        end
+        normOdd = normalize(medianOdd, 2, 'range');
+        normEven = normalize(medianEven, 2, 'range');
+        [~, peakIdx] = max(normOdd, [], 2);
+        [~, sortIdx] = sort(peakIdx);
+
+
+        imagesc(normEven(sortIdx, :));
+        caxis([0 1]); colormap(flipud(gray));
+
+
+        set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 10, 'YDir', 'normal');
+        xline(50, 'k--', 'LineWidth', 1.5);
+        xline(70, 'k--', 'LineWidth', 1.5);
+        xline(90, 'k--', 'LineWidth', 1.5);
+        xline(110, 'k--', 'LineWidth', 1.5);
+        xticks([0 50 70 90 110 140]);
+        xticklabels({'0', '50', '70', '90', '110', '140'});
+
+
+        title(['Day ' num2str(dayNum) ' Boutons']);
+
+
+        if iDay == 1
+            ylabel(MouseID, 'Interpreter', 'none', 'FontSize', 9);
+        % else % Removed this 'else' block
+            % yticklabels({}); % No longer hide labels
+        end
+        % ---
+    end
+
+    %% Plot SOMA Data (Plot 6) ---
+
+    ax(numCols) = nexttile; % go to the last tile
+
+    somaRows = filteredTable( ...
+        strcmp(filteredTable.MouseID, MouseID) & ...
+        strcmp(filteredTable.(ImagedTypeColumn), 'Somas'), :);
+
+    if isempty(somaRows)
+        title('Somas (Pooled)');
+        axis off;
+    else
+        all_medianOdd_cell = {}; % Renamed for clarity
+        all_medianEven_cell = {}; % Renamed for clarity
+
+        for iSoma = 1:height(somaRows)
+            mouseRow = somaRows(iSoma, :);
+            sessionString_char = char(mouseRow.Session);
+
+            %  Load sessionFileInfo 
+            clear sessionFileInfo response
+            try
+                sessionFileInfoFilePath = findSessionFileInfoFilePath(MouseID, sessionString_char);
+                if ~isfile(sessionFileInfoFilePath)
+                    warning('Info File Missing for SOMA %s, %s', MouseID, sessionString_char);
+                    continue;
+                end
+                load(sessionFileInfoFilePath, 'sessionFileInfo');
+            catch ME
+                warning('Error loading sessionFileInfo for SOMA %s, %s: %s', MouseID, sessionString_char, ME.message);
+                continue;
+            end
+
+            % Find Response File Path 
+            stimNames = string({sessionFileInfo.stimFiles.name});
+            responseFileIdx = [];
+            idx_Combined = find(contains(stimNames, "VRCorr") & contains(stimNames, "CombinedRuns"));
+            idx_VrOnly = find(contains(stimNames, "VRCorr") & ~contains(stimNames, "CombinedRuns"));
+            if ~isempty(idx_Combined)
+                responseFileIdx = idx_Combined(1);
+            elseif ~isempty(idx_VrOnly)
+                responseFileIdx = idx_VrOnly(end);
+            end
+            if isempty(responseFileIdx)
+                warning('No valid VRCorr file found for SOMA %s, %s', MouseID, sessionString_char);
+                continue;
+            end
+
+             %  Check if the selected stimFile entry has the 'Response' field 
+             if ~isfield(sessionFileInfo.stimFiles, 'Response') || isempty(sessionFileInfo.stimFiles(responseFileIdx).Response)
+                 warning('Response field missing or empty for selected SOMA stimFile in %s, %s', MouseID, sessionString_char);
+                 continue; % Skip this soma session
+             end
+
+            responseFilePath = sessionFileInfo.stimFiles(responseFileIdx).Response;
+
+            % Load Response Data 
+            try
+                if ~isfile(responseFilePath)
+                     warning('Response file path found, but SOMA file not found at: %s', responseFilePath);
+                     continue; % Skip this session if file doesn't exist
+                end
+                load(responseFilePath, 'response');
+            catch ME
+                warning('Error loading response file for SOMA %s, %s: %s', MouseID, sessionString_char, ME.message);
+                continue; % Skip this session if loading fails
+            end
+
+            if ~exist('response', 'var')
+                warning('File loaded, but ''response'' variable not found in SOMA: %s', responseFilePath);
+                continue; % Skip this session if 'response' is missing
+            end
+
+            %  Check & Process
+            if ~isfield(response, 'lapPositionActivity') || ...
+               ~isfield(response.lapPositionActivity, signalToUse) || ...
+               isempty(response.lapPositionActivity.(signalToUse))
+                 warning('Data Missing in response file for SOMA %s, %s', MouseID, sessionString_char);
+                 continue; % Skip this session if data is missing/invalid
+            end
+            lapActivity_mouse = response.lapPositionActivity.(signalToUse);
+            if size(lapActivity_mouse, 2) < 2
+                warning('(<2 laps) for SOMA %s, %s', MouseID, sessionString_char);
+                continue; % Skip this session if fewer than 2 laps
+            end
+
+            % Apply Smoothing
+            if applySmoothing
+                for iCell = 1:size(lapActivity_mouse, 1)
+                    for iLap = 1:size(lapActivity_mouse, 2)
+                        trace = squeeze(lapActivity_mouse(iCell, iLap, :));
+                        if all(isnan(trace)), continue; end
+                        nanMask = isnan(trace);
+                        trace(nanMask) = 0;
+                        smoothed = filtfilt(w, 1, trace);
+                        smoothed(nanMask) = NaN;
+                        lapActivity_mouse(iCell, iLap, :) = smoothed;
+                    end
+                end
+            end
+
+            % Process Laps (for this soma session, using MEDIAN)
+            oddLaps = lapActivity_mouse(:, 1:2:end, :);
+            evenLaps = lapActivity_mouse(:, 2:2:end, :);
+            medianOdd_mouse = squeeze(median(oddLaps, 2, 'omitnan')); % Changed to median
+            medianEven_mouse = squeeze(median(evenLaps, 2, 'omitnan'));% Changed to median
+            if size(lapActivity_mouse, 1) == 1
+                medianOdd_mouse = reshape(medianOdd_mouse, 1, []);
+                medianEven_mouse = reshape(medianEven_mouse, 1, []);
+            end
+
+            % Only add if data processing was successful
+            all_medianOdd_cell{end+1} = medianOdd_mouse;
+            all_medianEven_cell{end+1} = medianEven_mouse;
+
+        end 
+
+        %  process the pooled soma data: Using medians 
+        if isempty(all_medianOdd_cell)
+            title('Somas (Pooled - No Data)'); % Indicate if no valid soma sessions found
+            axis off;
+        else
+            medianOdd = vertcat(all_medianOdd_cell{:}); % Renamed for clarity
+            medianEven = vertcat(all_medianEven_cell{:});% Renamed for clarity
+
+            normOdd = normalize(medianOdd, 2, 'range');
+            normEven = normalize(medianEven, 2, 'range');
+            [~, peakIdx] = max(normOdd, [], 2);
+            [~, sortIdx] = sort(peakIdx);
+
+
+            imagesc(normEven(sortIdx, :));
+            caxis([0 1]); colormap(flipud(gray));
+
+            set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 10, 'YDir', 'normal');
+            xline(50, 'k--', 'LineWidth', 1.5);
+            xline(70, 'k--', 'LineWidth', 1.5);
+            xline(90, 'k--', 'LineWidth', 1.5);
+            xline(110, 'k--', 'LineWidth', 1.5);
+            xticks([0 50 70 90 110 140]);
+            xticklabels({'0', '50', '70', '90', '110', '140'});
+
+
+            title('Somas (Pooled)');
+            % --- CHANGE 2: Show y-ticks on soma plot ---
+            % yticklabels({}); % Removed this line
+            % ---
+
+            cb = colorbar;
+            ylabel(cb, 'Norm. Activity');
+            cb.Ticks = [0, 0.25, 0.5, 0.75, 1];
+            cb.TickLabels = {'', '0.25', '', '0.75', ''};
+        end
+    end
+
+    %% Align Subplot Widths @ChatGPT
+    drawnow;
+
+    minWidth = Inf;
+    validAx = ax(isgraphics(ax));
+    if ~isempty(validAx)
+        lastValidAx = validAx(end);
+        pos = get(lastValidAx, 'Position');
+        minWidth = pos(3);
+
+        if isfinite(minWidth) && numCols > 1
+            for i = 1:numCols
+                if isgraphics(ax(i)) && ax(i) ~= lastValidAx
+                    pos = get(ax(i), 'Position');
+                    pos(3) = minWidth;
+                    set(ax(i), 'Position', pos);
+                end
+            end
+        end
+    end
+
+    %% Add Title and Save 
+
+    title(tl, sprintf('%s: Bouton Tuning by Day and Pooled Somas (Signal: %s)', ...
+           MouseID, signalToUse), ...
+           'Interpreter', 'none', 'FontSize', 14, 'FontWeight', 'bold');
+
+    if ~isempty(savePath)
+        try
+            disp(['Saving figure to: ' savePath]);
+            parentFolder = fileparts(savePath);
+            if ~isempty(parentFolder) && ~isfolder(parentFolder)
+                mkdir(parentFolder);
+            end
+            saveas(figHandle, savePath);
+        catch ME
+            warning('Could not save figure to path: %s', savePath);
+            warning('Error: %s', ME.message);
+        end
+    end
+
+end 
