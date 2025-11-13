@@ -1,4 +1,4 @@
-function plotSortedPopulationResponse_OddEven(sessionFileInfo, response, applySmoothing)
+function plotSortedPopulationResponse_OddEven(sessionFileInfo, response, signalToUse, applySmoothing)
 
 %   Plots normalised population response heatmaps (odd vs even laps),
 %   sorted by peak response location in odd laps.
@@ -19,9 +19,8 @@ function plotSortedPopulationResponse_OddEven(sessionFileInfo, response, applySm
 %
 % Aman and Sonali - April 2025
 
-if nargin < 3
-    applySmoothing = false;
-end
+if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end
+if nargin < 4; applySmoothing = true; end
 
 %% Output path
 figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
@@ -30,14 +29,14 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name response.stimName 'ROISandNonROIS_SortedbyOdd_' response.signalUsed '.png']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROISandNonROIS_SortedbyOdd_zScoredSignals.png']);
 
 %% Extract activity matrix
-lapActivity = response.lapPositionActivity;
+lapActivity = response.lapPositionActivity.(signalToUse);
 
-% Optional plot-time smoothing
+% Optional spatial smoothning
 if applySmoothing
-    w = gausswin(9); w = w / sum(w);
+    w = gausswin(5); w = w / sum(w);
 
     for iCell = 1:size(lapActivity, 1)
         for iLap = 1:size(lapActivity, 2)
@@ -69,13 +68,13 @@ normEven = normalize(meanEven, 2, 'range');
 [~, sortIdx] = sort(peakIdx);
 
 %% Determine smoothing label for figure
-if applySmoothing
-    smoothingLabel = 'smoothed (plot-time)';
-elseif isfield(response, 'smoothingApplied') && response.smoothingApplied
-    smoothingLabel = 'smoothed (precomputed)';
-else
-    smoothingLabel = 'unsmoothed';
-end
+% if applySmoothing
+%     smoothingLabel = 'smoothed (plot-time)';
+% elseif isfield(response, 'smoothingApplied') && response.smoothingApplied
+%     smoothingLabel = 'smoothed (precomputed)';
+% else
+%     smoothingLabel = 'unsmoothed';
+% end
 
 %% Plot
 figure('Position', [100 100 1100 500]);
@@ -93,8 +92,8 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('ROIs');
-title([sessionFileInfo.animal_name ' - Odd laps sorted (' response.signalUsed ', ' smoothingLabel ')']);
-colorbar; ylabel(colorbar, 'Activity (normalized)');
+title([sessionFileInfo.animal_name ' - Odd laps sorted (' signalToUse ')']);
+colorbar; ylabel(colorbar, 'Activity (normalised)');
 
 % --- Even laps ---
 subplot(1, 2, 2);
@@ -109,8 +108,8 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('ROI');
-title([sessionFileInfo.animal_name ' - Even laps sorted (by odd) (' response.signalUsed ', ' smoothingLabel ')']);
-colorbar; ylabel(colorbar, 'Activity (normalized)');
+title([sessionFileInfo.animal_name ' - Even laps sorted (by odd) (' signalToUse ')']);
+colorbar; ylabel(colorbar, 'Activity (normalised)');
 
 %% Save
 set(gcf, 'PaperUnits', 'inches', ...

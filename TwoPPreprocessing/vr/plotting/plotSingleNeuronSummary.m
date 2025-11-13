@@ -23,7 +23,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 %% Extract activity
-lapActivityFull = response.lapPositionActivity;
+lapActivityFull = response.lapPositionActivity.dFFNeuropilCorrected;
 
 if neuronIdx < 1 || neuronIdx > size(lapActivityFull, 1)
     error('Invalid neuron index: %d', neuronIdx);
@@ -38,7 +38,7 @@ end
 
 %% Optional smoothing
 if applySmoothing
-    w = gausswin(9); w = w / sum(w);
+    w = gausswin(10); w = w / sum(w);
     for iLap = 1:size(roiActivity, 1)
         trace = roiActivity(iLap, :);
         if all(isnan(trace)), continue; end
@@ -73,8 +73,8 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('Mean activity');
-title(sprintf('%s - ROI %d (%s)', ...
-    sessionFileInfo.animal_name, neuronIdx, response.signalUsed));
+title(sprintf('%s - ROI %d : dFFNeuropilCorrected', ...
+    sessionFileInfo.animal_name, neuronIdx));
 legend({'SEM', 'Mean'}, 'Location', 'northeast');
 box off; set(gca, 'FontSize', 12);
 
@@ -87,16 +87,15 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('Lap #');
-title('Lap-by-position activity (normalized)');
-colorbar; ylabel(colorbar, 'Activity (normalized)');
+title('Lap-by-position activity (normalised)');
+colorbar; ylabel(colorbar, 'Activity (normalised)');
 set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
 
 %% Save figure
-figName = sprintf('%s_%s_ROI%d_%s_Summary.png', ...
+figName = sprintf('%s_%s_ROI%d_dFFNeuropilCorrected_Summary.png', ...
     sessionFileInfo.animal_name, ...
     sessionFileInfo.session_name, ...
-    neuronIdx, ...
-    response.signalUsed);
+    neuronIdx);
 figPath = fullfile(figSaveDir, figName);
 set(gcf, 'PaperUnits', 'inches', ...
          'PaperPosition', [0 0 11 4], ...

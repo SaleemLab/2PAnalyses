@@ -23,10 +23,10 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROIsOnly_SortedbyOdd_deltaFoverF+NeuropilCorrected_' response.signalUsed '.pdf']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROIsOnly_SortedbyOdd_deltaFoverF+NeuropilCorrected_' '.png']);
 
 %% Extract and subset to ROIs only
-lapActivityFull = response.lapPositionActivity;
+lapActivityFull = response.lapPositionActivity.dFFNeuropilCorrected;
 isCell = logical(processedTwoPData.iscell(:, 1));
 roiIdx = find(isCell);
 % roiIdx = response.cellROIs;
@@ -34,7 +34,7 @@ lapActivity = lapActivityFull(roiIdx, :, :);
 
 % Optional plot-time smoothing
 if applySmoothing
-    w = gausswin(9); w = w / sum(w);
+    w = gausswin(10); w = w / sum(w);
     for iCell = 1:size(lapActivity, 1)
         for iLap = 1:size(lapActivity, 2)
             trace = squeeze(lapActivity(iCell, iLap, :));
@@ -49,7 +49,8 @@ if applySmoothing
 end
 
 %% Split odd and even laps
-oddLaps = lapActivity(:, 1:2:end, :);
+% lap Activity here is dFFNeuropilCorrected (ROI x Laps x Position) 
+oddLaps = lapActivity(:, 1:2:end, :); 
 evenLaps = lapActivity(:, 2:2:end, :);
 
 % Average across laps
@@ -89,8 +90,8 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('ROIs');
-title([sessionFileInfo.animal_name ' - Odd laps sorted (' response.signalUsed ', ' smoothingLabel ')']);
-colorbar; ylabel(colorbar, 'Activity (normalized)');
+title([sessionFileInfo.animal_name ' - Odd laps sorted (' smoothingLabel ')']);
+colorbar; ylabel(colorbar, 'Activity (normalised)');
 
 % --- Even laps ---
 subplot(1, 2, 2);
@@ -105,12 +106,12 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('ROIs');
-title([sessionFileInfo.animal_name ' - Even laps sorted (by odd) (' response.signalUsed ', ' smoothingLabel ')']);
-colorbar; ylabel(colorbar, 'Activity (normalized)');
+title([sessionFileInfo.animal_name ' - Even laps sorted (by odd) (' smoothingLabel ')']);
+colorbar; ylabel(colorbar, 'Activity (normalised)');
 
 %% Save
 set(gcf, 'PaperUnits', 'inches', ...
          'PaperPosition', [0 0 11 8.5], ...
          'PaperOrientation', 'landscape');
-print(gcf, filename, '-dpdf', '-r300');
+print(gcf, filename, '-dpng', '-r300');
 end

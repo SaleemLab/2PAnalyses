@@ -19,10 +19,10 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_SortedAcrossAll_f_smoothed' response.signalUsed '.png']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_SortedAcrossAll_f_smoothed_test' '.png']);
 
 %% Extract activity matrix
-lapActivity = response.lapPositionActivity;
+lapActivity = response.lapPositionActivity.dFFNeuropilCorrected;
 
 % Optional plot-time smoothing
 if applySmoothing
@@ -73,7 +73,7 @@ xticks([0 50 70 90 110 140]);
 xticklabels({'0', '50', '70', '90', '110', '140'});
 xlabel('Position (cm)');
 ylabel('ROIs');
-title([sessionFileInfo.animal_name ' - All laps sorted (' response.signalUsed ', ' smoothingLabel ')']);
+title([sessionFileInfo.animal_name ' - All laps sorted ('  ', ' smoothingLabel ')']);
 colorbar; ylabel(colorbar, 'Activity (normalised)');
 
 %% Save

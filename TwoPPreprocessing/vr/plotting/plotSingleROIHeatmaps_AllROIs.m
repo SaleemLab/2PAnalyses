@@ -21,12 +21,12 @@ if ~exist(figSaveDir, 'dir')
 end
 
 %% Extract activity
-lapActivityFull = response.lapPositionActivity;
+lapActivityFull = response.lapPositionActivity.dFFNeuropilCorrected;
 nROIs = size(lapActivityFull, 1);
 
 %% Optional smoothing
 if applySmoothing
-    w = gausswin(9); w = w / sum(w);
+    w = gausswin(10); w = w / sum(w);
     for iCell = 1:nROIs
         for iLap = 1:size(lapActivityFull, 2)
             trace = squeeze(lapActivityFull(iCell, iLap, :));
@@ -65,16 +65,15 @@ for roiIdx = 1:nROIs
     xticklabels({'0', '50', '70', '90', '110', '140'});
     xlabel('Position (cm)');
     ylabel('Lap #');
-    title(sprintf('%s - ROI %d (%s)', ...
-        sessionFileInfo.animal_name, roiIdx, response.signalUsed));
+    title(sprintf('%s - ROI %d (dFFNeuropilCorrected)', ...
+        sessionFileInfo.animal_name, roiIdx));
     colorbar; ylabel(colorbar, 'Activity (normalised)');
 
     % Save figure
-    figName = sprintf('%s_%s_ROI%d_%s.pdf', ...
+    figName = sprintf('%s_%s_ROI%d_dFFNeuropilCorrected.pdf', ...
         sessionFileInfo.animal_name, ...
         sessionFileInfo.session_name, ...
-        roiIdx, ...
-        response.signalUsed);
+        roiIdx);
     figPath = fullfile(figSaveDir, figName);
     set(gcf, 'PaperUnits', 'inches', ...
              'PaperPosition', [0 0 11 4], ...
