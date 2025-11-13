@@ -1,8 +1,8 @@
-function [ES, bonsaiData, ES] = resamplAndAlign_BonsaiPeripheralSuite2P_VR(sessionFileInfo, samplingRate, mainTimeToUse, plotFlag)
+function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P_Apr25(sessionFileInfo, samplingRate, mainTimeToUse, VRStimName, plotFlag)
 %
 %   Aligns and interpolates all VR experiment signals (Suite2P, Bonsai, peripheral)
 %   to a unified 2P timebase using the Arduino clock.
-%   This function supports flexible frame time alignment, bondai lag correction, and visual
+%   This function supports flexible frame time alignment, bonsai lag correction, and visual
 %   inspection of raw vs interpolated signals.
 %
 % Inputs:
@@ -26,22 +26,24 @@ function [ES, bonsaiData, ES] = resamplAndAlign_BonsaiPeripheralSuite2P_VR(sessi
 %   sessionFileInfo = getSessionInfo('Mouse01', 'Day1');
 %   [processedTwoPData, bonsaiData, peripheralData] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo, 60, 'TwoPFrameTime', true);
 %
-% Aman and Sonali - April 2025
+% Aman and Sonali - April 2025 (used for 1st round of analyese) 
 %% Define default paramters and load appropriate data files
 if nargin < 2, samplingRate = 60; end
 if nargin < 3, mainTimeToUse = 'TwoPFrameTime'; end % This is the interrupt-arduino time from the Bonsai Arduino
-if nargin < 4, plotFlag = true; end
-if nargin < 5, VR_number = 1; end
+if nargin < 5, plotFlag = true; end
+% if nargin < 5, VR_number = 1; end
 
 % Pick out VRCorr
 for iStim = 1:length(sessionFileInfo.stimFiles)
-    bonsaiData.isVRstim(iStim) = strcmp('VRCorr',sessionFileInfo.stimFiles(iStim).name);
+    bonsaiData.isVRstim(iStim) = strcmp(VRStimName,sessionFileInfo.stimFiles(iStim).name);
 end
 
-stimList = find(bonsaiData.isVRstim==1); %%% have iStim (or) VR number as an input so you can run multiple VR files. And here just point to the first case if not specified
-iStim = stimList(VR_number);
+% stimList = find(bonsaiData.isVRstim==1); %%% have iStim (or) VR number as an input so you can run multiple VR files. And here just point to the first case if not specified
+% iStim = stimList(VR_number);
+iStim = find(bonsaiData.isVRstim==1);
 
 % Load data files
+
 if exist(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'file') && ...
         exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file') && ...
         exist(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'file')
@@ -53,7 +55,7 @@ else
 end
 
 % Save output path for a new 2P data file
-stimFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ES_' sessionFileInfo.stimFiles(iStim).name '.mat'];
+stimFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_processed2PData_' sessionFileInfo.stimFiles(iStim).name '.mat'];
 sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
 
 %% Create unified time base from the selected main time
@@ -79,10 +81,10 @@ for thisField = 1:numel(timeFields)
     fieldName = timeFields{thisField};
     concatenatedTimeVec = vertcat(twoPData.(fieldName));
     concatenatedTimeVec = concatenatedTimeVec(mainTimeUniqueIdx);
-    ES.(fieldName) = interp1(concatenatedTimeVec, concatenatedTimeVec, sampleTimes, generalInterpMethod)';
+    processedTwoPData.(fieldName) = interp1(concatenatedTimeVec, concatenatedTimeVec, sampleTimes, generalInterpMethod)';
 end
 
-ES.resample2PTimeUsed = mainTimeToUse; % For future use.
+processedTwoPData.resample2PTimeUsed = mainTimeToUse; % For future use.
 
 %% Interpolate: Suite2p data
 disp('Processing Suite2P Data')
@@ -90,15 +92,15 @@ roiFields = {'F', 'Fneu', 'spks'};
 %interpMethods = {'linear', 'linear', 'nearest'}; % Change if incorrect
 
 for thisField = 1:numel(roiFields)
-    ES.(roiFields{thisField}) = [];
+    processedTwoPData.(roiFields{thisField}) = [];
 end
 
-ES.roiPlaneIdentity = [];
-ES.iscell = [];
-ES.redcell = [];
-ES.stat = {};
-ES.ops = {};
-ES.planeName = {};
+processedTwoPData.roiPlaneIdentity = [];
+processedTwoPData.iscell = [];
+processedTwoPData.redcell = [];
+processedTwoPData.stat = {};
+processedTwoPData.ops = {};
+processedTwoPData.planeName = {};
 
 for thisPlaneIdx = 1:numel(twoPData)
     % Using the chosen arduino 2p plane time
@@ -108,15 +110,15 @@ for thisPlaneIdx = 1:numel(twoPData)
         fieldName = roiFields{thisField};
         signal = double(twoPData(thisPlaneIdx).(fieldName));
         interpolated = interp1(rawArduinoPlaneTime, signal', sampleTimes, generalInterpMethod)';
-        ES.(fieldName) = [ES.(fieldName); interpolated];
+        processedTwoPData.(fieldName) = [processedTwoPData.(fieldName); interpolated];
     end
 
-    ES.iscell = [ES.iscell; twoPData(thisPlaneIdx).iscell];
-    ES.redcell = [ES.redcell; twoPData(thisPlaneIdx).redcell];
-    ES.roiPlaneIdentity = [ES.roiPlaneIdentity; repmat(thisPlaneIdx-1, size(twoPData(thisPlaneIdx).F,1), 1)];
-    ES.stat = [ES.stat, twoPData(thisPlaneIdx).stat];
-    ES.ops{end+1} = twoPData(thisPlaneIdx).ops;
-    ES.planeName{end+1} = twoPData(thisPlaneIdx).planeName;
+    processedTwoPData.iscell = [processedTwoPData.iscell; twoPData(thisPlaneIdx).iscell];
+    processedTwoPData.redcell = [processedTwoPData.redcell; twoPData(thisPlaneIdx).redcell];
+    processedTwoPData.roiPlaneIdentity = [processedTwoPData.roiPlaneIdentity; repmat(thisPlaneIdx-1, size(twoPData(thisPlaneIdx).F,1), 1)];
+    processedTwoPData.stat = [processedTwoPData.stat, twoPData(thisPlaneIdx).stat];
+    processedTwoPData.ops{end+1} = twoPData(thisPlaneIdx).ops;
+    processedTwoPData.planeName{end+1} = twoPData(thisPlaneIdx).planeName;
 end
 
 %%  Interpolate: Peripheral - Wheel (no lag correction)
@@ -126,8 +128,8 @@ if isfield(peripheralData, 'Wheel')
     rawValue    = peripheralData.Wheel.rawValue;
     % @Aman Alternative naming for organising for interpolated vectors/
     % ResampledCorrArduinoTime? ResampledCorrValue?
-    ES.wheelValue      = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-    ES.wheelSampleTimes = sampleTimes;
+    peripheralData.Wheel.Value      = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    peripheralData.Wheel.sampleTimes = sampleTimes';
     %     peripheralData.Wheel.ArduinoTime= interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
 end
 
@@ -136,19 +138,25 @@ disp('Processing Peripheral Data: PD')
 if isfield(peripheralData, 'Photodiode')
     rawTime = peripheralData.Photodiode.rawArduinoTime;
     rawValue = peripheralData.Photodiode.rawValue;
-    ES.photodiodeValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-    ES.photodiodeSampleTimes = sampleTimes';
-
+    peripheralData.Photodiode.Value = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    peripheralData.Photodiode.sampleTimes = sampleTimes';
+    %     peripheralData.Photodiode.ArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
 end
 
 %% Interpolate: Bonsai - Mouse Position (lag corrected & uncorrected)
 disp('Processing Bonsai Data: Mouse Position')
 if isfield(bonsaiData, 'MousePos')
     rawValue = bonsaiData.MousePos.rawValue;
-    rawCorrectedTime = bonsaiData.MousePos.rawCorrectedArduinoTime;
+    rawTime = bonsaiData.MousePos.rawCorrectedArduinoTime;
+    %     lagCorrT = bonsaiData.MousePos.rawCorrectedArduinoTime;
     % Lag corrected
-     ES.mousePosValue = interp1(rawCorrectedTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-     ES.mousePosSampleTimes = sampleTimes';
+    bonsaiData.MousePos.Value = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    bonsaiData.MousePos.sampleTimes = sampleTimes';
+    %     bonsaiData.MousePos.ArduinoTime = interp1(lagCorrT, lagCorrT, sampleTimes, generalInterpMethod, NaN)';
+
+    % Uncorrected %%%%% don't need this
+%     bonsaiData.MousePos.uncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+%     bonsaiData.MousePos.uncorrectedArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
 end
 
 
@@ -157,9 +165,9 @@ disp('Processing Bonsai Data: Trial Info')
 if isfield(bonsaiData, 'TrialInfo')
     correctedStartTimeAll = bonsaiData.TrialInfo.rawCorrectedArduinoTime;
     uncorrectedStartTimeAll = bonsaiData.TrialInfo.rawArduinoTime;
-    % Snap to nearest value in resampled 2P time vector % Try previous 
-    ES.StartTimeAll = interp1(sampleTimes, sampleTimes, correctedStartTimeAll, trialInfoInterpMethod);
-    ES.uncorrectedStartTimeAll = interp1(sampleTimes, sampleTimes, uncorrectedStartTimeAll, trialInfoInterpMethod);
+    % Snap to nearest value in resampled 2P time vector
+    bonsaiData.TrialInfo.StartTimeAll = interp1(sampleTimes, sampleTimes, correctedStartTimeAll, trialInfoInterpMethod);
+    bonsaiData.TrialInfo.uncorrectedStartTimeAll = interp1(sampleTimes, sampleTimes, uncorrectedStartTimeAll, trialInfoInterpMethod);
 end
 
 %% Interpolate: Bonsai - Quadstate (lag corrected)
@@ -168,12 +176,12 @@ if isfield(bonsaiData, 'Quadstate')
     rawValue = bonsaiData.Quadstate.rawValue;
     rawTime = bonsaiData.Quadstate.rawArduinoTime;
     % Lag corrected
-    rawCorrectedTime = bonsaiData.Quadstate.rawCorrectedArduinoTime;
-    ES.quadstateValue = interp1(rawCorrectedTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-    ES.quadstateSampleTime = sampleTimes; 
+    lagCorrT = bonsaiData.Quadstate.rawCorrectedArduinoTime;
+    bonsaiData.Quadstate.Value = interp1(lagCorrT, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    bonsaiData.Quadstate.sampleTimes = sampleTimes';
     % Uncorrected
-    ES.quadstateUncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-
+%     bonsaiData.Quadstate.uncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+%     bonsaiData.Quadstate.uncorrectedArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
 end
 
 %% Sanity check plots
@@ -183,19 +191,19 @@ if plotFlag
     hold on;
     histogram(diff(raw2PTimes), 'BinWidth', 0.001, 'DisplayName', 'Original');
     histogram(diff(unique2PTimes), 'BinWidth', 0.001, 'DisplayName', 'Unique');
-    histogram(diff(ES.(mainTimeToUse)), 'BinWidth', 0.001, 'DisplayName', 'Resampled');
+    histogram(diff(processedTwoPData.(mainTimeToUse)), 'BinWidth', 0.001, 'DisplayName', 'Resampled');
     xlabel('Time Diff (s)'); ylabel('Count');
     legend; title('2P Frame Time Distribution');
     xlim([0 0.2]);
 
     % Neuron trace comparison
-    planeIn dex = 1;
+    planeIndex = 1;
     fOrig = double(twoPData(planeIndex).F);
     originalTime = double(twoPData(planeIndex).(mainTimeToUse));
     nROIs = size(fOrig, 1);
     roiIndices = randperm(nROIs, 5);
-    roiMask = ES.roiPlaneIdentity == (planeIndex - 1);
-    fResampled = ES.F(roiMask, :);
+    roiMask = processedTwoPData.roiPlaneIdentity == (planeIndex - 1);
+    fResampled = processedTwoPData.F(roiMask, :);
 
     figure('Name', 'Calcium Trace Comparison');
     for idx = 1:numel(roiIndices)
@@ -203,7 +211,7 @@ if plotFlag
         subplot(numel(roiIndices), 1, idx);
         hold on;
         plot(originalTime, fOrig(roi, :), 'k','LineWidth', 1.2, 'DisplayName', 'Original');
-        plot(ES.(mainTimeToUse), fResampled(roi, :), 'r--', 'LineWidth', 1.2, 'DisplayName', 'Resampled');
+        plot(processedTwoPData.(mainTimeToUse), fResampled(roi, :), 'r--', 'LineWidth', 1.2, 'DisplayName', 'Resampled');
         title(sprintf('ROI %d (Plane %d)', roi, planeIndex));
         ylabel('F');
         if idx == 1
@@ -215,17 +223,17 @@ if plotFlag
 
     figure('Name', 'Resampled Peripheral Signals');
     plotIdx = 1;
-    if isfield(ES, 'Photodiode')
+    if isfield(peripheralData, 'Photodiode')
         subplot(2,1,plotIdx); plotIdx = plotIdx + 1;
         plot(peripheralData.Photodiode.rawArduinoTime, peripheralData.Photodiode.rawValue, 'k.', 'DisplayName', 'Raw'); hold on;
-        plot(ES.photodiodeSampleTimes, ES.photodiodeValue, 'r-', 'DisplayName', 'Corrected/Interpolated');
+        plot(peripheralData.Photodiode.sampleTimes, peripheralData.Photodiode.Value, 'r-', 'DisplayName', 'Corrected/Interpolated');
         title('Photodiode: Raw vs Interpolated'); legend; ylabel('PD'); xlabel('Time');
     end
 
-    if isfield(ES, 'Wheel')
+    if isfield(peripheralData, 'Wheel')
         subplot(2,1,plotIdx); plotIdx = plotIdx + 1;
-        plot(ES.Wheel.rawArduinoTime, ES.Wheel.rawValue, 'k.', 'DisplayName', 'Raw'); hold on;
-        plot(ES.Wheel.ArduinoTime, ES.Wheel.Value, 'r-', 'DisplayName', 'Corrected/Interpolated');
+        plot(peripheralData.Wheel.rawArduinoTime, peripheralData.Wheel.rawValue, 'k.', 'DisplayName', 'Raw'); hold on;
+        plot(peripheralData.Wheel.sampleTimes, peripheralData.Wheel.Value, 'r-', 'DisplayName', 'Corrected/Interpolated');
         title('Wheel: Raw vs Interpolated'); legend; ylabel('PD'); xlabel('Time');
     end
 
@@ -234,25 +242,25 @@ if plotFlag
     if isfield(bonsaiData, 'MousePos')
         subplot(2,1,plotIdx); plotIdx = plotIdx + 1;
         plot(bonsaiData.MousePos.rawArduinoTime, bonsaiData.MousePos.rawValue, 'k.', 'DisplayName', 'Raw'); hold on;
-        plot(bonsaiData.MousePos.ArduinoTime, bonsaiData.MousePos.Value, 'r-', 'DisplayName', 'Corrected/Interpolated');
+        plot(bonsaiData.MousePos.sampleTimes, bonsaiData.MousePos.Value, 'r-', 'DisplayName', 'Corrected/Interpolated');
         title('MousePos: Raw vs Lag-Corrected'); legend; ylabel('Position'); xlabel('Time');
     end
 
     if isfield(bonsaiData, 'Quadstate')
         subplot(2,1,plotIdx); plotIdx = plotIdx + 1;
         plot(bonsaiData.Quadstate.rawArduinoTime, bonsaiData.Quadstate.rawValue, 'k', 'DisplayName', 'raw Time'); hold on;
-        plot(bonsaiData.Quadstate.ArduinoTime, bonsaiData.Quadstate.Value, 'r-', 'DisplayName', 'Corrected/Interpolated Time');
+        plot(bonsaiData.Quadstate.sampleTimes, bonsaiData.Quadstate.Value, 'r-', 'DisplayName', 'Corrected/Interpolated Time');
         title('Quadstate: Raw vs Lag-Corrected'); legend; ylabel('Quad'); xlabel('Time');
     end
 end
 
 %% Save
 disp('Saving processed data files...');
-save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'ES', '-v7.3');
+save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData', '-v7.3');
 disp('Saved processedTwoPData');
 save(sessionFileInfo.stimFiles(iStim).BonsaiData, "bonsaiData");
 disp('Saved bonsaiData');
-save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, "ES");
+save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, "peripheralData");
 disp('Saved peripheralData');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 disp('Saved sessionFileInfo');

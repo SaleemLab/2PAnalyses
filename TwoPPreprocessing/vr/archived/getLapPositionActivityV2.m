@@ -1,8 +1,8 @@
-function [response, sessionFileInfo] = getLapPositionActivityV2(sessionFileInfo, signalField, applySmoothing, VRStimName, onlyIncludeROIs, applyDeltaFoverF, applyNeuropilCorrection)
+function [response, sessionFileInfo] = getLapPositionActivityV2(sessionFileInfo, signalField, applyTemporalSmoothing, VRStimName, onlyIncludeROIs, applyDeltaFoverF, applyNeuropilCorrection)
 %% Split the delta f/f into a different function and save this as a new session; Using median as the metric. 
 % Handle optional inputs
 if nargin < 2 || isempty(signalField), signalField = 'F'; end
-if nargin < 3, applySmoothing = false; end
+if nargin < 3, applyTemporalSmoothing = false; end
 if nargin < 4, error('VRStimName must be provided'); end
 if nargin < 5, onlyIncludeROIs = true; end
 if nargin < 6, applyDeltaFoverF = true; end
@@ -80,8 +80,8 @@ for thisCell = 1:numCells
     end
 end
 
-%% Optional smoothing
-if applySmoothing
+%% Optional temporal smoothing
+if applyTemporalSmoothing
     w = gausswin(9); w = w / sum(w);
     for thisCell = 1:numCells
         for lapIdx = 1:nLaps
@@ -99,7 +99,7 @@ end
 %% Save and return
 response.lapPositionActivity = lapPositionActivity;
 response.signalUsed = signalField;
-response.smoothingApplied = applySmoothing;
+response.smoothingApplied = applyTemporalSmoothing;
 response.deltaFoverFApplied = applyDeltaFoverF;
 response.neuropilCorrected = applyNeuropilCorrection;
 if onlyIncludeROIs

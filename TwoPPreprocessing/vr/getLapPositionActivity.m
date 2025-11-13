@@ -1,129 +1,99 @@
-function [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, signalField, applySmoothing, VRStimName, onlyIncludeROIs)
-%   Extracts mean binned fluorescence/activity values per lap from 2P data.
-%   Only includes ROIs labeled as "cells" and only for completed laps.
-%   Optionally applies Gaussian temporal smoothing across position bins.
+function [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, VRStimName, overwrite, onlyIncludeROIs, useZScoredProcessedSignals)
+% Calculates and saves binned lap activity for four signal types.
+% This version uses an efficient, vectorized approach assuming that
+% lapPosition2PFrameIdx is a 2D cell array (nLaps x nBins).
 %
-% Inputs:
-%   sessionFileInfo : struct
-%
-%   signalField : string (optional, default = 'F')
-%       The signal to extract (e.g., 'F', 'Fneu', 'spks', 'deltaF_over_F')
-%
-%   applySmoothing : logical (optional, default = false)
-%       Whether to smooth activity across position bins using a Gaussian filter
-%
-% Output:
-%   response : struct (updated)
-%       Adds the following fields:
-%         - lapPositionActivity : [nCells x nLaps x nBins] mean activity per bin
-%         - cellROIs             : indices of cell ROIs
-%         - signalUsed           : which signal type was used
-%         - smoothingApplied     : whether smoothing was applied
-%
-% Example usage:
-%   response = getLapPositionActivity(sessionFileInfo, 'F', false);
+% Aman and Sonali February 2025
+% Modified Oct 2025
 
-% Handle optional inputs
-if nargin < 2 || isempty(signalField)
-    signalField = 'F';
-end
-if nargin < 3
-    applySmoothing = false;
+%% Handle optional inputs
+if nargin < 3, overwrite = false; end % Default overwrite to false
+if nargin < 4, onlyIncludeROIs = false; end
+if nargin < 5, useZScoredProcessedSignals = true; end
+
+
+%% Find VR stimulus and load data
+stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
+if isempty(stimIdx), error('Specified VRStimName not found in sessionFileInfo.'); end
+
+disp('Loading processedTwoPData and Response structs...');
+load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'processedTwoPData');
+load(sessionFileInfo.stimFiles(stimIdx).Response, 'response');
+
+%% Overwrite check
+if overwrite && isfield(response, 'lapPositionActivity')
+    disp('Overwrite is true. Removing old analysis fields...');
+    fieldsToRemove = {'lapPositionActivity', 'cellROIs'}; % Add any other related fields
+    response = rmfield(response, intersect(fieldsToRemove, fieldnames(response)));
 end
 
-if nargin < 4
-    onlyIncludeROIs = true;
-end 
-
-%% Find the VRCorr stimulus index
-for iStim = 1:length(sessionFileInfo.stimFiles)
-    bonsaiData.isVRstim(iStim) = strcmp(VRStimName, sessionFileInfo.stimFiles(iStim).name);
-end
-iStim = find(bonsaiData.isVRstim == 1);
-
-if isempty(iStim)
-    error('No VRCorr stimulus found in sessionFileInfo.');
-end
-
-%% Load required data
-if exist(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'file') && ...
-   exist(sessionFileInfo.stimFiles(iStim).Response, 'file')
-    disp('Loading processedTwoPData..')
-    load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData')
-    disp('Loaded response..')
-    load(sessionFileInfo.stimFiles(iStim).Response, 'response')
-else
-    error('Missing processed files: Response or processedTwoPData.');
-end
-
-%% Validate and pull signal
-if ~isfield(processedTwoPData, signalField)
-    error(['Signal field "' signalField '" not found in twoPData.']);
-end
-signalMatrix = processedTwoPData.(signalField);  % Size: ROI x time
-
+%% Get cell ROIs if needed
 if onlyIncludeROIs
-    % Get ROIs that are cells
-    isCell = logical(processedTwoPData.iscell(:, 1));
-    cellROIs = find(isCell);
-    numCells = length(cellROIs);
+    ROIs = find(processedTwoPData.iscell(:, 1));
 else
-    numCells = size(processedTwoPData.F, 1);
+    ROIs = 1:size(processedTwoPData.iscell, 1);
+end
+numCells = length(ROIs);
+
+%% Select appropriate signal to use
+
+if useZScoredProcessedSignals
+    disp('Using zScored dFF and dFFNeuropilCorrected for spatial tuning curves..')
+    signals = processedTwoPData.zScoredProcessedSignals; 
+    response.signalsZScored = true; 
+else  
+    signals = processedTwoPData.processedSignals; 
+    response.signalsZScored = false; 
+    disp('Using dFF and dFFNeuropilCorrected (without zScoring) for spatial tuning curves..')
 end 
-% Lap + bin setup
-binCentres = 0.5:1:139.5;
-numBins = length(binCentres);
-nLaps = length(response.completedStartTimes);
+%% Binning parameters and initialisation
+if ndims(response.lapPosition2PFrameIdx) == 3
+    response.lapPosition2PFrameIdx = squeeze(response.lapPosition2PFrameIdx);
+end
+numBins = 140; % 1cm bins for a 140cm track
+nLaps = size(response.lapPosition2PFrameIdx, 1); % Get nLaps from the 2D cell array
+lapPositionActivity = struct();
 
-% Init output matrix
-lapPositionActivity = nan(numCells, nLaps, numBins);
 
-% Compute mean signal per bin per lap
-for thisCell = 1:numCells
-    if onlyIncludeROIs
-        roiIdx = cellROIs(thisCell);
-    else
-        roiIdx = thisCell;
-    end
-    for lapIdx = 1:nLaps
-        for binIdx = 1:numBins
-            frameIdx = response.lapPosition2PFrameIdx{roiIdx, lapIdx, binIdx};
-            if ~isempty(frameIdx)
-                lapPositionActivity(thisCell, lapIdx, binIdx) = ...
-                    mean(signalMatrix(roiIdx, frameIdx));
+% Initialise storage for all signal types
+signalNames = fieldnames(signals);
+for thisSignal = 1:length(signalNames)
+    lapPositionActivity.(signalNames{thisSignal}) = nan(numCells, nLaps, numBins);
+end
+
+%% 
+disp('Binning lap-position-activity for all signals...');
+
+% Loop over laps and bins first
+for thisLap = 1:nLaps
+    for thisBin = 1:numBins
+        % 1. Get frame indices ONCE for this lap and bin.
+        % lapPosition2PFrameIdx is now {nLaps, nBins}
+        frameIdx = response.lapPosition2PFrameIdx{thisLap, thisBin};
+        
+        % If frames exist in this bin, process all signals and cells
+        if ~isempty(frameIdx)
+            for iSignal = 1:length(signalNames)
+                currentSignalName = signalNames{iSignal};
+                currentSignalMatrix = signals.(currentSignalName);
+                
+                % 2. Vectorised calculation for ALL cells at once.
+                % This is much faster than an inner for-loop.
+                % It takes the mean across the time dimension (dim 2).
+                meanActivity = mean(currentSignalMatrix(ROIs, frameIdx), 2, 'omitnan');
+                
+                % 3. Store the resulting vector of activities for all cells.
+                lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = meanActivity;
             end
         end
     end
 end
-
-%% Optional Gaussian smoothing across bins
-if applySmoothing
-    w = gausswin(9); w = w / sum(w);
-    for thisCell = 1:numCells
-        for lapIdx = 1:nLaps
-            signal = squeeze(lapPositionActivity(thisCell, lapIdx, :));
-            if all(isnan(signal))
-                continue 
-            end
-            nanMask = isnan(signal);F
-            signal(nanMask) = 0; % Turn nans to 0 temporarily 
-            smoothed = filtfilt(w, 1, signal); % Smoothen
-            smoothed(nanMask) = NaN; % Turn back to nans 
-            lapPositionActivity(thisCell, lapIdx, :) = smoothed;
-        end
-    end
-end
-
-%% Store in response struct and save
+%% Save results to the response struct
 response.lapPositionActivity = lapPositionActivity;
 if onlyIncludeROIs
-    response.cellROIs = cellROIs;
+    response.cellROIs = ROIs;
 end
-response.signalUsed = signalField;
-response.smoothingApplied = applySmoothing;
 
-% Save updated response
-disp('Saving updated response with lapPositionActivity...');
-save(sessionFileInfo.stimFiles(iStim).Response, 'response', '-v7.3');
-
+disp('Saving response with updated lapPositionActivities...');
+save(sessionFileInfo.stimFiles(stimIdx).Response, 'response', '-v7.3');
 end
