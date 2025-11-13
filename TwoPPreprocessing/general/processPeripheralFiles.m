@@ -33,7 +33,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
     %% Quad File
     quad_path = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'Quad');
     if exist(quad_path, 'file')
-        fprintf('Found Quad file: %s\n', quad_path);  % Debugging
+        % fprintf('Found Quad file: %s\n', quad_path);  % Debugging
         
         quadstate_table = readtable(quad_path);
         if ismember('ArduinoTime', quadstate_table.Properties.VariableNames)
@@ -81,5 +81,6 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
    end
     
    save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, "peripheralData")
+   disp('Saving Peripheral Data for all Stimuli')
    save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end

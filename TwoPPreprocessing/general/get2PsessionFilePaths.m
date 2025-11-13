@@ -40,6 +40,7 @@ end
 save_fileName = [animal_name '_' session_name '_sessionFileInfo' fileNameAddition '.mat'];
 
 if exist([save_folder filesep save_fileName])~=2 || rerun_process == 1
+    % Checks the number of suite2p planes
     planes = dir(fullfile(suite2p_folder, 'plane*'));
     sessionFileInfo.numPlanes = length(planes);
 

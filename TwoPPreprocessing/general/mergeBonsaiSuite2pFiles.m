@@ -1,87 +1,103 @@
-function [sessionFileInfo] = mergeBonsaiSuite2pFiles(sessionFileInfo) 
-% Example usage: [sessionFileInfo] = mergeBonsaiSuite2pFiles(sessionFileInfo) 
-% Outputs: Updates sessionFileInfo with filepaths and mouse_session_2pData.mat file 
+function [sessionFileInfo] = mergeBonsaiSuite2pFiles(sessionFileInfo)
+% Merges Bonsai and Suite2p data for each stimulus in a session.
+% This version is robust to errors, continuing to the next stimulus
+% even if one fails to process. It saves all successful filepaths.
+%
 % Sonali and Aman - Jan 2025
+% Modified for robustness - Oct 2025
 
 for iStim = 1:length(sessionFileInfo.stimFiles)
     
-    % Add the merged .mat file to the sessionFileInfo 
-    stimFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_2pData' '_' sessionFileInfo.stimFiles(iStim).name '.mat'];
-    sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData = fullfile(sessionFileInfo.Directories.save_folder,stimFileName);
+    stimName = sessionFileInfo.stimFiles(iStim).name;
     
-    % find the last plane's size to trim bonsai and suite2p data
-    if strcmp(sessionFileInfo.suite2pFiles(end).planeName,'plane')
-        lastPlane_FrameRun = sessionFileInfo.stim_framerun{[sessionFileInfo.suite2pFiles(end).planeName '0'],sessionFileInfo.stimFiles(iStim).name}{1};
-        numPlanes = sessionFileInfo.origNPlanes;
-    else
-        lastPlane_FrameRun = sessionFileInfo.stim_framerun{sessionFileInfo.suite2pFiles(end).planeName,sessionFileInfo.stimFiles(iStim).name}{1};
-        numPlanes = sessionFileInfo.numPlanes;
-    end
-    trimLength = lastPlane_FrameRun(2)-lastPlane_FrameRun(1) + 1;
-    
-%     % Pick out VRCorr if present and process differently.
-%     bonsaiData.isVRstim(iStim) = strcmp('VRCorr',sessionFileInfo.stimFiles(iStim).name);
-%     if iStim == bonsaiData.isVRstim
-% 
-%     end 
-    % load the Bonsai 2p plane times 
-    twop_filepath     = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, '2P');
-    planeTimes_table  = get_bonsai_twopframetimes_by_planes(twop_filepath, numPlanes);
-   
-    %% Suite2p and Bonsai
-    for iPlane = 1:sessionFileInfo.numPlanes
-        planeName = sessionFileInfo.suite2pFiles(iPlane).planeName;
-        twoPData(iPlane).planeName = planeName;
+    % --- Wrap the processing for each stimulus in a try...catch block ---
+    try
+        fprintf('Processing mergeBonsaiSuite2PFiles for %s\n', stimName);
         
-        % ---------- Suite2p -----------
-        % This filepath contains all the suite2p data stored in a .mat file
-        fAll_filepath = findFile(sessionFileInfo.suite2pFiles(iPlane).planes, 'fall');
-          
-        % Check if the is empty (i.e., file not found)
-        if isempty(fAll_filepath)
-           warning([twoPData(iPlane).planeName, ' fall.mat file has not been generated from suite2p or this plane has no data']);
-           continue;  % Skip this plane and move on to the next one
-        end 
+        % 1. Define the output filepath for the merged .mat file
+        stimFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_2pData' '_' stimName '.mat'];
+        merged_data_filepath = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
         
-        % Load the Suite2p data for the current plane
-        fAll                    = load(fAll_filepath);
-        twoPData(iPlane).ops    = fAll.ops;
-        twoPData(iPlane).iscell = fAll.iscell;
-        twoPData(iPlane).stat   = fAll.stat;
-        twoPData(iPlane).redcell= fAll.redcell;
-
-        % Pick out the stimulus frameRun for the corresponding stimulus 
-        if strcmp(planeName,'plane')
-            twoPData(iPlane).frameRun = sessionFileInfo.stim_framerun{[planeName '0'],sessionFileInfo.stimFiles(iStim).name}{1};
-            currentPlaneInfo = twoPData.ops.current_plane(twoPData(iPlane).frameRun(1):(twoPData(iPlane).frameRun(1)+trimLength-1));
+        % 2. Determine the trim length based on the last plane's frame run
+        if strcmp(sessionFileInfo.suite2pFiles(end).planeName, 'plane')
+            lastPlane_FrameRun = sessionFileInfo.stim_framerun{['plane' '0'], stimName}{1};
+            numPlanes = sessionFileInfo.origNPlanes;
         else
-            twoPData(iPlane).frameRun = sessionFileInfo.stim_framerun{planeName,sessionFileInfo.stimFiles(iStim).name}{1};
+            lastPlane_FrameRun = sessionFileInfo.stim_framerun{sessionFileInfo.suite2pFiles(end).planeName, stimName}{1};
+            numPlanes = sessionFileInfo.numPlanes;
         end
-    
+        trimLength = lastPlane_FrameRun(2) - lastPlane_FrameRun(1) + 1;
         
-        % Trim across all planes using the last plane's max length and save
-        trimIndices             = twoPData(iPlane).frameRun(1):(twoPData(iPlane).frameRun(1)+trimLength-1);
-        twoPData(iPlane).F      =    fAll.F(:, trimIndices);
-        twoPData(iPlane).spks   = fAll.spks(:, trimIndices);
-        twoPData(iPlane).Fneu   = fAll.Fneu(:, trimIndices);  
-
-        % % ---------- Bonsai -----------
-        if strcmp(planeName,'plane')
-            planeTimes_trim = planeTimes_table.plane0(1:trimLength,:);
-            for iTime = 1:trimLength
-                planeTimes_trim(iTime,:) = planeTimes_table.([planeName num2str(currentPlaneInfo(iTime))])(iTime, :);
+        % 3. Load the Bonsai 2p plane times
+        twop_filepath = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, '2P');
+        planeTimes_table = get_bonsai_twopframetimes_by_planes(twop_filepath, numPlanes);
+        
+        % 4. Initialize a temporary struct for this stimulus's data
+        twoPData = struct(); 
+        
+        %% Loop through each plane for the current stimulus
+        for iPlane = 1:sessionFileInfo.numPlanes
+            planeName = sessionFileInfo.suite2pFiles(iPlane).planeName;
+            
+            fAll_filepath = findFile(sessionFileInfo.suite2pFiles(iPlane).planes, 'fall');
+            if isempty(fAll_filepath)
+               warning('fall.mat not found for %s. Skipping this plane.', planeName);
+               continue;
             end
-        else
-            planeTimes_trim = planeTimes_table.(planeName)(1:trimLength, :);
+            fAll = load(fAll_filepath);
+            
+            % Get stimulus-specific frame run and trim indices
+            if strcmp(planeName, 'plane')
+                frameRun = sessionFileInfo.stim_framerun{['plane' '0'], stimName}{1};
+                currentPlaneInfo = fAll.ops.current_plane(frameRun(1):(frameRun(1) + trimLength - 1));
+            else
+                frameRun = sessionFileInfo.stim_framerun{planeName, stimName}{1};
+            end
+            trimIndices = frameRun(1):(frameRun(1) + trimLength - 1);
+            
+            % Populate the twoPData struct for this plane
+            twoPData(iPlane).planeName = planeName;
+            twoPData(iPlane).ops = fAll.ops;
+            twoPData(iPlane).iscell = fAll.iscell;
+            twoPData(iPlane).stat = fAll.stat;
+            twoPData(iPlane).redcell = fAll.redcell;
+            twoPData(iPlane).frameRun = frameRun;
+            twoPData(iPlane).F = fAll.F(:, trimIndices);
+            twoPData(iPlane).spks = fAll.spks(:, trimIndices);
+            twoPData(iPlane).Fneu = fAll.Fneu(:, trimIndices);
+            
+            % Trim and add Bonsai data
+            if strcmp(planeName,'plane')
+                planeTimes_trim = planeTimes_table.plane0(1:trimLength,:);
+                for iTime = 1:trimLength
+                    planeTimes_trim(iTime,:) = planeTimes_table.([planeName num2str(currentPlaneInfo(iTime))])(iTime, :);
+                end
+            else
+                planeTimes_trim = planeTimes_table.(planeName)(1:trimLength, :);
+            end
+            twoPData(iPlane).TwoPFrameTime = planeTimes_trim.TwoPFrameTime;
+            twoPData(iPlane).BonsaiTime = planeTimes_trim.BonsaiTime;
+            twoPData(iPlane).ArduinoTime = planeTimes_trim.ArduinoTime; % why was this missing.. 
         end
-        twoPData(iPlane).TwoPFrameTime = planeTimes_trim.TwoPFrameTime;
-        twoPData(iPlane).BonsaiTime = planeTimes_trim.BonsaiTime;
-        twoPData(iPlane).RenderFrameCount = planeTimes_trim.RenderFrameCount;
-        twoPData(iPlane).LastSyncPulseTime = planeTimes_trim.LastSyncPulseTime;
-        twoPData(iPlane).ArduinoTime = planeTimes_trim.ArduinoTime;
+        
+        % 5. If all planes processed successfully, save the data
+        save(merged_data_filepath, 'twoPData');
+        
+        % 6. Crucially, save the successful filepath to sessionFileInfo
+        sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData = merged_data_filepath;
+        
+    catch ME
+        % --- This block runs ONLY if an error occurred in the 'try' block ---
+        warning('Failed to process stimulus "%s". Error: %s', stimName, ME.message);
+        fprintf(2, '    -> Error occurred in function %s at line %d.\n', ME.stack(1).name, ME.stack(1).line);
+        
+        % Set the filepath to empty to indicate failure
+        sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData = []; 
     end
+end
 
-    save(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'twoPData');
-    save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
-
+% --- Save the final sessionFileInfo ONCE after the loop is finished ---
+disp('All stimuli processed. Saving final sessionFileInfo...');
+save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+disp('Done.');
 end

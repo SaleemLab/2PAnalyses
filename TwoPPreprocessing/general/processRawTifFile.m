@@ -2,6 +2,7 @@ function [tempsessionFileInfo] = processRawTifFile(animal_name, session_name)
 % Usage: [tempsessionFileInfo] = processRawTifFile('M25012', '20250210')
 % Aman and Sonali - Feb 2025
 %% Create a temp sessionFileInfo struct (that is currently not saved) to find the tif paths 
+
 rootDir = ['Z:' filesep fullfile('ibn-vision','DATA','SUBJECTS',animal_name)];
 ophysFolder = fullfile(rootDir, 'Ophys', session_name);
 entries = dir(ophysFolder);
@@ -53,10 +54,13 @@ for iStim = 1:length(tempsessionFileInfo.stimFiles)
 
      % ---- Check if last grab was complete -----
 
-    % 1 'grab' = twopMetadata.numSlices * twopMetadata.channelSave
-    % length(str2num(twopMetadata.channelSave))) 
-    
-    channelSave = str2num(twopMetadata.channelSave);  % handles both numeric (1 channel) and string (2 channels)
+    % 1 'grab' = twopMetadata.numSlices * twopMetadata.channelSave 
+    % handles both numeric (1 channel) and string (2 channels)
+    if isstring(twopMetadata.channelSave)
+        channelSave = str2num(twopMetadata.channelSave); 
+    else 
+        channelSave = twopMetadata.channelSave;
+    end 
     if isempty(channelSave)
         error('channelSave could not be parsed. Check the format in twopMetadata.');
     end
@@ -194,6 +198,7 @@ function trimmedTifPath = trimLastGrab(lastTiffilePath, framesToRemove, lastFram
     % Return the number of frames after trimming
     trimmedFrames = framesToKeep;
 end
+
 end
 
 %% Helper function to parse metadata - entirely ChatGPT :P
@@ -244,3 +249,4 @@ function value = convertValue(valueStr)
         value = numericValue;
     end
 end
+

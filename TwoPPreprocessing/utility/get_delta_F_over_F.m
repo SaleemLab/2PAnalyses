@@ -17,7 +17,9 @@ function dF_F = get_delta_F_over_F(Fc, F0)
     % dF_F : [t x nROIs] matrix
     %     Change in fluorescence (dF/F) of ROIs.
     % 
-
-    dF_F = (Fc - F0) ./ max(1, nanmean(F0, 1));
-    % Alternative: dF_F = (Fc - F0) ./ max(1, F0);
+    
+    
+    % dF_F = (Fc - F0) ./ max(1, nanmean(F0, 1));
+    % Alternative: 
+    dF_F = (Fc - F0) ./ max(1, F0);
 end
