@@ -1,0 +1,143 @@
+function plotSpatialTuningAndBoutonCorrMatrix_AcrossLearningDays(MouseID, varargin)
+p = inputParser;
+addRequired(p, 'MouseID', @iscellstr);
+addParameter(p, 'ExcludeMice', {'M24043', 'M24046', 'M24048', 'M24049'}, @iscellstr);
+addParameter(p, 'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\', @ischar);
+addParameter(p, 'TypeImaged', 'Boutons', @ischar);
+
+masterTable = filterMasterTable('Exclude', 0, 'Suite2PPreprocessing', 1);
+parse(p, MouseID, varargin{:});
+
+excludeMiceList = p.Results.ExcludeMice;
+saveDirectory = p.Results.SavePath;
+imagingType = p.Results.TypeImaged;
+
+
+if ~exist(saveDirectory, 'dir')
+    mkdir(saveDirectory);
+    fprintf('Created save directory: %s\n', saveDirectory);
+end
+
+% Get the final list of mice to process
+miceToProcess = setdiff(unique(p.Results.MouseID), excludeMiceList, 'stable');
+
+% Loop through each mouse
+for mouseIndex = 1:length(miceToProcess)
+    currentMouseID = miceToProcess{mouseIndex};
+    fprintf('Processing Mouse: %s\n', currentMouseID);
+
+    % Filter table for this mouse and imaging type
+    mouseSessionsTable = masterTable(strcmp(masterTable.MouseID, currentMouseID) & ...
+        strcmp(masterTable.TypeImaged, imagingType), :);
+
+    % Sort sessions based on SessionNum
+    if ~ismember('SessionNum', mouseSessionsTable.Properties.VariableNames)
+        sortedMouseSessionsTable = mouseSessionsTable;
+    else
+        [~, sortOrder] = sort(mouseSessionsTable.SessionNum);
+        sortedMouseSessionsTable = mouseSessionsTable(sortOrder, :);
+    end
+
+    numberOfSessions = height(sortedMouseSessionsTable);
+
+    if numberOfSessions == 0
+        fprintf('  No sessions found for %s matching criteria. Skipping.\n', currentMouseID);
+        continue;
+    end
+
+    % Single PDF for each mouse
+    pdfSavePath = fullfile(saveDirectory, [currentMouseID '_AllBoutonSessions_TuningAndBoutonCorrelation_NonVRRecsOnly.pdf']);
+
+    % Iterate through each session for this mouse
+    for sessionIndex = 1:numberOfSessions
+        try
+            currentSessionRow = sortedMouseSessionsTable(sessionIndex, :);
+
+            % Extract session details from the table row
+            currentSessionID = currentSessionRow.Session{1};
+            currentTargetArea = currentSessionRow.TargetArea{1};
+
+            fprintf('  Processing Session: %s\n', currentSessionID);
+
+
+            [R_sorted, normOdd, normEven, sortIdx, numCells, dataScope, signalToUse] = SpatialTuningAndBoutonCorrelationMatrix(currentMouseID, currentSessionID, currentTargetArea, false, true, false);
+
+            %
+            hFig = figure('Position', [100 100 1600 600], 'Visible', 'off');
+
+            % Sorted correlation matrix
+            ax1 = subplot(1, 3, 1);
+            imagesc(R_sorted);
+            colormap(ax1, 'jet');
+            clim([-0.2 1]);
+            axis square;
+            set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 10);
+            xlabel('Sorted ROIs');
+            ylabel('Sorted ROIs');
+            title(sprintf('Correlation Matrix (Sorted)\n%s', dataScope));
+            colorbar; ylabel(colorbar, 'Pearson (r)');
+
+            % Odd Laps (The sorting reference)
+            ax2 = subplot(1, 3, 2);
+            imagesc(normOdd(sortIdx, :));
+            clim([0 1]); colormap(ax2, flipud(gray));
+            set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 10, 'YDir', 'normal');
+            xline(50, 'k--', 'LineWidth', 1.5);
+            xline(70, 'k--', 'LineWidth', 1.5);
+            xline(90, 'k--', 'LineWidth', 1.5);
+            xline(110, 'k--', 'LineWidth', 1.5);
+            xticks([0 50 70 90 110 140]);
+            xticklabels({'0', '50', '70', '90', '110', '140'});
+            xlabel('Position (cm)');
+            ylabel('ROIs (sorted by odd peak)');
+            title(sprintf('Odd Laps (Sorted)\n%s', signalToUse));
+            colorbar; ylabel(colorbar, 'Activity (normalised)');
+
+            % Even Laps (Sorted by Odd)
+            ax3 = subplot(1, 3, 3);
+            imagesc(normEven(sortIdx, :));
+            clim([0 1]); colormap(ax3, flipud(gray));
+            set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 10, 'YDir', 'normal');
+            xline(50, 'k--', 'LineWidth', 1.5);
+            xline(70, 'k--', 'LineWidth', 1.5);
+            xline(90, 'k--', 'LineWidth', 1.5);
+            xline(110, 'k--', 'LineWidth', 1.5);
+            xticks([0 50 70 90 110 140]);
+            xticklabels({'0', '50', '70', '90', '110', '140'});
+            xlabel('Position (cm)');
+            ylabel('ROIs (sorted by odd peak)');
+            title(sprintf('Even Laps (Sorted by Odd)\n%s', signalToUse));
+            colorbar; ylabel(colorbar, 'Activity (normalised)');
+
+            % main title for the entire figure
+            sgtitle(sprintf('%s :: Mouse: %s, Session: %s (n=%d ROIs)', ...
+                currentTargetArea, currentMouseID, currentSessionID, numCells), 'Interpreter', 'none');
+
+            % Save this figure to this mouse's PDF file
+            fprintf('  Appending figure to PDF: %s\n', pdfSavePath);
+
+            % Set paper properties for consistent PDF output
+            set(hFig, 'PaperUnits', 'inches', ...
+                'PaperPosition', [0 0 16 6], ...
+                'PaperOrientation', 'landscape');
+
+            % Use exportgraphics to create or append to the PDF
+            if sessionIndex == 1
+                % new file for the first session
+                exportgraphics(hFig, pdfSavePath, 'ContentType', 'vector');
+            else
+                % append existing file for subsequent sessions
+                exportgraphics(hFig, pdfSavePath, 'ContentType', 'vector', 'Append', true);
+            end
+
+            close(hFig);
+        catch
+            fprintf('Skipping session %s', currentSessionID)
+        end % session loop end
+
+        fprintf('Finished mouse %s. PDF saved.\n\n', currentMouseID);
+
+    end % mouse loop end
+    fprintf('All processing complete.\n');
+
+end
