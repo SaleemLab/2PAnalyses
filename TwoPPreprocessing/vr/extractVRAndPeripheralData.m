@@ -34,7 +34,7 @@ function [response, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInf
 %
 % Authors: Sonali & Aman (based on Diao/Masa code), March 2025
 
-    if nargin < 3, plotFlag = false; end
+
 
     %% Load data files 
     for iStim = 1:length(sessionFileInfo.stimFiles) % Find VR Stimulus
