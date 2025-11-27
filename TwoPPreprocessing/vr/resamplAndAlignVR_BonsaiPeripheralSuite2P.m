@@ -18,10 +18,10 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %   mainTimeToUse : string (optional, default = 'TwoPFrameTime')
 %       Timebase to align to; Use 'TwoPFrameTime' or 'ArduinoTime'
 %   VRStimName : string
-%       Name of the VR stimulus file to process (e.g., 'VRStim_001').
+%       Name of the  visual stimulus file to process (e.g., 'RFStim_001').
 %   plotFlag : logical (optional, default = true)
 %       If true, generates sanity check plots.
-%   trimNaNs : logical (optional, default = false) % <<< NEW
+%   trimNaNs : logical (optional, default = false) % 
 %       If true, finds the common non-NaN time window across all signals
 %       and trims all data to that window.
 %
@@ -135,6 +135,33 @@ if isfield(peripheralData, 'Photodiode')
     peripheralData.Photodiode.sampleTimes = sampleTimes';
     %     peripheralData.Photodiode.ArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
 end
+
+%% Interpolate: Peripheral - Quadstate (lag corrected) / (changed to peripheral: 18.11.25)
+% disp('Processing Bonsai Data: Quad')
+% if isfield(bonsaiData, 'Quadstate')
+%     rawValue = bonsaiData.Quadstate.rawValue;
+%     rawTime = bonsaiData.Quadstate.rawArduinoTime;
+%     % Lag corrected
+%     lagCorrT = bonsaiData.Quadstate.rawCorrectedArduinoTime;
+%     bonsaiData.Quadstate.Value = interp1(lagCorrT, rawValue, sampleTimes, generalInterpMethod, NaN)';
+%     bonsaiData.Quadstate.sampleTimes = sampleTimes';
+%     % Uncorrected
+% %     bonsaiData.Quadstate.uncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+% %     bonsaiData.Quadstate.uncorrectedArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
+% end
+
+disp('Processing Bonsai Data: Quad')
+if isfield(peripheralData, 'Quadstate')
+    rawValue = peripheralData.Quadstate.rawValue;
+    rawTime = peripheralData.Quadstate.rawArduinoTime;
+    % Lag corrected
+    lagCorrT = peripheralData.Quadstate.rawCorrectedArduinoTime;
+    peripheralData.Quadstate.Value = interp1(lagCorrT, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    peripheralData.Quadstate.sampleTimes = sampleTimes';
+    % Uncorrected
+%     bonsaiData.Quadstate.uncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+%     bonsaiData.Quadstate.uncorrectedArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
+end
 %% Interpolate: Bonsai - Mouse Position (lag corrected & uncorrected)
 disp('Processing Bonsai Data: Mouse Position')
 if isfield(bonsaiData, 'MousePos')
@@ -158,28 +185,13 @@ if isfield(bonsaiData, 'TrialInfo')
     bonsaiData.TrialInfo.StartTimeAll = interp1(sampleTimes, sampleTimes, correctedStartTimeAll, trialInfoInterpMethod);
     bonsaiData.TrialInfo.uncorrectedStartTimeAll = interp1(sampleTimes, sampleTimes, uncorrectedStartTimeAll, trialInfoInterpMethod);
 end
-%% Interpolate: Bonsai - Quadstate (lag corrected)
-disp('Processing Bonsai Data: Quad')
-if isfield(bonsaiData, 'Quadstate')
-    rawValue = bonsaiData.Quadstate.rawValue;
-    rawTime = bonsaiData.Quadstate.rawArduinoTime;
-    % Lag corrected
-    lagCorrT = bonsaiData.Quadstate.rawCorrectedArduinoTime;
-    bonsaiData.Quadstate.Value = interp1(lagCorrT, rawValue, sampleTimes, generalInterpMethod, NaN)';
-    bonsaiData.Quadstate.sampleTimes = sampleTimes';
-    % Uncorrected
-%     bonsaiData.Quadstate.uncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-%     bonsaiData.Quadstate.uncorrectedArduinoTime = interp1(rawTime, rawTime, sampleTimes, generalInterpMethod, NaN)';
-end
+
 
 %% NEW: Trim NaN padding if requested 
 if trimNaNs
-
     disp('Trimming NaN padding from start/end of signals...');
-
     % Start with a full mask (sampleTimes is a row vector)
     combinedValidMask = true(size(sampleTimes));
-
     % 1. Check processedTwoPData (N_ROIs x N_Time)
     % A timepoint is invalid if *any* ROI is NaN at that time
     % We use all(isfinite(...)) to find columns with NO NaNs.
@@ -187,28 +199,31 @@ if trimNaNs
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.spks), 1);
 
-    % 2. Check peripheralData (N_Time x 1 vectors)
+    % Check peripheralData (N_Time x 1 vectors)
     % Ensure they are row vectors for logical AND
-    if isfield(peripheralData, 'Wheel')
-        combinedValidMask = combinedValidMask & isfinite(peripheralData.Wheel.Value)'; 
-    end
-    if isfield(peripheralData, 'Photodiode')
-        combinedValidMask = combinedValidMask & isfinite(peripheralData.Photodiode.Value)';
-    end
+    % if isfield(peripheralData, 'Wheel')
+    %     combinedValidMask = combinedValidMask & isfinite(peripheralData.Wheel.Value)'; 
+    % end
+    % if isfield(peripheralData, 'Photodiode')
+    %     combinedValidMask = combinedValidMask & isfinite(peripheralData.Photodiode.Value)';
+    % end
+    % 
+    % if isfield(peripheralData, 'Quadstate')
+    %     combinedValidMask = combinedValidMask & isfinite(peripheralData.Quadstate.Value)';
+    % end
+    % 
+    % % Check bonsaiData (N_Time x 1 vectors)
+    % if isfield(bonsaiData, 'MousePos')
+    %     combinedValidMask = combinedValidMask & isfinite(bonsaiData.MousePos.Value)';
+    % end
 
-    % 3. Check bonsaiData (N_Time x 1 vectors)
-    if isfield(bonsaiData, 'MousePos')
-        combinedValidMask = combinedValidMask & isfinite(bonsaiData.MousePos.Value)';
-    end
-    if isfield(bonsaiData, 'Quadstate')
-        combinedValidMask = combinedValidMask & isfinite(bonsaiData.Quadstate.Value)';
-    end
+
     
     % Check if we'd be removing everything
     if ~any(combinedValidMask)
         warning('Trimming NaNs would remove all data. Skipping trim.');
     else
-        % 4. Apply the mask to all time-series data
+        % Apply the mask to all time-series data
         processedTwoPData.trimmedNaNPadding = true; 
         processedTwoPData.trimmedMetaData = ['Trimming ' num2str(numel(sampleTimes)) ' samples down to ' num2str(sum(combinedValidMask)) ' samples.'];
         disp(['Trimming ' num2str(numel(sampleTimes)) ' samples down to ' num2str(sum(combinedValidMask)) ' samples.']);
@@ -232,18 +247,18 @@ if trimNaNs
             peripheralData.Photodiode.Value = peripheralData.Photodiode.Value(combinedValidMask);
             peripheralData.Photodiode.sampleTimes = peripheralData.Photodiode.sampleTimes(combinedValidMask);
         end
+        if isfield(peripheralData, 'Quadstate')
+            peripheralData.Quadstate.Value = peripheralData.Quadstate.Value(combinedValidMask);
+            peripheralData.Quadstate.sampleTimes = peripheralData.Quadstate.sampleTimes(combinedValidMask);
+        end
 
         % Trim bonsaiData
         if isfield(bonsaiData, 'MousePos')
             bonsaiData.MousePos.Value = bonsaiData.MousePos.Value(combinedValidMask);
             bonsaiData.MousePos.sampleTimes = bonsaiData.MousePos.sampleTimes(combinedValidMask);
         end
-        if isfield(bonsaiData, 'Quadstate')
-            bonsaiData.Quadstate.Value = bonsaiData.Quadstate.Value(combinedValidMask);
-            bonsaiData.Quadstate.sampleTimes = bonsaiData.Quadstate.sampleTimes(combinedValidMask);
-        end
 
-        % 5. Filter TrialInfo data to be within the new time range
+        % Filter TrialInfo data to be within the new time range
         if isfield(bonsaiData, 'TrialInfo')
             minTime = newSampleTimes(1);
             maxTime = newSampleTimes(end);

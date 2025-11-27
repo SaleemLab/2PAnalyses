@@ -1,26 +1,26 @@
-% process_all_mice_sessions.m
-% Script to automate processing for multiple mice and sessions with error logging.
+
 clear; clc;
 
 %% DEFINE MICE, SESSIONS, AND KEYWORDS
 % Define all mice and their sessions to be processed
 mouseInfo = {
+
+    'M25041', {'20250417A'};...
     'M25040', {'20250511B'};...
-    % 'M25041', {'20250417A'};...
-    % 'M25040', {'20250511A', '20250507'};...
+    'M25058', {'20250529'};...
     % Add new mice here, e.g.: 'M25042', {'YYYYMMDD', 'YYYYMMDD'};
 };
 % Keywords to identify stimulus types from filenames
 vrKeywords = {'VRCorr'};
 rfKeywords = {'RFMapping'};
 
-filteredTable = filterMasterTable('Exclude', 0, 'Suite2PPreprocessing', 1, 'TypeImaged', 'Somas');
+% filteredTable = filterMasterTable('Exclude', 0, 'Suite2PPreprocessing', 1, 'TargetArea', {'V1'});
 % mouseInfo = sessionsToProcess(filteredTable);
 %% SET PROCESSING PARAMETERS:
 
 
 interpRate = 60;        % Hz, for resampling
-frameRate = 7.50;       % Frame rate 
+frameRate = 7.28;       % Frame rate 
 pdthreshold = 10;       % Photodiode threshold
 planeNums = 8;          % Number of planes in recording
 channelsSaved = 1;      % Number of channels saved
@@ -28,10 +28,10 @@ method = 2;
 isZcorrected = true;
 % Method for PSTH extraction (e.g., 2 for mean)
 % RF Mapping PSTH parameters
-rfpreStimTime = 0.5;    % seconds
-rfpostStimTime = 3;     % seconds
-applyNeuropilCorrection = true; 
-calculateDFF = true;            
+% rfpreStimTime = 0.5;    % seconds
+% rfpostStimTime = 3;     % seconds
+% applyNeuropilCorrection = false; 
+% calculateDFF = flase;            
 
 %% INITIALISE ERROR LOG 
 logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVRPipeline_20251110.csv');
@@ -66,12 +66,12 @@ for thisMouse = 1:size(mouseInfo, 1)
             
             % Identify which stimuli are VR and which are RF based on keywords
             vrStimNames = {};
-            rfStimNames = {};
+            otherVisualStim = {};
             for k = 1:length(stimList)
                 if any(contains(stimList{k}, vrKeywords, 'IgnoreCase', true))
                     vrStimNames{end+1} = stimList{k};
-                elseif any(contains(stimList{k}, rfKeywords, 'IgnoreCase', true))
-                    rfStimNames{end+1} = stimList{k};
+                elseif any(~contains(stimList{k}, vrKeywords, 'IgnoreCase', true))
+                    otherVisualStim{end+1} = stimList{k};
                 end
             end
             
@@ -81,7 +81,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             % [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, planeNums, isZcorrected);
             % sessionFileInfo = processPeripheralFiles(sessionFileInfo);
             % sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
-            % 
+            
             % B. Process all VR Stimuli
             if ~isempty(vrStimNames)
                 fprintf('Found %d VR stimulus file(s).\n', length(vrStimNames));
@@ -94,14 +94,11 @@ for thisMouse = 1:size(mouseInfo, 1)
                     % [~, sessionFileInfo]        = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
                     % [~, ~, ~, sessionFileInfo]  = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', vrStimName, true, true);
                     % [~, sessionFileInfo]        = extractVRAndPeripheralData(sessionFileInfo, vrStimName, true);
-                    [~, sessionFileInfo]        = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
-                    [~, sessionFileInfo]        = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName); % default is overwrite
-                    [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, true);
-                    % Get running speed across laps 
-                    % [response, sessionFileInfo] = getRunningSpeedAcrossLaps(sessionFileInfo, VRStimName, processedTwoPData);
-
-                    % Get roi stability matrix
-                    plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
+                    % [~, sessionFileInfo]        = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
+                    % [~, sessionFileInfo]        = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName); % default is overwrite
+                    % [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, true);
+                    % % Get roi stability matrix
+                    % plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
                 end
             end
             
@@ -118,6 +115,30 @@ for thisMouse = 1:size(mouseInfo, 1)
             % end
             % fprintf('  Session %s processed successfully!\n', sessionName);
                
+            % could change this to all tuning stimuli 
+            if ~isempty(otherVisualStim)
+                fprintf('Found %d other visual stimulus file(s).\n', length(otherVisualStim));
+                for thisOtherVisualStim = 1:length(otherVisualStim)
+                    otherVisualStimName = otherVisualStim{thisOtherVisualStim};
+                    fprintf('Processing Stimulus file: %s\n', otherVisualStimName);
+                    % Get stimulus events from Bonsai file
+                    try
+                        % Loads Bonsai data files where appropriate 
+                        [~, sessionFileInfo]       = getTuningStimEventsBonsaiFile(sessionFileInfo, otherVisualStimName, true); % overwrite = true
+                        % Interpolate Suite2P, Bonsai and Peripheral Data to 60Hz
+                        [~, ~, ~, sessionFileInfo] = ...
+                            resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', otherVisualStimName, true, true, true);  % overwrite = true
+                        % Delta F/F (Neuropil corrected)
+                        [~, sessionFileInfo]       = computeNeuropilCorrectionAndDFF(sessionFileInfo, otherVisualStimName);
+                        % then proceed with the rest... 
+                    catch
+                        fprintf('Missing bonsai data structure for stimulus file: %s\n', otherVisualStimName)
+                    end
+                    % [rfbonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, rfStimName, pdthreshold);   
+                end
+            
+            end 
+
            
         catch ME
           
@@ -140,7 +161,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             
             % Append the error data to the CSV file
             writetable(errorData, logFilePath, 'WriteMode', 'append', 'WriteVariableNames', false);
-            % --- END OF MODIFICATION ---
+
         end
     end
 end
