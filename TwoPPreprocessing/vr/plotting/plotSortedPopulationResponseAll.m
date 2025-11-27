@@ -9,7 +9,7 @@ function plotSortedPopulationResponseAll(sessionFileInfo, response, applySmoothi
 %   applySmoothing  : logical (optional, default = false)
 
 if nargin < 3
-    applySmoothing = false;
+    applySmoothing = true;
 end
 
 %% Output path

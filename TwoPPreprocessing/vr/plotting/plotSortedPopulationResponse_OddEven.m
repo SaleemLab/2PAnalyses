@@ -29,7 +29,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROISandNonROIS_SortedbyOdd_zScoredSignals.png']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROISandNonROIS_SortedbyOdd_test.png']);
 
 %% Extract activity matrix
 lapActivity = response.lapPositionActivity.(signalToUse);
