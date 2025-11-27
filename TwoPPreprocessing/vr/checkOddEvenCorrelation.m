@@ -8,7 +8,7 @@ function [r, p, stableIdx] = checkOddEvenCorrelation(response, signalToUse, appl
 
 %% Handle optional inputs
 if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end
-if nargin < 4; applySpatialSmoothing = false; end 
+if nargin < 4; applySpatialSmoothing = true; end 
 if nargin < 5; plotFlag = true; end
 
 %% Get data 
@@ -18,7 +18,7 @@ lapPositionActivity = response.lapPositionActivity.(signalToUse);
 %% Optional spatial smoothning before computing correlations
 if applySpatialSmoothing
     fprintf('Applying spatial smoothing...\n');
-    w = gausswin(10); % 10-bin Gaussian window
+    w = gausswin(5); % 10-bin Gaussian window
     w = w / sum(w);
     for iCell = 1:size(lapPositionActivity, 1)
         for iLap = 1:size(lapPositionActivity, 2)
@@ -61,7 +61,7 @@ r = diag(r_matrix);
 p = diag(p_matrix);
 
 %% Identify "stable" cells (0.6 threshold @aman)
-stableThresh = 0.5;
+stableThresh = 0.4;
 stableIdx = find(r > stableThresh);
 
 % %% Save in response (temp) 
@@ -71,6 +71,8 @@ stableIdx = find(r > stableThresh);
 %% Plotting
 if plotFlag
     fprintf('Plotting %d stable cells (r > %.2f)...\n', length(stableIdx), stableThresh);
+
+    
     
     % Get the tuning curves for stable cells
     normOddStable = normOdd(stableIdx, :);
@@ -80,11 +82,12 @@ if plotFlag
     [~, peakIdx] = max(normOddStable, [], 2);
     [~, sortIdx] = sort(peakIdx);
     
-    figure('Name', 'Odd-Even Lap Correlations');
+    fig1 = figure('Name', 'Odd-Even Lap Correlations');
     
     % Odd Laps
     subplot(121)
     imagesc(normOddStable(sortIdx,:));
+    caxis([0 1]); colormap(flipud(gray));
     set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
     xline(50, 'k--', 'LineWidth', 1.5);
     xline(70, 'k--', 'LineWidth', 1.5);
@@ -99,6 +102,7 @@ if plotFlag
     % Even Laps
     subplot(122)
     imagesc(normEvenStable(sortIdx,:));
+    caxis([0 1]); colormap(flipud(gray));
     set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
     xline(50, 'k--', 'LineWidth', 1.5);
     xline(70, 'k--', 'LineWidth', 1.5);
@@ -109,6 +113,8 @@ if plotFlag
     title(sprintf('Even Laps (n=%d)', size(evenLaps, 2)));
     xlabel('Position (cm)');
     ylabel('Stable ROIs (Sorted)');
+
+    % saveas(fig1,'\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25041\Analysis\20250416\Figures\StableROIs.png')
 end
 
 end

@@ -111,7 +111,7 @@ for thisMouse = 1:size(mouseInfo,1)
                 % Find VRLag
                 [bonsaiData, sessionFileInfo]=findBonsaiPeripheralLag(sessionFileInfo, 1, 60, vrStimName);
                 % Align bonsai to peripheral data 
-                [bonsaiData, sessionFileInfo]  = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
+                [bonsaiData, sessionFileInfo]  = alignVRBon saiToPeripheralData(sessionFileInfo,vrStimName);
                 % Interpolate VR data streams 
                 [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', vrStimName, true);
                 %Add another function here to load processedTwoPData and compute dFF, dFFNeuropilCorrection and fNeuropilCorrection 

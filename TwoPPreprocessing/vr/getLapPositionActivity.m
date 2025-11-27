@@ -65,6 +65,7 @@ end
 disp('Binning lap-position-activity for all signals...');
 
 % Loop over laps and bins first
+tl = tic;
 for thisLap = 1:nLaps
     for thisBin = 1:numBins
         % 1. Get frame indices ONCE for this lap and bin.
@@ -77,16 +78,26 @@ for thisLap = 1:nLaps
                 currentSignalName = signalNames{iSignal};
                 currentSignalMatrix = signals.(currentSignalName);
                 
-                % 2. Vectorised calculation for ALL cells at once.
+                % Vectorised calculation for ALL cells at once.
                 % This is much faster than an inner for-loop.
                 % It takes the mean across the time dimension (dim 2).
                 meanActivity = mean(currentSignalMatrix(ROIs, frameIdx), 2, 'omitnan');
                 
-                % 3. Store the resulting vector of activities for all cells.
+                % Store the resulting vector of activities for all cells.
                 lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = meanActivity;
             end
         end
     end
+end
+toc(tl)
+
+maxShift = 2000;
+numShifts = 20;
+randShifts = randi(maxShift,[1 numShifts]);
+for iShift = 1:length(randShifts)
+    newSignal = circshift(currentSignalMatrix,[0 randShifts(iShift)]);
+    meanActivity = mean(newSignal(ROIs, frameIdx), 2, 'omitnan');
+    lapPositionActivity_randShift.(currentSignalName)(:, thisLap, thisBin, iShift) = meanActivity;
 end
 %% Save results to the response struct
 response.lapPositionActivity = lapPositionActivity;

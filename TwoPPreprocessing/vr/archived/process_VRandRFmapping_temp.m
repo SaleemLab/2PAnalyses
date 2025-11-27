@@ -130,7 +130,7 @@ for thisMouse = 1:size(mouseInfo,1)
             %--------- RF -------------
 
             % Get stimulus events from Bonsai file
-            [rfbonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFileInfo, rfStimName, 'StimulusParams');
+            [rfbonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFileInfo, rfStimName);
             % Get stimulus times
             [rfbonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, rfStimName, pdthreshold);
             % Get 2P frames by trial

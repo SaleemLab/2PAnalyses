@@ -17,7 +17,8 @@ function [response, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo
 %
 % Aman and Sonali - April 2025
 % Optimized to save lapPosition2PFrameIdx as a 2D array - October 2025
-
+minSpeedBin = 1;
+maxSpeedBin = 100;
 %% Load processed data
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx)
@@ -35,7 +36,7 @@ posBinEdges = 0:140;
 numPosBins = length(posBinEdges) - 1;
 nLaps = length(response.completedStartTimes);
 timeVec = processedTwoPData.(processedTwoPData.resample2PTimeUsed);
-speedFilter = response.wheelSpeed > 1 & response.wheelSpeed < 100;
+speedFilter = response.wheelSpeed > minSpeedBin & response.wheelSpeed < maxSpeedBin;
 
 % Initialise as a 2D cell array 
 % No need for the ROI dimension.

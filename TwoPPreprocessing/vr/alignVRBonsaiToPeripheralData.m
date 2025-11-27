@@ -33,7 +33,13 @@ iStim = find(bonsaiData.isVRstim == 1);
 if exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file') 
     load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 else
-    error('Missing Bonsai or peripheral data file');
+    error('Missing Bonsai file');
+end
+
+if exist(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'file')
+    load(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
+else
+    error('Missing Peripheral file');
 end
 
 % Lag shift for Bonsai correction
@@ -45,9 +51,9 @@ if isfield(bonsaiData, 'MousePos')
     bonsaiData.MousePos.rawCorrectedArduinoTime = bonsaiData.MousePos.rawArduinoTime - lagShift; %%% substitute 'rawC' with 'c'
 end
 
-%% Quadstate
-if isfield(bonsaiData, 'Quadstate')
-    bonsaiData.Quadstate.rawCorrectedArduinoTime =  bonsaiData.Quadstate.rawArduinoTime - lagShift;%%% substitute 'rawC' with 'c'
+%% Quadstate 
+if isfield(peripheralData, 'Quadstate') % changed to peripheralData
+    peripheralData.Quadstate.rawCorrectedArduinoTime =  peripheralData.Quadstate.rawArduinoTime - lagShift;%%% substitute 'rawC' with 'c'
 end
 
 %% TrialInfo 
@@ -65,10 +71,10 @@ if plotFlag
         title('MousePos: Raw vs Lag-Corrected'); legend; ylabel('Position'); xlabel('Time (s)');
     end
 
-    if isfield(bonsaiData, 'Quadstate')
+    if isfield(peripheralData, 'Quadstate')
         subplot(3,1,2);
-        plot(bonsaiData.Quadstate.rawArduinoTime, bonsaiData.Quadstate.rawValue, 'k--', 'DisplayName', 'raw Time'); hold on;
-        plot(bonsaiData.Quadstate.rawCorrectedArduinoTime, bonsaiData.Quadstate.rawValue, 'r-', 'DisplayName', 'Corrected');
+        plot(peripheralData.Quadstate.rawArduinoTime(1:300), peripheralData.Quadstate.rawValue(1:300), 'k--', 'DisplayName', 'raw Time'); hold on;
+        plot(peripheralData.Quadstate.rawCorrectedArduinoTime(1:300), peripheralData.Quadstate.rawValue(1:300), 'r-', 'DisplayName', 'Corrected');
         title('Quadstate: Raw vs Lag-Corrected'); legend; ylabel('Quad'); xlabel('Time (s)');
     end
 
@@ -83,5 +89,6 @@ end
 
 %% Save
 save(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
+save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end

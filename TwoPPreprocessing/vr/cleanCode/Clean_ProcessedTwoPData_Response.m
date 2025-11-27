@@ -1,21 +1,21 @@
-% =========================================================================
+
 % Loads processedTwoPData data for 
 
 % Sonali Oct 2025, 
-% =========================================================================
+
 clear; clc; close all;
 
-%% --- Define filepaths and criteria ---
+%%  Define filepaths and criteria 
 masterTableFilePath = "Z:\ibn-vision\USERS\Sonali\datatable\MasterExpDatatable.csv";
 rootDir = 'Z:\ibn-vision\DATA\SUBJECTS';
 % DEFINE where to save the log file for any unprocessed stimuli
 logFilePath = "Z:\ibn-vision\USERS\Sonali\errorLogs\unprocessed_log20251013.csv";
 
 
-%% --- Initialize an error log to track unprocessed files ---
+%% Initialize an error log to track unprocessed files 
 unprocessedStimuli = struct('MouseID', {}, 'Session', {}, 'StimulusFile', {}, 'Reason', {});
 
-%% --- Load, parse and filter master table ---
+%%  Load, parse and filter master table 
 
 filteredTable = filterMasterTable('TypeImaged', 'Boutons', ...
     'HasStimulus', 'VRCorr');
