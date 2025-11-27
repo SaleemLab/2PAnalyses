@@ -72,8 +72,8 @@ end
 % Process each plane in twoPData / Possibly not necessary..CHANGE; not
 % iterating through planes anymore.. 
 
-frameTimes = processedTwoPData.TwoPFrameTime;
-% response = twoPData(thisPlane).planeName;
+frameTimes = processedTwoPData(thisPlane).TwoPFrameTime;
+response(thisPlane).planeName = twoPData(thisPlane).planeName;
 
 % Preallocate cell arrays for each trial in this plane
 response(thisPlane).responseFrameIdx = cell(length(combinedStimARDTimes), 1);

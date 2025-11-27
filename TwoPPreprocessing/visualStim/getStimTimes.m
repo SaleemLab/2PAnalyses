@@ -25,7 +25,7 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
         thresholdOff = thresholdOn;
     end 
     if nargin < 5
-        useQuadState = false;
+        useQuadState = false; % Not recommended to use at this point. 
     end 
     if nargin < 6
         plotFlag = true;
@@ -57,7 +57,7 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     % PeripheralData & twoPData
     if exist(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'file')
         load(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
-        load(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'twoPData');
+        load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData');
     else
         error('Missing PeripheralData and/or twoPData.');
     end
@@ -65,10 +65,10 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     %% Process PD
 
     % Extract PD signals
-    pdArduinoTime = peripheralData.Photodiode.rawArduinoTime;
-    pdValue       = peripheralData.Photodiode.rawValue;
+    pdArduinoTime = peripheralData.Photodiode.sampleTimes;
+    pdValue       = peripheralData.Photodiode.Value;
     % Smoothning 
-    pdValue = movmedian(peripheralData.Photodiode.rawValue,20);
+    pdValue = movmedian(peripheralData.Photodiode.Value,20);
 
     % Compute ON and OFF transitions
     pdON  = pdValue >= thresholdOn;
@@ -101,8 +101,10 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     offARDTimes = refinedOffTimes;
 
     %% If QuadState exists, use it to refine both ON and OFF detection
-    if useQuadState && isfield(peripheralData, 'quadstate') && isfield(peripheralData.Quadstate, 'Value')
-        quadTimes  = peripheralData.Quadstate.rawArduinoTime;
+    if useQuadState && isfield(peripheralData, 'Quadstate') && isfield(peripheralData.Quadstate, 'Value')
+        % Change these to the raw because Bonsai is only logging the quad 
+        % change when the stimulus is On and Off and it not saving the inbetween transitions.. 
+        quadTimes  = peripheralData.Quadstate.rawArduinoTime; 
         quadValues = peripheralData.Quadstate.rawValue;
 
         % Determine QuadState ON (value 1) and OFF (value 0) times
@@ -146,7 +148,7 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     %% Remove stimulus events that occur after two-photon imaging has stopped 
     % Can move out??
 
-    idxToDrop = find(onARDTimes >= max(twoPData(1).TwoPFrameTime));
+    idxToDrop = find(onARDTimes >= max(processedTwoPData(1).TwoPFrameTime));
 
     if ~isempty(idxToDrop) && max(idxToDrop) <= length(offARDTimes)
         onARDTimes(idxToDrop)  = [];

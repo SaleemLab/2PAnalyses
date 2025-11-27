@@ -53,7 +53,7 @@ end
 if nargin < 3
     samplingRate = bonsaiData.resampledTimes.samplingRate; 
 else
-    warning('Sampling rate used is not consistent with the resampled TwoPData')
+    fprintf('Sampling rate used %d...\n', samplingRate)
 end 
 
 % Pick out raw values 
@@ -235,7 +235,8 @@ otherwise
         error('Invalid method. Choose 1 (xCorr across the full length), 2 (Align quad start with PD On edge)');
 end
 
-save(sessionFileInfo.stimFiles(iStim).BonsaiData, "bonsaiData")
+save(sessionFileInfo.stimFiles(iStim).BonsaiData, "bonsaiData");
+save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end
 
