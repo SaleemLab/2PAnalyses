@@ -7,6 +7,7 @@ function [R_sorted, normOdd, normEven, sortIdx, numCells, dataScope, signalToUse
 %   All three panels are sorted based on the peak response location from the
 %   odd laps (Panel 2).
 %% Default Arguments
+if nargin < 6; onlyIncludeROIs = false; end
 if nargin < 7; signalToUse = 'dFFNeuropilCorrected'; end
 if nargin < 8; applySmoothing = true; end
 if nargin < 9; plotFlag = false; end
