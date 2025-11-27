@@ -24,50 +24,75 @@ end
 F = processedTwoPData.F;    % Interpolated F (ROI x time)
 Fneu = processedTwoPData.Fneu; % Interpolated Fneu (ROI x time)
 
+% NOTE: This should not be necessary anymore. Removing NAN padding for soma
+% sessions before interpolating to 60Hz.. 
+% 
+% if applyTemporalSmoothing 
+%     disp('Applying temporal smoothing by removing and re-inserting NaNs...');
+%     w = gausswin(9); % 150ms (16.66 ms per frame)
+%     w = w / sum(w);
+% 
+%     numROIs = size(F, 1);
+%     fSmoothed = nan(size(F));
+%     fneuSmoothed = nan(size(Fneu));
+% 
+%     % Loop through each ROI to apply the filter
+%     for i = 1:numROIs
+%         %Process F signal for the current ROI 
+%         originalFRoi = F(i, :);
+%         nanLocationsF = isnan(originalFRoi);
+%         fWithoutNans = originalFRoi(~nanLocationsF);
+% 
+%         if length(fWithoutNans) > length(w)
+%             smoothedFClean = filtfilt(w, 1, fWithoutNans);
+%             fSmoothed(i, ~nanLocationsF) = smoothedFClean;
+%         else
+%             fSmoothed(i, ~nanLocationsF) = fWithoutNans;
+%         end
+% 
+%         % --- Repeat for the Fneu signal ---
+%         originalFneuRoi = Fneu(i, :);
+%         nanLocationsFneu = isnan(originalFneuRoi);
+%         fneuWithoutNans = originalFneuRoi(~nanLocationsFneu);
+% 
+%         if length(fneuWithoutNans) > length(w)
+%             smoothedFneuClean = filtfilt(w, 1, fneuWithoutNans);
+%             fneuSmoothed(i, ~nanLocationsFneu) = smoothedFneuClean;
+%         else
+%             fneuSmoothed(i, ~nanLocationsFneu) = fneuWithoutNans;
+%         end
+%     end
+% else
+%     disp('Skipping temporal smoothing.');
+%     fSmoothed = F;
+%     fneuSmoothed = Fneu;
+% end
+
 if applyTemporalSmoothing
-    disp('Applying temporal smoothing by removing and re-inserting NaNs...');
-    w = gausswin(9); % 150ms (16.66 ms per frame)
+    disp('Applying temporal smoothing to F and Fneu time-series...');
+    w = gausswin(9);
     w = w / sum(w);
     
     numROIs = size(F, 1);
-    fSmoothed = nan(size(F));
-    fneuSmoothed = nan(size(Fneu));
+    % Using fSmoothed and fneuSmoothed >>>
+    fSmoothed = zeros(size(F));
+    fneuSmoothed = zeros(size(Fneu));
     
-    % Loop through each ROI to apply the filter
+    % Loop through each ROI to apply the filter along the time dimension
     for i = 1:numROIs
-        %Process F signal for the current ROI 
-        originalFRoi = F(i, :);
-        nanLocationsF = isnan(originalFRoi);
-        fWithoutNans = originalFRoi(~nanLocationsF);
-        
-        if length(fWithoutNans) > length(w)
-            smoothedFClean = filtfilt(w, 1, fWithoutNans);
-            fSmoothed(i, ~nanLocationsF) = smoothedFClean;
-        else
-            fSmoothed(i, ~nanLocationsF) = fWithoutNans;
-        end
-
-        % --- Repeat for the Fneu signal ---
-        originalFneuRoi = Fneu(i, :);
-        nanLocationsFneu = isnan(originalFneuRoi);
-        fneuWithoutNans = originalFneuRoi(~nanLocationsFneu);
-        
-        if length(fneuWithoutNans) > length(w)
-            smoothedFneuClean = filtfilt(w, 1, fneuWithoutNans);
-            fneuSmoothed(i, ~nanLocationsFneu) = smoothedFneuClean;
-        else
-            fneuSmoothed(i, ~nanLocationsFneu) = fneuWithoutNans;
-        end
+        fSmoothed(i, :) = filtfilt(w, 1, F(i, :));
+        fneuSmoothed(i, :) = filtfilt(w, 1, Fneu(i, :));
     end
 else
     disp('Skipping temporal smoothing.');
+    % Might be good to change variable name here to something more neutral 
     fSmoothed = F;
     fneuSmoothed = Fneu;
 end
 
 %% Prepare all four signal matrices
 disp('Preparing all four signal types...');
-fs = processedTwoPData.ops{1}.fs;  % sampling rate
+fs = processedTwoPData.ops{1}.fs;  % frame rate
 
 % Neuropil-Corrected F (Fc)
 disp('Computing neuropil correction...');
