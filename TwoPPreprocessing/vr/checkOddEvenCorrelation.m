@@ -7,9 +7,9 @@ function [r, p, stableIdx] = checkOddEvenCorrelation(response, signalToUse, appl
 %   stableIdx - [nStableROIs x 1] indices of ROIs with r > 0.5
 
 %% Handle optional inputs
-if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end
-if nargin < 4; applySpatialSmoothing = true; end 
-if nargin < 5; plotFlag = true; end
+if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end % changed 3 to 2 
+if nargin < 3; applySpatialSmoothing = true; end 
+if nargin < 4; plotFlag = true; end
 
 %% Get data 
 % lapPositionActivity is (ROI x Laps x Position)

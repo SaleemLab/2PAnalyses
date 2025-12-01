@@ -1,4 +1,4 @@
-function [roisToKeep, roisToDiscard, groups, corrMatrix] = findHightlyCorrelatedROIs(sessionFileInfo, signalToUse, useNonVRRecOnly, plotFlag)
+function [roisToKeep, roisToDiscard, groups, corrMatrix] = findHightlyCorrelatedROIs_V1(sessionFileInfo, signalToUse, useNonVRRecOnly, plotFlag)
 % Finds highly correlated ROIs (e.g., from the same axon) and keeps only
 % the one with the highest SNR (max z-score) from each group.
 %
@@ -11,7 +11,7 @@ function [roisToKeep, roisToDiscard, groups, corrMatrix] = findHightlyCorrelated
 % VRthreshold = 0.5 
 % Set defaults
 if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end
-if nargin < 3; useNonVRRecOnly = false; end
+if nargin < 3; useNonVRRecOnly = true; end
 if nargin < 3; plotFlag = true; end
 % if nargin < 3; plotFlag = true; end % Uncomment for debugging
 %%
@@ -106,7 +106,7 @@ corrMatrix = corr(tracesToCorrelate');
 
 %% Find Groups (Connected Components)
 % Create an adjacency matrix based on the 0.5 threshold
-correlationThreshold = 0.5;
+correlationThreshold = 0.3;
 % Filtering highly correlated ROIs based on threshold. 
 adjMatrix = corrMatrix > correlationThreshold;
 % An ROI should not be 'grouped' with itself; 
@@ -218,7 +218,7 @@ if plotFlag
     % Plot spatial tuning curves
     % Change in the morning: use idex to load either the second response
     % file or combined if present. 
-    load("Z:\ibn-vision\DATA\SUBJECTS\M25058\Analysis\20250529\M25058_20250529_Response_M25058_VRCorr_20250529_CombinedRuns.mat")
+    load("\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25040\Analysis\20250511B\M25040_20250511B_Response_M25040_VRCorr_20250511_00002.mat")
     lapActivity = response.lapPositionActivity.dFFNeuropilCorrected; 
     meanAll = squeeze(mean(lapActivity, 2, 'omitnan'));
     normAll = normalize(meanAll, 2, 'range');

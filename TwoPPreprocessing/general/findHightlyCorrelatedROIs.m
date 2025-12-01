@@ -1,0 +1,269 @@
+function [roisToKeep, roisToDiscard, groups, corrMatrixCombined] = findHightlyCorrelatedROIs(sessionFileInfo, signalToUse, VRThreshold_ForBoutonMatch, NonVRThreshold_ForBoutonMatch, plotFlag)
+% FINDHIGHTLYCORRELATEDROIS identifies groups of highly correlated ROIs 
+% using dual thresholds on VR and NonVR data. Groups require both VR and 
+% NonVR thresholds to be met (AND logic).
+% 
+% NOTE: This function calculates matrices and APPENDS them to the .mat file 
+% specified in sessionFileInfo.otherSessFilePaths.sessionROIData.
+
+%% Set defaults and initialize
+if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end
+if nargin < 3; VRThreshold_ForBoutonMatch = 0.5; end
+if nargin < 4; NonVRThreshold_ForBoutonMatch = 0.0; end
+if nargin < 5; plotFlag = true; end
+
+% Initialize trace containers
+traces_VR = [];
+traces_NonVR = [];
+dataScope = 'CombinedVR_NonVR';
+
+%% Load VR Data
+VRStimIndices = find(contains({sessionFileInfo.stimFiles.name}, 'VRCorr') & ...
+    ~contains({sessionFileInfo.stimFiles.name}, 'CombinedRuns') );
+numVRFiles = length(VRStimIndices);
+
+if numVRFiles >= 1
+    fprintf('Loading and concatenating %d VR files...\n', numVRFiles);
+    allDFFData_VR = cell(1, numVRFiles);
+    for thisVRFile = 1:numVRFiles
+        thisStimIdx = VRStimIndices(thisVRFile);
+        processedTwoPDataPath = sessionFileInfo.stimFiles(thisStimIdx).processedMergedBonsaiSuite2pData;
+        if exist(processedTwoPDataPath, "file")
+            processedTwoPData = load(processedTwoPDataPath);
+            allDFFData_VR{thisVRFile} = processedTwoPData.processedTwoPData.zScoredProcessedSignals.(signalToUse);
+        else
+            warning('Missing processedTwoPData file for VR: %s \n', sessionFileInfo.stimFiles(thisStimIdx).name);
+        end
+    end
+    traces_VR = [allDFFData_VR{:}];
+else
+    warning('No VRCorr files found. VR correlation matrix will be empty.');
+end
+
+%% Load NonVR Data
+isNotVRStim = find(~contains({sessionFileInfo.stimFiles.name}, 'VRCorr'));
+numNonVRFiles = length(isNotVRStim);
+
+if numNonVRFiles >= 1
+    fprintf('Loading and concatenating %d NonVR files...\n', numNonVRFiles);
+    allDFFData_NonVR = cell(1, numNonVRFiles);
+    for thisNonVRFile = 1:numNonVRFiles
+        thisOtherStimIdx = isNotVRStim(thisNonVRFile);
+        processedTwoPDataPath = sessionFileInfo.stimFiles(thisOtherStimIdx).processedMergedBonsaiSuite2pData;
+        if exist(processedTwoPDataPath, "file")
+            processedTwoPData = load(processedTwoPDataPath);
+            allDFFData_NonVR{thisNonVRFile} = processedTwoPData.processedTwoPData.zScoredProcessedSignals.(signalToUse);
+        else
+            warning('Missing processedTwoPData file for NonVR: %s \n', sessionFileInfo.stimFiles(thisOtherStimIdx).name);
+        end
+    end
+    traces_NonVR = [allDFFData_NonVR{:}];
+else
+    warning('No NonVR files found. NonVR correlation matrix will be empty.');
+end
+
+%% Prepare Combined Traces and Check Consistency
+traces_combined = [traces_VR, traces_NonVR];
+
+if isempty(traces_combined)
+    error('Traces variable is empty after loading both VR and NonVR data.');
+end
+
+[nROIs, ~] = size(traces_combined);
+fprintf('Loaded %d ROIs. Starting dual-correlation analysis...\n', nROIs);
+
+%% Calculate Correlation Matrices and Adjacency Matrices
+
+% VR Correlation and Thresholding 
+if ~isempty(traces_VR)
+    VRCorrMatrix = corr(traces_VR');
+    adjMatrix_VR = VRCorrMatrix > VRThreshold_ForBoutonMatch;
+    fprintf('VR correlation matrix calculated. Applying VR Threshold: %.2f\n', VRThreshold_ForBoutonMatch);
+else
+    VRCorrMatrix = zeros(nROIs);
+    adjMatrix_VR = false(nROIs);
+end
+
+% NonVR Correlation and Thresholding ---
+if ~isempty(traces_NonVR)
+    NonVRCorrMatrix = corr(traces_NonVR');
+    adjMatrix_NonVR = NonVRCorrMatrix > NonVRThreshold_ForBoutonMatch;
+    fprintf('NonVR correlation matrix calculated. Applying NonVR Threshold: %.2f\n', NonVRThreshold_ForBoutonMatch);
+else
+    NonVRCorrMatrix = zeros(nROIs);
+    adjMatrix_NonVR = false(nROIs);
+end
+
+% Use the maximum correlation observed across both conditions for the combined matrix
+corrMatrixCombined = max(VRCorrMatrix, NonVRCorrMatrix);
+
+%% Append matrices and thresholds to .mat file
+
+outputFilePath = sessionFileInfo.otherSessFilePaths.sessionROIData;
+
+
+vrThreshold = VRThreshold_ForBoutonMatch;
+nonvrThreshold = NonVRThreshold_ForBoutonMatch;
+vrAdjMatrix = adjMatrix_VR;
+nonvrAdjMatrix = adjMatrix_NonVR;
+
+if exist(outputFilePath, 'file') == 2
+    fprintf('Appending new correlation variables to existing file: %s\n', outputFilePath);
+    
+    % Save variables using the '-append' flag
+    save(outputFilePath, ...
+         'VRCorrMatrix', ... 
+         'NonVRCorrMatrix', ... 
+         'vrThreshold', ... 
+         'nonvrThreshold', ... 
+         'vrAdjMatrix', ... 
+         'nonvrAdjMatrix', ... 
+         '-append', ...
+         '-v7.3');
+    
+    fprintf('Successfully appended correlation data.\n');
+else
+    % This error prevents the subsequent steps from running without the required data
+    error('sessionROIData file not found at: %s. Cannot append correlation data.', outputFilePath);
+end
+
+%% Combine Adjacency Matrices (AND Logic)
+% An ROI pair is considered correlated if it exceeds the threshold in BOTH VR AND NonVR.
+adjMatrix_final = vrAdjMatrix & nonvrAdjMatrix; 
+adjMatrix_final(logical(eye(nROIs))) = false; % Remove self-correlation
+fprintf('Combining adjacency matrices using AND logic (requiring **both** thresholds to be met).\n');
+
+%% Find Groups and Pruning
+fprintf('Calculating SNR scores (max z-score) for %d ROIs using combined data...\n', nROIs);
+snrScores = max(traces_combined, [], 2);
+
+% Use graph theory to find all connected components based on the FINAL ADJACENCY MATRIX
+fprintf('Finding robustly correlated groups...\n');
+G = graph(adjMatrix_final, 'upper'); 
+groups = conncomp(G);
+uniqueGroups = unique(groups);
+fprintf('Found %d unique groups (including singletons).\n', length(uniqueGroups));
+
+% Keep only highest SNR ROI from each group (Pruning logic)
+fprintf('Pruning groups to keep highest SNR ROI...\n');
+roisToKeep_mask = false(nROIs, 1);
+roisToDiscard_mask = false(nROIs, 1);
+
+for thisGroup = 1:length(uniqueGroups)
+    thisGroupID = uniqueGroups(thisGroup);
+    roisInGroup_idx = find(groups == thisGroupID);
+    
+    if isscalar(roisInGroup_idx)
+        roisToKeep_mask(roisInGroup_idx) = true;
+    else
+        groupSnrScores = snrScores(roisInGroup_idx);
+        [~, localWinnerIdx] = max(groupSnrScores); 
+        globalWinnerIdx = roisInGroup_idx(localWinnerIdx);
+        
+        roisToKeep_mask(globalWinnerIdx) = true;
+        roisInGroup_idx(localWinnerIdx) = []; 
+        roisToDiscard_mask(roisInGroup_idx) = true;
+    end
+end
+
+roisToKeep = find(roisToKeep_mask);
+roisToDiscard = find(roisToDiscard_mask);
+fprintf('Analysis complete. Kept %d ROIs, discarded %d ROIs.\n', ...
+        length(roisToKeep), length(roisToDiscard));
+        
+
+%% Plotting 
+if plotFlag
+    
+    fig1 = figure('Name', 'Correlation Matrix and Adjacency Matrices', 'NumberTitle', 'off');
+    
+    subplot(1, 2, 1);
+    imagesc(corrMatrixCombined);
+    axis image;
+    colorbar;
+    title(sprintf('Combined Max Correlation Matrix (%d ROIs)', nROIs));
+    xlabel('ROI Index');
+    ylabel('ROI Index');
+    
+    subplot(1, 2, 2);
+    imagesc(adjMatrix_final);
+    colormap gray;
+    axis image;
+    title(sprintf('Final Adjacency Matrix (VR > %.2f AND NonVR > %.2f)', VRThreshold_ForBoutonMatch, NonVRThreshold_ForBoutonMatch));
+    xlabel('ROI Index');
+    ylabel('ROI Index'); 
+    saveas(fig1, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'CorrAndAdjacencyMatrix_' dataScope '.png']))
+    
+    % Plotting traces for two unique discarded groups
+    discardedGroupIDs = groups(roisToDiscard);
+    uniqueDiscardedGroups = unique(discardedGroupIDs);
+    if numel(uniqueDiscardedGroups) >= 2
+    
+        fig2 = figure('Name', 'Correlated ROI Groups', 'NumberTitle', 'off');
+        subplot(211)
+        gM1 = find(groups == uniqueDiscardedGroups(1)); 
+        plot(traces_combined(gM1, :)');
+        title(['Discarded Group ID: ' num2str(uniqueDiscardedGroups(1))]);
+        ylabel('dF/F');
+    
+        subplot(212)
+        gM2 = find(groups == uniqueDiscardedGroups(2)); 
+        plot(traces_combined(gM2, :)');
+        title(['Discarded Group ID: ' num2str(uniqueDiscardedGroups(2))]);
+        ylabel('dF/F');
+        saveas(fig2, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'HighlyCorreltedROIGroups_' dataScope '.png',]))
+    
+    else
+        warning('Could not find 2 unique groups in roisToDiscard to plot.');
+    end
+    
+    % Plot spatial tuning curves
+    load("Z:\ibn-vision\DATA\SUBJECTS\M25058\Analysis\20250529\M25058_20250529_Response_M25058_VRCorr_20250529_CombinedRuns.mat")
+    lapActivity = response.lapPositionActivity.dFFNeuropilCorrected; 
+    
+    % --- FIX: Filter indices to match the size of lapActivity ---
+    maxValidROI = size(lapActivity, 1); 
+    
+    roisToKeep_filtered = roisToKeep(roisToKeep <= maxValidROI);
+    roisToDiscard_filtered = roisToDiscard(roisToDiscard <= maxValidROI);
+
+    % --- Continue plotting using the filtered indices ---
+    meanAll = squeeze(mean(lapActivity, 2, 'omitnan'));
+    normAll = normalize(meanAll, 2, 'range');
+    [~, peakIdx] = max(normAll, [], 2);
+    [~, sortIdx] = sort(peakIdx);
+    
+    meanROIsToKeep = squeeze(mean(lapActivity(roisToKeep_filtered,:,:), 2, 'omitnan'));
+    normROIsToKeep = normalize(meanROIsToKeep, 2, 'range');
+    [~, peakIdxToKeep] = max(normROIsToKeep, [], 2);
+    [~, sortIdxToKeep] = sort(peakIdxToKeep);
+    meanROIsToDiscard = squeeze(mean(lapActivity(roisToDiscard_filtered,:,:), 2, 'omitnan'));
+    normROIsToDiscard = normalize(meanROIsToDiscard, 2, 'range');
+    [~, peakIdxToDiscard] = max(normROIsToDiscard, [], 2);
+    [~, sortIdxToDiscard] = sort(peakIdxToDiscard);
+    
+    fig3 = figure;
+    subplot(131)
+    imagesc(normAll(sortIdx, :));
+    xlabel('Position (cm)');
+    ylabel('ROIs');
+    title('All')
+    ylabel(colorbar, 'Activity (normalised)');
+    
+    subplot(132)
+    imagesc(normROIsToKeep(sortIdxToKeep, :));
+    xlabel('Position (cm)');
+    ylabel('ROIs');
+    title('Single pringle')
+    ylabel(colorbar, 'Activity (normalised)');
+    
+    subplot(133)
+    imagesc(normROIsToDiscard(sortIdxToDiscard, :));
+    xlabel('Position (cm)');
+    ylabel('ROIs');
+    title('Matched and discarded')
+    ylabel(colorbar, 'Activity (normalised)');
+    
+    saveas(fig3, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'SpatialTuningPlots_SingleMatchedROIs_' dataScope '.png']))
+end
+end

@@ -100,9 +100,13 @@ for thisMouse = 1:size(mouseInfo, 1)
                     [~, sessionFileInfo]        = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
                     [~, sessionFileInfo]        = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName); % default is overwrite
                     % [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, true); OLD
-                    [response, sessionFileInfo] = getLapPositionActivity_withShuffle(sessionFileInfo, VRStimName, true); % default is overwrite  
+                    
+                    
+                     
                     
                     % Functions to filter out ROIs 
+                    [response, sessionFileInfo] = getLapPositionActivity_withShuffle(sessionFileInfo, VRStimName, true); % default is overwrite 
+                    
                     [~,~,~,~] = findHightlyCorrelatedROIs(sessionFileInfo); % NEW appends this info to sessionROIData
                     [~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response);
 
