@@ -1,0 +1,237 @@
+% process_all_mice_sessions_combined_final.m
+% Combined script with dynamic parameter loading based on TypeImaged from filteredTable.
+clear; clc;
+%% DEFINE MICE, SESSIONS, AND KEYWORDS
+% Define all mice and their sessions to be processed
+% The mouseInfo is generated from the filteredTable
+vrKeywords = {'VRCorr'};
+rfKeywords = {'RFMapping'};
+
+% filteredTable now holds the key metadata (TypeImaged) needed for parameter setting.
+
+filteredTable = filterMasterTable('Exclude', 0, ...
+    'Suite2PPreprocessing', 1, ...
+    'MouseID', {'M25012', 'M25037', 'M25038', 'M25040', 'M25041', 'M25057', 'M25058'}); %, 'TypeImaged', 'Boutons'
+mouseInfo = sessionsToProcess(filteredTable);
+
+%% DEFINE PARAMETER SETS BASED ON IMAGING TYPE 
+% These static structures define the two parameter configurations.
+% Parameters for Soma (Cell Body) Imaging
+paramsSomas.interpRate = 60;
+paramsSomas.frameRate = 7.5;
+paramsSomas.pdthreshold = 10;
+% paramsSoma.planeNums = 8;
+paramsSomas.channelsSaved = 2;       
+paramsSomas.isZcorrected = false;
+paramsSomas.applyNeuropilCorrection = true; 
+paramsSomas.calculateDFF = true;
+
+% Parameters for Bouton Imaging 
+% CRITICAL: CHANGE CHANNELS SAVED FOR V1 RECORDINGS 
+paramsBoutons.interpRate = 60;
+paramsBoutons.frameRate = 7.28;
+paramsBoutons.pdthreshold = 10;
+% paramsBouton.planeNums = 8;
+paramsBoutons.channelsSaved = 2;      
+paramsBoutons.isZcorrected = true;
+paramsBoutons.applyNeuropilCorrection = true; 
+paramsBoutons.calculateDFF = true;
+
+% Common processing parameters
+rfpreStimTime = 0.5;    % seconds
+rfpostStimTime = 3;     % seconds
+method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
+
+%% INITIALISE ERROR LOG 
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVRPipeline_20251201.csv');
+logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
+% If the log file doesn't exist, create it with headers
+if ~exist(logFilePath, 'file')
+    logTable = table('Size', [0, numel(logHeaders)], 'VariableTypes', repmat("string", 1, numel(logHeaders)), 'VariableNames', logHeaders);
+    writetable(logTable, logFilePath);
+end
+fprintf('Error logging enabled. Log will be saved to: %s\n', logFilePath);
+
+%% START PROCESSING LOOP
+% Loop through each mouse defined in mouseInfo
+for thisMouse = 1:size(mouseInfo, 1)
+    
+    mousenumber = mouseInfo{thisMouse, 1};
+    sessionNames = mouseInfo{thisMouse, 2};
+    
+    fprintf('Processing Mouse: %s\n', mousenumber);
+    % Loop through each session for the current mouse
+    for thisSession = 1:length(sessionNames)
+        sessionName = sessionNames{thisSession};
+        
+        fprintf('\n-- Processing Session: %s --\n', sessionName);
+        
+        try
+          
+            % Find the row in filteredTable corresponding to the current mouse and session
+            sessionIdx = find(strcmp(filteredTable.MouseID, mousenumber) & strcmp(filteredTable.Session, sessionName), 1);
+            
+            if isempty(sessionIdx)
+                error('Session info not found in filteredTable for %s, %s.', mousenumber, sessionName);
+            end
+            
+            typeImaged = filteredTable.TypeImaged{sessionIdx}; % Get the imaging type
+            
+            fprintf('  Type Imaged: %s. Loading specific processing parameters.\n', typeImaged);
+            
+            % Assign parameters based on the imaging type
+            if strcmpi(typeImaged, 'Somas')
+                currentParams = paramsSomas;
+            elseif strcmpi(typeImaged, 'Boutons')
+                currentParams = paramsBoutons;
+            else
+                error('Unknown TypeImaged: %s. Cannot set processing parameters.', typeImaged);
+            end
+            
+
+            interpRate = currentParams.interpRate;
+            % planeNums = currentParams.planeNums;
+            applyNeuropilCorrection = currentParams.applyNeuropilCorrection;
+            calculateDFF = currentParams.calculateDFF;
+            isZcorrected = currentParams.isZcorrected;
+            % channelsSaved = currentParams.channelsSaved; % 
+            % frameRate = currentParams.frameRate; % 
+            % pdthreshold = currentParams.pdthreshold; % 
+            % -----------------------------------------------------------
+            
+            % get the list of stimuli for this specific session from
+            % Suite2p; This will also extract the order of stimuli that
+            % were concatenated
+            stimList = getStimList(mousenumber, sessionName);
+            fprintf('  Found stimuli: %s\n', strjoin(stimList, ', '));
+            
+            % Identify which stimuli are VR and which are others (including RF)
+            vrStimNames = {};
+            otherVisualStim = {}; 
+            rfStimNames = {}; 
+            
+            for k = 1:length(stimList)
+                if any(contains(stimList{k}, vrKeywords, 'IgnoreCase', true))
+                    vrStimNames{end+1} = stimList{k};
+                else 
+                    otherVisualStim{end+1} = stimList{k};
+                    if any(contains(stimList{k}, rfKeywords, 'IgnoreCase', true))
+                        rfStimNames{end+1} = stimList{k};
+                    end
+                end
+            end
+            
+            % General file processing for the entire session
+            sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, stimList);
+            % sessionFileInfo = get2PMetadata(sessionFileInfo); % exclude
+            
+            % as the tiff files have been moved to a different repo and
+            % metadata has already been generated before moving tifs 
+            [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected); % Uses dynamic planeNums, isZcorrected
+            sessionFileInfo = processPeripheralFiles(sessionFileInfo);
+            sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
+            [sessionFileInfo] = createSessionROIData(sessionFileInfo);   %% NEW
+            
+            % B. Process all other visual stimuli; Process Visual stimuli
+            % as it is needed to check for highly correlated boutons 
+            if ~isempty(otherVisualStim)
+                fprintf('Found %d other visual stimulus file(s).\n', length(otherVisualStim));
+                for thisOtherVisualStim = 1:length(otherVisualStim)
+                    otherVisualStimName = otherVisualStim{thisOtherVisualStim};
+                    fprintf('Processing Stimulus file: %s\n', otherVisualStimName);
+                    
+                    try
+                        % Loads Bonsai data files where appropriate 
+                        [~, sessionFileInfo]       = getTuningStimEventsBonsaiFile(sessionFileInfo, otherVisualStimName, true); 
+                        % Interpolate Suite2P, Bonsai and Peripheral Data to interpRate
+                        [~, ~, ~, sessionFileInfo] = ...
+                            resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', otherVisualStimName, true, true, true);  % Uses dynamic interpRate
+                        % Delta F/F (Neuropil corrected)
+                        [~, sessionFileInfo]       = computeNeuropilCorrectionAndDFF(sessionFileInfo, otherVisualStimName, applyNeuropilCorrection, calculateDFF); % Uses dynamic flags
+                        % then proceed with the rest...Not currently
+                        % running 
+                    catch
+                        fprintf('Missing bonsai data structure for stimulus file: %s\n', otherVisualStimName)
+                    end
+                end
+            end 
+
+
+            % B. Process all VR Stimuli (REORDERED TO BE SECOND)
+            if ~isempty(vrStimNames)
+                fprintf('Found %d VR stimulus file(s).\n', length(vrStimNames));
+
+                % --- Step 1: Process each VR run individually up to calculating un-shuffled response ---
+                for thisVRStim = 1:length(vrStimNames)
+                    vrStimName = vrStimNames{thisVRStim};
+                    fprintf('Processing VR Stim: %s\n', vrStimName);
+
+                    [~, sessionFileInfo]        = getVRBonsaiFiles(sessionFileInfo, vrStimName);
+                    [~]                         = findBonsaiPeripheralLag(sessionFileInfo, 1, interpRate);
+                    [~, sessionFileInfo]        = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
+                    [~, ~, ~, sessionFileInfo]  = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', vrStimName, true, true); % Uses dynamic interpRate
+                    [~, sessionFileInfo]        = extractVRAndPeripheralData(sessionFileInfo, vrStimName, true);
+                    % Filter out laps to include (TODO; NOT PROPRITY)
+                    [~, sessionFileInfo]        = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
+                    [~, sessionFileInfo]        = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName, applyNeuropilCorrection, calculateDFF); % Uses dynamic flags
+
+                    % Calculate only the UN-SHUFFLED Lap Position Activity 
+                    [response_unshuffled, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, true);
+
+                end
+
+                % Combine responses if multiple VR runs exist 
+                if length(vrStimNames) > 1
+                    fprintf('Checking for and combining Response across multiple VR runs\n')
+                    responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'VRCorr', 'Response'); % Load all individual 'response_unshuffled' structures
+                    response = combineResponseForVRRuns(responseVRRuns, sessionFileInfo); % Combine them into the final response
+                else
+                    % If only one run, use its calculated response as the final response
+                    response = response_unshuffled;
+                end
+
+                % Run all stability and significance checks ONCE on the final response ---
+                fprintf('Running stability and significance checks on final VR response structure...\n')
+
+                TODO
+                % [response, sessionFileInfo] = computeShuffleSignificance(sessionFileInfo, response);
+
+                % Functions to filter out ROIs: appends this info to sessionROIData
+                [~,~,~,~] = findHightlyCorrelatedROIs(sessionFileInfo); % This might need updating to check all VR runs
+                [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
+                [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
+                [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response); % Run on final response
+                [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response); % Run on final response
+                [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response); % Run on final response
+
+                % Get roi stability matrix
+                plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
+            end
+               
+            fprintf('  Session %s processed successfully!\n', sessionName);
+               
+        catch ME
+          
+            % Still display the warning for immediate feedback
+            warning('    Error processing %s, session %s: %s', mousenumber, sessionName, ME.message);
+            fprintf(2, '    Error in function %s, line %d.\n', ME.stack(1).name, ME.stack(1).line);
+            
+            % Prepare the data for the log file
+            timestamp = string(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
+            mouseStr = string(mousenumber);
+            sessionStr = string(sessionName);
+            % Clean up the error message to remove newlines for better CSV formatting
+            errorMessage = string(strrep(ME.message, newline, ' '));
+            errorFunction = string(ME.stack(1).name);
+            errorLine = ME.stack(1).line;
+            
+            % Create a table with the new error information
+            errorData = table(timestamp, mouseStr, sessionStr, errorMessage, errorFunction, errorLine, ...
+                'VariableNames', logHeaders);
+            
+            % Append the error data to the CSV file
+            writetable(errorData, logFilePath, 'WriteMode', 'append', 'WriteVariableNames', false);
+        end
+    end
+end
+disp('All mice and sessions processed!');
