@@ -4,12 +4,9 @@ clear; clc;
 %% DEFINE MICE, SESSIONS, AND KEYWORDS
 % Define all mice and their sessions to be processed
 mouseInfo = {
-
+    'M25041', {'20250415A'};...
     % 'M25041', {'20250417A'};...
-    'M25040', {'20250511B'};...
-    'M25058', {'20250529'};...
-    'M25041', {'20250420'};... tested on this session (soma session test)
-
+    % 'M25040', {'20250511A', '20250507'};...
     % Add new mice here, e.g.: 'M25042', {'YYYYMMDD', 'YYYYMMDD'};
 };
 % Keywords to identify stimulus types from filenames
@@ -80,7 +77,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             % General file processing for the entire session
             sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, stimList);
             % sessionFileInfo = get2PMetadata(sessionFileInfo);
-            % [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, planeNums, isZcorrected);
+            % [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected, planeNums);
             % sessionFileInfo = processPeripheralFiles(sessionFileInfo);
             % sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
             
