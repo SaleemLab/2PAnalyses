@@ -49,12 +49,12 @@ if numSpeedPlots == 0
 end
 numCols = ceil(sqrt(numSpeedPlots));
 numRows = ceil(numSpeedPlots / numCols);
-hFig1 = figure('Name', sprintf('1. Running Speed Distributions for Mouse: %s', MouseID)); % Saved handle for export
+hFig1 = figure('Name', sprintf('1. Running Speed Distributions for Mouse: %s', MouseID));
 tiledlayout(numRows, numCols, 'Padding', 'compact', 'TileSpacing', 'compact');
 fprintf('Processing Mouse: %s\n', MouseID);
 % Lap Times Per Session (Line Plots)
 % Use the same dimensions as the speed histograms for Figure 2
-hFig2 = figure('Name', sprintf('2. Lap Time Performance Per Session for Mouse: %s', MouseID)); % Saved handle for export
+hFig2 = figure('Name', sprintf('2. Lap Time Performance Per Session for Mouse: %s', MouseID));
 tiledlayout(numRows, numCols, 'Padding', 'compact', 'TileSpacing', 'compact');
 currentLapTile = 1;
 % Plotting Loop 
@@ -127,8 +127,9 @@ if ~isempty(sessionSummaryData)
     laps = [sessionSummaryData.numLaps];
     timeRuns = [sessionSummaryData.timeRun]; 
     sessionLabels = {sessionSummaryData.sessionName};
+    
     % Create a 4x1 tiled layout for the summary plots in Figure 3
-    hFig3 = figure('Name', sprintf('3. Summary Metrics Across Days for Mouse: %s', MouseID)); % Saved handle for export
+    hFig3 = figure('Name', sprintf('3. Summary Metrics Across Days for Mouse: %s', MouseID));
     tiledlayout(4, 1, 'Padding', 'compact', 'TileSpacing', 'compact');
     %Percentage Run Across Days
     nexttile;
@@ -164,20 +165,5 @@ if ~isempty(sessionSummaryData)
     xticklabels(replace(sessionLabels, '_', '\_'));
     xtickangle(45);
     sgtitle(sprintf('3. Summary Running Metrics for Mouse: %s', MouseID));
-    
-    baseSavePath = 'Z:\ibn-vision\USERS\Sonali\Figures\RunningSpeed'; 
-    
-    filename1 = [MouseID '_1_SpeedDistributions.png'];
-    filename2 = [MouseID '_2_LapTimePerformance.png'];
-    filename3 = [MouseID '_3_SummaryMetricsDistribution.png'];
-    
-    filePath1 = fullfile(baseSavePath, filename1);
-    filePath2 = fullfile(baseSavePath, filename2);
-    filePath3 = fullfile(baseSavePath, filename3);
-    exportgraphics(hFig1, filePath1, 'ContentType', 'vector');
-    
-    exportgraphics(hFig2, filePath2, 'ContentType', 'vector');
-    
-    exportgraphics(hFig3, filePath3, 'ContentType', 'vector');
 end
 end
