@@ -1,14 +1,18 @@
-function [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, nPlanes, isZcorrected)
+function [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected, nPlanes)
 % Calculates stimulus frame ranges from Suite2p output for multiple planes.
 %
 % This function performs a direct 1-to-1 mapping. It assumes that the number
 % of stimuli in 'sessionFileInfo.stimFiles' is equal to the number of TIFF
 % files processed by Suite2p, as reported in 'ops.frames_per_folder'.
 
-% --- Argument and Path Setup ---
-if nargin < 3
+
+if nargin < 2
     error('A third argument, isZcorrected (true/false), is required.');
 end
+if nargin < 3
+    twoPMetaData = load(sessionFileInfo.stimFiles(1).TwoPMetaData);
+    nPlanes = twoPMetaData.twopMetadata.numSlices;
+end 
 rootDir = sessionFileInfo.Directories.rootDir;
 save_folder = fullfile(rootDir, 'Analysis', sessionFileInfo.session_name);
 save_fileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_sessionFileInfo.mat'];
@@ -20,7 +24,7 @@ framerun = struct();
 %% --- Calculate Frame Runs Based on Processing Pipeline ---
 
 if isZcorrected
-    % --- SCENARIO 1: Z-motion correction applied (One 'plane' folder) ---
+    %  Z-motion correction applied (One 'plane' folder) ---
     disp('Z-corrected mode: Calculating frame runs once and replicating for all planes...');
     plane_folder_path = fullfile(suite2pDir, 'plane');
     if ~exist(plane_folder_path, 'dir')
@@ -42,7 +46,7 @@ if isZcorrected
     end
 
 else
-    % --- SCENARIO 2: No Z-motion correction (Multiple 'planeN' folders) ---
+    % No Z-motion correction (Multiple 'planeN' folders) ---
     disp('Multi-plane mode: Calculating frame runs for each plane individually...');
     planeItems = dir(fullfile(suite2pDir, 'plane*'));
     planeFolders = planeItems([planeItems.isdir]);
