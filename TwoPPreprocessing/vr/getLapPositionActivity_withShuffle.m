@@ -44,10 +44,11 @@ end
 if ndims(response.lapPosition2PFrameIdx) == 3
     response.lapPosition2PFrameIdx = squeeze(response.lapPosition2PFrameIdx);
 end
+totalTimes = length(processedTwoPData.TwoPFrameTime);
 numBins = 140; % 1cm bins for a 140cm track
 nLaps = size(response.lapPosition2PFrameIdx, 1); % Get nLaps from the 2D cell array
 % Shuffle parameters 
-maxShift = 2000; % maximum number of elements by which the signal can be circularly shifted (2000)
+maxShift = round(totalTimes./2); % maximum number of elements by which the signal can be circularly shifted (2000)
 numShifts = 1000;  % number of times the randomization loop will run (20)
 % Generates a vector of numShifts random integers.
 rng(1)
@@ -126,16 +127,17 @@ for iSignal = 1:length(signalNames)
             allFramesInBin = find(frameToBinMap == thisBin);
             
             if ~isempty(allFramesInBin)
-                % Calculate the mean activity for the shifted signal
+                % Calculate the mean activity for the shifted signal %
+                % Changed to median 
                 % 1. Extract all activities (across all laps) for this bin:
                 activityInBin = shiftedSignalMatrix(:, allFramesInBin);
                 
                 % 2. Calculate the mean activity across all those frames:
                 % (This is the average across all laps for this bin/shuffle)
-                meanActivity = mean(activityInBin, 2, 'omitnan');
+                medianActivityInBin = median(activityInBin, 2, 'omitnan'); % changed to median 
                 
                 % Store the result for this bin and shift
-                meanLapActivityForShift(:, thisBin) = meanActivity;
+                meanLapActivityForShift(:, thisBin) = medianActivityInBin;
             end
         end
         
@@ -144,6 +146,7 @@ for iSignal = 1:length(signalNames)
     end
 end
 toc(tl)
+
 response.lapPositionActivity = lapPositionActivity;
 % Save the new shuffle matrix under a new field name
 response.lapPositionActivity_ShuffleMatrix = lapPositionActivity_ShuffleMatrix; 

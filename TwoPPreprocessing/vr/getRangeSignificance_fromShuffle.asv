@@ -1,4 +1,4 @@
-function [isSignificantByRangeShuffling_local, realRangePercentileRank_local] = getRangeSignificance_fromShuffle(sessionFileInfo, response)
+function [isSignificantByRangeShuffling, realRangePercentileRank] = getRangeSignificance_fromShuffle(sessionFileInfo, response)
 % Calculates the range (Max - Min) of each cell's spatial tuning curve,
 % compares it to the distribution of ranges from the shuffled data,
 % and determines which cells have a range greater than the 95th percentile.
@@ -108,17 +108,16 @@ end
 disp('Range significance calculation complete.');
 %% Saving Data to sessionROIData 
 % Assign the local structs to the final variables used in the save command
-nullDist_RangeTuningMetric.isSignificantByRange = isSignificantByRangeShuffling_local;
-nullDist_RangeTuningMetric.realRangePercentileRank = realRangePercentileRank_local;
-nullDist_RangeTuningMetric.targetPercentile = targetPercentile; 
-
+shuffledMetrics.isSignificantByRangeShuffling = isSignificantByRangeShuffling_local;
+realRangePercentileRank = realRangePercentileRank_local;
 % Check if the file path exists and save the variables
 if isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file') == 2
     
     disp(['Saving range significance results to: ', sessionFileInfo.otherSessFilePaths.sessionROIData]);
     
     save(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
-        "nullDist_RangeTuningMetric", ...
+        "isSignificantByRangeShuffling", ...
+        "realRangePercentileRank", ...
          '-append')
          
 elseif isfield(sessionFileInfo, 'otherSessFilePaths')

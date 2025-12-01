@@ -1,4 +1,4 @@
-function [isSignificantByPeakShuffling, realPeakPercentileRank] = getPeakSignificance_fromShuffle(sessionFileInfo, response)
+function [isSignificantByPeakShuffling_local, realPeakPercentileRank_local] = getPeakSignificance_fromShuffle(sessionFileInfo, response)
 % Calculates the peak activity for each cell's spatial tuning curve,
 % compares it to the distribution of peak activities from the shuffled data,
 % and determines which cells have a peak activity greater than the 95th percentile.
@@ -98,8 +98,9 @@ disp('Peak significance calculation complete.');
 %% Saving Data to sessionROIData 
 
 % Assign the local structs to the final variables used in the save command
-isSignificantByPeakShuffling = isSignificantByPeakShuffling_local;
-realPeakPercentileRank = realPeakPercentileRank_local;
+nullDist_PeakTuningMetric.isSignificantByPeakShuffling = isSignificantByPeakShuffling_local;
+nullDist_PeakTuningMetric.realPeakPercentileRank = realPeakPercentileRank_local;
+nullDist_PeakTuningMetric.targetPercentile = targetPercentile; 
 
 % Check if the file path exists and save the variables
 if isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file') == 2
@@ -107,8 +108,7 @@ if isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.other
     disp(['Saving peak significance results to: ', sessionFileInfo.otherSessFilePaths.sessionROIData]);
     
     save(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
-        "isSignificantByPeakShuffling", ...
-        "realPeakPercentileRank", ...
+       "nullDist_PeakTuningMetric", ...
          '-append')
          
 elseif isfield(sessionFileInfo, 'otherSessFilePaths')
