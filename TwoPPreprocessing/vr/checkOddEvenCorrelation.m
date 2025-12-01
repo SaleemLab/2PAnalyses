@@ -1,4 +1,4 @@
-function [r, p, stableIdx] = checkOddEvenCorrelation(response, signalToUse, applySpatialSmoothing, plotFlag)
+function [r, p, stableIdx] = checkOddEvenCorrelation(sessionFileInfo, response, signalToUse, applySpatialSmoothing, plotFlag)
 % Calculates the odd vs. even laps spatial correlation for
 % each RO
 %
@@ -7,9 +7,9 @@ function [r, p, stableIdx] = checkOddEvenCorrelation(response, signalToUse, appl
 %   stableIdx - [nStableROIs x 1] indices of ROIs with r > 0.5
 
 %% Handle optional inputs
-if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end % changed 3 to 2 
-if nargin < 3; applySpatialSmoothing = true; end 
-if nargin < 4; plotFlag = true; end
+if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end % changed 3 to 2 
+if nargin < 4; applySpatialSmoothing = true; end 
+if nargin < 5; plotFlag = false; end
 
 %% Get data 
 % lapPositionActivity is (ROI x Laps x Position)
@@ -64,6 +64,28 @@ p = diag(p_matrix);
 stableThresh = 0.4;
 stableIdx = find(r > stableThresh);
 
+%%
+lapCorr_OddEven.rho = r;
+lapCorr_OddEven.p = p;
+lapCorr_OddEven.stableThreshold = stableThresh;
+lapCorr_OddEven.stableIdx = stableIdx;
+
+%% Save 
+% Check if the file path exists and save the variables
+if isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file') == 2
+    
+    disp(['Saving Odd-Even Lap significance results to: ', sessionFileInfo.otherSessFilePaths.sessionROIData]);
+    
+    save(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
+       "lapCorr_OddEven", ...
+         '-append')
+         
+elseif isfield(sessionFileInfo, 'otherSessFilePaths')
+    warning('sessionROIData file not found at: %s. Cannot append peak significance data.', ...
+        sessionFileInfo.otherSessFilePaths.sessionROIData);
+else
+    warning('sessionFileInfo.otherSessFilePaths field not found. Cannot save peak significance data.');
+end
 % %% Save in response (temp) 
 % response.roiOddEvenCorr.r = r;
 % response.roiOddEvenCorr.p = p; 
