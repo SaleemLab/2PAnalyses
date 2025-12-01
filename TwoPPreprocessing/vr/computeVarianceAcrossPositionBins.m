@@ -2,8 +2,9 @@ function [ratioVarToTuningRange, ratioVarToTuningVar, meanTuning]= computeVarian
 
 % calculates metrics of spatial selectivity and lap-to-lap reliability 
 % for each ROI by comparing the variance of the average
-% spatial tuning curve (signal) against the average activity 
-% variance within individual position bins (noise).
+% spatial tuning curve against the average activity 
+% variance within individual position bins .
+
 %% Handle optional arguments 
 if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end
 
@@ -58,12 +59,15 @@ ratioVarToTuningRange = posAllVar./tuningRange;
 % poor place field structure that is easily obscured by the noise.
 ratioVarToTuningVar   = posAllVar./tuningVar;
 
+%% 
+tuningCurveVariance.ratioVarToTuningVar = ratioVarToTuningVar;
+tuningCurveVariance.ratioVarToTuningRange = ratioVarToTuningRange; 
+
 
 %% Check if sessionROIData exists and append 
 if exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file') == 2
     save(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
-        "ratioVarToTuningVar", ...
-        "ratioVarToTuningRange", ...
+       "tuningCurveVariance", ...
          '-append')
 else
     warning('sessionROIData file not found at: %s. Cannot append variance data.', ...
