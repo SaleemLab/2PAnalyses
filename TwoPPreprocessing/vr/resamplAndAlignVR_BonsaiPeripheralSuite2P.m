@@ -9,6 +9,8 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %   Includes new 'trimNaNs' flag to remove NaN padding from the start/end
 %   of all signals, ensuring a common, valid time window. This will only be
 %   relavent for Soma recordings without z-motion correction. 
+%   
+%   Modified Nov: Creates and saves sessionROIData 
 %
 % Inputs:
 %   sessionFileInfo : struct
