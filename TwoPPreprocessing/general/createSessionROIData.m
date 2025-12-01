@@ -80,28 +80,24 @@ for thisPlaneIdx = 1:numPlanes
 end
 
 %% Assemble and Save sessionROIData Structure
-sessionROIData.typeImaged        = typeImaged;
-sessionROIData.targetArea        = targetArea;
-sessionROIData.scanZoomFactor    = scanZoomFactor;
-sessionROIData.micronsPerPix     = micronsPerPix;
-sessionROIData.pixelsPerLine     = pixelsPerLine;
-sessionROIData.linesPerFrame     = linesPerFrame;
-sessionROIData.roiPlaneIdentity  = roiPlaneIdentity;
-sessionROIData.roiGlobalIdx      = roiGlobalIdx;   % New field
-sessionROIData.iscell            = iscell;
-sessionROIData.redcell           = redcell;
-sessionROIData.radiuspix         = radiuspix;
-sessionROIData.npix              = npix;
-sessionROIData.ypix              = ypix;
-sessionROIData.xpix              = xpix;
-sessionROIData.selectedPlane     = selectedPlane;
+typeImaged        = typeImaged;
+targetArea        = targetArea;
+roiInfo.scanZoomFactor    = scanZoomFactor;
+roiInfo.micronsPerPix     = micronsPerPix;
+roiInfo.pixelsPerLine     = pixelsPerLine;
+roiInfo.linesPerFrame     = linesPerFrame;
+roiInfo.roiPlaneIdentity  = roiPlaneIdentity;
+roiInfo.roiGlobalIdx      = roiGlobalIdx;   % New field
+roiInfo.iscell            = iscell;
+roiInfo.redcell           = redcell;
+roiInfo.radiuspix         = radiuspix;
+roiInfo.npix              = npix;
+roiInfo.ypix              = ypix;
+roiInfo.xpix              = xpix;
+roiInfo.selectedPlane     = selectedPlane;
 
 % Save individual variables to the .mat file for selective loading
-save(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
-     'scanZoomFactor', 'micronsPerPix', 'pixelsPerLine', 'linesPerFrame', ...
-     'typeImaged', 'targetArea', ...
-     'roiPlaneIdentity', 'roiGlobalIdx', 'iscell', 'redcell', 'radiuspix', 'npix', ... % Added roiGlobalIdx
-     'ypix', 'xpix', 'selectedPlane');
+save(sessionFileInfo.otherSessFilePaths.sessionROIData, "roiInfo", "targetArea","typeImaged");
      
 % Save sessionFileInfo
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
