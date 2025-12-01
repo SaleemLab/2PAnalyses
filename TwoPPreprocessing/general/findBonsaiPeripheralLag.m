@@ -48,8 +48,8 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
     % Pick out raw values
     rawPDValue              = peripheralData.Photodiode.rawValue;
     rawPDArduinoTime        = peripheralData.Photodiode.rawArduinoTime;
-    rawQuadValue            = bonsaiData.Quadstate.rawValue;
-    rawQuadArduinoTime      = bonsaiData.Quadstate.rawArduinoTime;
+    rawQuadValue            = peripheralData.Quadstate.rawValue;
+    rawQuadArduinoTime      = peripheralData.Quadstate.rawArduinoTime;
     bonsaiData.LagInfo.method = method;
 
     switch method
