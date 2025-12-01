@@ -9,7 +9,7 @@
 % 1. DEFINE FILE PATHS AND PARAMETERS 
 % =========================================================================
 roiDataPath = "\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25040\Analysis\20250511B\M25040_20250511B_sessionROIData.mat"; % Path to your saved sessionROIData file
-tiffFilePath = "\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25040\OPhys\20250511B\M25040_VRCorr_20250511_00002\M25040_VRCorr_20250511_00002_00001 - Copy.tif"; % Path to your raw TIFF file
+tiffFilePath ="\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25040\OPhys\20250511B\M25040_VRCorr_20250511_00002\M25040_VRCorr_20250511_00002_00004 - Copy.tif"; % Path to your raw TIFF file
 startFrame = 10;   % Frame index to start averaging (1-based volume index)
 numFramesToAverage = 1000; % Number of volumes to average for background image
 numPlanes = 8; % Total number of planes in the TIF acquisition (FULL_CYCLE_SIZE is now 8)
