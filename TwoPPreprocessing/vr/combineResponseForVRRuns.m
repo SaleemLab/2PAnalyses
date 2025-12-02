@@ -3,7 +3,7 @@ function [responseCombined, sessionFileInfo] = combineResponseForVRRuns(VRruns, 
 % Includes an 'overwrite' flag and robustly handles array reshaping.
 
 %% Handle optional 'overwrite' input
-if nargin < 3, overwrite = false; end
+if nargin < 3, overwrite = true; end
 
 %% Define combined stimulus name and file path
 combinedStimName = [sessionFileInfo.animal_name '_VRCorr_' sessionFileInfo.session_name '_CombinedRuns'];
@@ -47,6 +47,10 @@ end
 responseCombined = VRruns{1};
 numLapsInFirstRun = size(responseCombined.lapCount, 1);
 responseCombined.VRLapRun = ones(numLapsInFirstRun, 1);
+
+responseCombined.stimName = combinedStimName; 
+
+responseCombined.AllstimName = VRruns{1}.stimName;
 
 %% Main Combination Loop
 for thisRun = 2:numRuns
@@ -103,7 +107,7 @@ for thisRun = 2:numRuns
     responseCombined.startTimeAll = [responseCombined.startTimeAll; responseCurrent.startTimeAll];
     responseCombined.completedStartTimes = [responseCombined.completedStartTimes; responseCurrent.completedStartTimes];
     responseCombined.completedEndTimes = [responseCombined.completedEndTimes; responseCurrent.completedEndTimes];
-    responseCombined.stimName = [responseCombined.stimName; responseCurrent.stimName];
+    responseCombined.AllstimName = [responseCombined.AllstimName, ' | ', responseCurrent.stimName];
     responseCombined.lapPositionRelativeTime = [responseCombined.lapPositionRelativeTime; responseCurrent.lapPositionRelativeTime];
     responseCombined.VRLapRun = [responseCombined.VRLapRun; currentRunLapTracker];
 end

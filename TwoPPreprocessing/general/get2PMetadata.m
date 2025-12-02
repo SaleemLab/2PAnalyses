@@ -15,7 +15,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
     
     % add an if statement to deal with trimmed tiff files with only one tif
     % saved:
-    if length(sessionFileInfo.stimFiles(iStim).tif_filepaths) == 1 && contains(sessionFileInfo.stimFiles(iStim).tif_filepaths(1), '_trimmed')
+    if isscalar(sessionFileInfo.stimFiles(iStim).tif_filepaths) && contains(sessionFileInfo.stimFiles(iStim).tif_filepaths(1), '_trimmed')
         % load the original tif (which contains software) in the
         trimmedPath = sessionFileInfo.stimFiles(iStim).tif_filepaths{1};
         % Remove '_trimmed' from the filename
