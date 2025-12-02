@@ -8,7 +8,7 @@ function [r, p, stableIdx] = checkHalvesCorrelation(sessionFileInfo, response, s
 %% Handle optional inputs
 if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end
 if nargin < 4; applySpatialSmoothing = true; end
-if nargin < 5; plotFlag = false; end
+if nargin < 5; plotFlag = true; end
 
 %% Get data
 % lapPositionActivity is (ROI x Laps x Position)
