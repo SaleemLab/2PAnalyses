@@ -93,7 +93,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                     fprintf('Processing VR Stim: %s\n', vrStimName);
 
                     [~, sessionFileInfo]        = getVRBonsaiFiles(sessionFileInfo, vrStimName);
-                    [~]        = findBonsaiPeripheralLag(sessionFileInfo, 1, 60);
+                    [~,sessionFileInfo]        = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, 60);
                     [~, sessionFileInfo]        = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
                     [~, ~, ~, sessionFileInfo]  = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', vrStimName, true, true); % Edit this function to save information about ROI
                     [~, sessionFileInfo]        = extractVRAndPeripheralData(sessionFileInfo, vrStimName, true);
