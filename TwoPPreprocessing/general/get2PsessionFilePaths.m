@@ -29,7 +29,17 @@ sessionFileInfo.session_name = session_name;
 % Directories
 rootDir = ['Z:' filesep fullfile('ibn-vision','DATA','SUBJECTS',animal_name)];
 bonsai_folder = fullfile(rootDir, 'Bonsai', session_name);
-ophys_folder = fullfile(rootDir, 'Ophys', session_name);
+
+% These two mouse folder have been moved to the other research drive 
+if strcmp(animal_name, 'M25041') || strcmp(animal_name, 'M25012')
+    newTempTiffRootDir = ['Y:' filesep fullfile('ibn-vision','DATA','SUBJECTS',animal_name)];
+    ophys_folder = fullfile(newTempTiffRootDir, 'Ophys', session_name);
+else
+    ophys_folder = fullfile(rootDir, 'Ophys', session_name);
+end
+
+% ophys_folder = fullfile(rootDir, 'Ophys', session_name);
+
 processed_folder = fullfile(rootDir, 'Processed', session_name);
 suite2p_folder = fullfile(processed_folder, 'suite2p');
 
