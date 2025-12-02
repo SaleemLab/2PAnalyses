@@ -8,9 +8,9 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %% Define default parameters
 if nargin < 2, samplingRate = 60; end
 if nargin < 3, mainTimeToUse = 'TwoPFrameTime'; end 
-if nargin < 5, plotFlag = true; end
+if nargin < 5, plotFlag = false; end
 if nargin < 6, trimNaNs = true; end
-if nargin < 7, overwrite = false; end 
+if nargin < 7, overwrite = true; end 
 
 %% File Paths
 % Identify specific stimulus file index

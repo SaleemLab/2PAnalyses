@@ -10,7 +10,7 @@ function [roisToKeep, roisToDiscard, groups, corrMatrixCombined] = findHightlyCo
 if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end
 if nargin < 3; VRThreshold_ForBoutonMatch = 0.4; end
 if nargin < 4; NonVRThreshold_ForBoutonMatch = 0.7; end
-if nargin < 5; plotFlag = true; end
+if nargin < 5; plotFlag = false; end
 
 % Initialize trace containers
 traces_VR = [];
