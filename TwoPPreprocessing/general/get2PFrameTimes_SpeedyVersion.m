@@ -7,7 +7,7 @@ function [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZc
 
 
 if nargin < 2
-    error('A third argument, isZcorrected (true/false), is required.');
+    error('A second argument, isZcorrected (true/false), is required.');
 end
 if nargin < 3
     twoPMetaData = load(sessionFileInfo.stimFiles(1).TwoPMetaData);
@@ -19,6 +19,16 @@ save_fileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_
 suite2pDir = fullfile(rootDir, 'Processed', sessionFileInfo.session_name, 'suite2p');
 nStimuli = length(sessionFileInfo.stimFiles);
 stimuli_names = {sessionFileInfo.stimFiles.name};
+names_to_remove = contains(stimuli_names, 'CombinedRuns') & contains(stimuli_names, 'VRCorr');
+
+% Condition in case
+if any(names_to_remove)
+    disp('Found stimuli containing both CombinedRuns and VRCorr. Removing...')
+    stimuli_names = stimuli_names(~names_to_remove);
+    disp('Removal complete.')
+else
+    disp('No stimuli found containing both "CombinedRuns" and "VRCorr". List unchanged.')
+end
 framerun = struct();
 
 %% --- Calculate Frame Runs Based on Processing Pipeline ---
