@@ -43,8 +43,8 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %% Define default paramters and load appropriate data files
 if nargin < 2, samplingRate = 60; end
 if nargin < 3, mainTimeToUse = 'TwoPFrameTime'; end % This is the interrupt-arduino time from the Bonsai Arduino
-if nargin < 5, plotFlag = true; end
-if nargin < 6, trimNaNs = false; end % <<< NEW: Default for trimNaNs
+if nargin < 5, plotFlag = false; end
+if nargin < 6, trimNaNs = true; end % 
 
 % if nargin < 5, VR_number = 1; end
 % Pick out VRCorr
@@ -194,9 +194,8 @@ if trimNaNs
     disp('Trimming NaN padding from start/end of signals...');
     % Start with a full mask (sampleTimes is a row vector)
     combinedValidMask = true(size(sampleTimes));
-    % 1. Check processedTwoPData (N_ROIs x N_Time)
-    % A timepoint is invalid if *any* ROI is NaN at that time
-    % We use all(isfinite(...)) to find columns with NO NaNs.
+    
+    % Check processedTwoPData only
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.F), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.spks), 1);
