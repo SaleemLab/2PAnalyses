@@ -29,7 +29,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROISandNonROIS_SortedbyOdd_test.png']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROISandNonROIS_SortedbyOdd.png']);
 
 %% Extract activity matrix
 lapActivity = response.lapPositionActivity.(signalToUse);
@@ -56,8 +56,8 @@ oddLaps = lapActivity(:, 1:2:end, :);
 evenLaps = lapActivity(:, 2:2:end, :);
 
 % Average across laps
-meanOdd = squeeze(median(oddLaps, 2, 'omitnan'));
-meanEven = squeeze(median(evenLaps, 2, 'omitnan'));
+meanOdd = squeeze(mean(oddLaps, 2, 'omitnan'));
+meanEven = squeeze(mean(evenLaps, 2, 'omitnan'));
 
 % Normalize across position bins
 normOdd = normalize(meanOdd, 2, 'range');

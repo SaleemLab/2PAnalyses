@@ -18,24 +18,18 @@ if exist(outputFilePath, 'file') == 2
     fprintf('Loading significance and variance metrics from: %s\n', outputFilePath);
     
     % Load all necessary threshold metrics
-    loadedMetrics = load(outputFilePath, ...
-        'isSignificantByPeakShuffling', ...
-        'isSignificantByRangeShuffling', ...
-        'realPeakPercentileRank', ... % <-- NEW: Load Rank Value
-        'realRangePercentileRank', ...% <-- NEW: Load Rank Value
-        'ratioVarToTuningVar', ...
-        'ratioVarToTuningRange', ... 
-        'roisToKeep'); 
+    loadedMetrics = load(outputFilePath); ... 
+        % 'roisToKeep'); 
     
     % Access the dFFNeuropilCorrected signal data (assuming consistency)
-    peakSigIndex = loadedMetrics.isSignificantByPeakShuffling.dFFNeuropilCorrected;
-    rangeSigIndex = loadedMetrics.isSignificantByRangeShuffling.dFFNeuropilCorrected;
-    peakRankVal = loadedMetrics.realPeakPercentileRank.dFFNeuropilCorrected; % <-- NEW
-    rangeRankVal = loadedMetrics.realRangePercentileRank.dFFNeuropilCorrected; % <-- NEW
-    varToTuningVar = loadedMetrics.ratioVarToTuningVar;
-    varToTuningRange = loadedMetrics.ratioVarToTuningRange;
+    peakSigIndex = loadedMetrics.nullDist_PeakTuningMetric.isSignificantByPeakShuffling.dFFNeuropilCorrected;
+    rangeSigIndex = loadedMetrics.nullDist_RangeTuningMetric.isSignificantByRange.dFFNeuropilCorrected;
+    peakRankVal = loadedMetrics.nullDist_PeakTuningMetric.realPeakPercentileRank.dFFNeuropilCorrected; % <-- NEW
+    rangeRankVal = loadedMetrics.nullDist_RangeTuningMetric.realRangePercentileRank.dFFNeuropilCorrected; % <-- NEW
+    varToTuningVar = loadedMetrics.tuningCurveVariance.ratioVarToTuningVar;
+    varToTuningRange = loadedMetrics.tuningCurveVariance.ratioVarToTuningRange;
     roisToKeepMask = false(size(varToTuningVar));
-    roisToKeepMask(loadedMetrics.roisToKeep) = true;
+    % roisToKeepMask(loadedMetrics.roisToKeep) = true;
     
     metricsLoaded = true;
 else
@@ -107,10 +101,10 @@ for neuronIdx = 1:nROIs
         % Check Variance Criteria
         isTuningQualityPass = varToVarVal <= THRESHOLD_VAR_TO_VAR;
         isRangeQualityPass = varToRangeVal <= THRESHOLD_VAR_TO_RANGE;
-        isBoutonKept = roisToKeepMask(neuronIdx); 
+        % isBoutonKept = roisToKeepMask(neuronIdx); 
         
         % Define overall pass/fail status
-        passesAllCriteria = (isPeakSig || isRangeSig) && isTuningQualityPass && isRangeQualityPass && isBoutonKept;
+        passesAllCriteria = (isPeakSig || isRangeSig) && isTuningQualityPass && isRangeQualityPass;
         
         % Tally the passing ROIs
         if passesAllCriteria
@@ -128,7 +122,7 @@ for neuronIdx = 1:nROIs
             sprintf('Range Rank (95%%): %.1f%% (%d)', rangeRank, isRangeSig), 
             sprintf('Var/TuningVar (<=%.1f): %.2f (%d)', THRESHOLD_VAR_TO_VAR, varToVarVal, isTuningQualityPass),
             sprintf('Var/TuningRange (<=%.1f): %.2f (%d)', THRESHOLD_VAR_TO_RANGE, varToRangeVal, isRangeQualityPass), 
-            sprintf('Correlation Kept: %d', isBoutonKept)
+            % sprintf('Correlation Kept: %d', isBoutonKept)
         };
         
         mainTitle = sprintf('ROI %d: %s', neuronIdx, statusStr);
