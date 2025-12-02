@@ -1,4 +1,4 @@
-function loadedData = loadDataByKeyword(sessionFileInfo, stimKeyword, varargin)
+function loadedData = loadDataStructuresByKeyword(sessionFileInfo, stimKeyword, varargin)
 % Flexibly loads specific data for stimuli matching a keyword.
 %
 % This function finds all stimuli containing 'stimKeyword', excludes combined runs,
@@ -43,7 +43,7 @@ end
 if isempty(stimRunIndices)
     fprintf('No stimuli found matching keyword "%s". Returning empty.\n', stimKeyword);
     % Handle the output format for the no-data case
-    if length(fieldsToLoad) == 1
+    if isscalar(fieldsToLoad)
         loadedData = {}; % Return empty cell if one thing was requested
     else
         loadedData = outputStruct; % Return empty struct if multiple things were requested
@@ -116,7 +116,7 @@ fprintf('Finished. Loaded complete data for %d of %d runs.\n', length(outputStru
 %% Final Output Formatting (Modified Section)
 % If the user only asked for one variable, return the cell array directly.
 % Otherwise, return the full struct.
-if length(fieldsToLoad) == 1
+if isscalar(fieldsToLoad)
     loadedData = outputStruct.(fieldsToLoad{1});
 else
     loadedData = outputStruct;

@@ -70,7 +70,7 @@ Fneu = processedTwoPData.Fneu; % Interpolated Fneu (ROI x time)
 
 if applyTemporalSmoothing
     disp('Applying temporal smoothing to F and Fneu time-series...');
-    w = gausswin(9);
+    w = gausswin(9); % 144ms smoothning / SD is 25.6ms
     w = w / sum(w);
     
     numROIs = size(F, 1);

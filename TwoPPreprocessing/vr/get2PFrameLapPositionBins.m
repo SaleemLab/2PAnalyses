@@ -3,7 +3,7 @@ function [response, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo
 %   corresponding two-photon (2P) frame indices. This index is the same
 %   for all ROIs and is stored once per lap/bin.
 %
-%   Only includes frames where wheel speed > 1 cm/s.
+%   Only includes frames where wheel speed > 1 cm/s and less than 100 cm/s
 %
 % Inputs:
 %   sessionFileInfo : struct
@@ -17,8 +17,7 @@ function [response, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo
 %
 % Aman and Sonali - April 2025
 % Optimized to save lapPosition2PFrameIdx as a 2D array - October 2025
-minSpeedBin = 1;
-maxSpeedBin = 100;
+
 %% Load processed data
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx)
@@ -32,6 +31,8 @@ load(sessionFileInfo.stimFiles(stimIdx).processedPeripheralData, 'peripheralData
 load(sessionFileInfo.stimFiles(stimIdx).Response, 'response');
 
 %% Define bins and setup
+minSpeedBin = 1;
+maxSpeedBin = 100;
 posBinEdges = 0:140;
 numPosBins = length(posBinEdges) - 1;
 nLaps = length(response.completedStartTimes);
@@ -68,7 +69,7 @@ for thisLap = 1:nLaps
         binMask = (positionIdx == thisBin) & speedFilter(lapFrameIdx);
         frameIdxInBin = lapFrameIdx(binMask);
         
-        % --- CHANGE 2: Store the indices directly into the 2D array ---
+        % Store the indices directly into the 2D array 
         % The unnecessary loop over ROIs is completely removed.
         lapPosition2PFrameIdx{thisLap, thisBin} = frameIdxInBin;
 
