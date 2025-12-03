@@ -12,7 +12,7 @@ signalName = 'dFFNeuropilCorrected';
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25012', 'M25037', 'M25038', 'M25040', 'M25041', 'M25057', 'M25058'}); %, 'TypeImaged', 'Boutons'
+    'MouseID', {'M25057', 'M25058'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -53,7 +53,7 @@ rfpostStimTime = 3;     % seconds
 method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
 
 %% INITIALISE ERROR LOG
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVR_VisualStimPipeline_20251202.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVR_VisualStimPipeline_20251203.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 % If the log file doesn't exist, create it with headers
 if ~exist(logFilePath, 'file')
