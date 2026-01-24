@@ -6,14 +6,14 @@ clear; clc;
 % The mouseInfo is generated from the filteredTable
 vrKeywords = {'VRCorr'};
 rfKeywords = {'RFMapping'};
-doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002', };
-signalName = 'dFF'; %changed to dff 2026 jan
+doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002', 'M25126_VRCorr_20260123_00001', 'M25126_VRCorrBaseline_20260123_00002', 'M25126_VRCorrWithManipulations_20260123_00003'};
+signalName = 'dFF'; %changed to dff 2026 jan 
 % filteredTable now holds the key metadata (TypeImaged) needed for parameter setting.
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25126'}, ...
-    'Session', {'20260123'}); %, 'TypeImaged', 'Boutons'
+    'MouseID', {'M25012'}, ...
+    'Session', {'20250510'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -177,7 +177,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                     % Preprocessing steps
                         [~, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, vrStimName);
                         [~, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, interpRate);
-                        [~, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
+                        [~, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName); 
                         [~, ~, ~, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', vrStimName);
                         [~, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo, vrStimName);
                         [~, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
@@ -208,7 +208,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         vrStimName = vrStimNames{thisVRStim};
                         stimIdx = find(strcmp(vrStimName, {sessionFileInfo.stimFiles.name}), 1);
                         % load the individual response structure into the environment
-                        load(sessionFileInfo.stimFiles(stimIdx).Response, 'response');
+                        response = load(sessionFileInfo.stimFiles(stimIdx).Response);
                         % Compute Shuffle Matrix (Stitch to itself)
                         fprintf(' -> Computing shuffle matrix for run: %s\n', vrStimName);
                         [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo,response,{vrStimName});

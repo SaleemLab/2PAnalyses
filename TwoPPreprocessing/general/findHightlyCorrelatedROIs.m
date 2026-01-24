@@ -31,7 +31,7 @@ if numVRFiles >= 1
         processedTwoPDataPath = sessionFileInfo.stimFiles(thisStimIdx).processedMergedBonsaiSuite2pData;
         if exist(processedTwoPDataPath, "file")
             processedTwoPData = load(processedTwoPDataPath);
-            allDFFData_VR{thisVRFile} = processedTwoPData.processedTwoPData.zScoredProcessedSignals.(signalToUse);
+            allDFFData_VR{thisVRFile} = processedTwoPData.zScoredProcessedSignals.(signalToUse);
         else
             warning('Missing processedTwoPData file for VR: %s \n', sessionFileInfo.stimFiles(thisStimIdx).name);
         end

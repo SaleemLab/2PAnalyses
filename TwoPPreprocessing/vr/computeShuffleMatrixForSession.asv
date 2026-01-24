@@ -145,11 +145,11 @@ toc(tl)
 
 %% 5. Return Results
 response.lapPositionActivity_ShuffleMatrix = lapPositionActivity_ShuffleMatrix; 
-stimIdx = find(strcmp(response.stimName, {sessionFileInfo.stimFiles.name}));
 
+stimIdx = find(strcmp(response.stimName, {sessionFileInfo.stimFiles.name}));
 disp(['Saving updated Response struct to ', sessionFileInfo.stimFiles(stimIdx).Response]);
-save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append');
-save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+save(sessionFileInfo.stimFiles(stimIdx).Response, 'response', '-append');
+
 end
 
 % Helper function (for conditional assignment) @gemini and stupid.. 

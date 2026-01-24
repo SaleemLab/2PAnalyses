@@ -116,11 +116,10 @@ end
 
 %% Saving (Maintaining the struct as a root variable)
 disp('Appending processedSignals to the file...');
-save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'processedSignals', 'zScoredProcessedSignals', '-append');
+save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'processedSignals', '-append');
 
 % Also return for function output (temp) 
 processedTwoPData.processedSignals = processedSignals;
-processedTwoPData.zScoredProcessedSignals = zScoredProcessedSignals;
 processedTwoPData.F = F; 
 processedTwoPData.ops = ops;
 

@@ -45,7 +45,7 @@ maxSpeedBin = 100;
 posBinEdges = 0:140;
 numPosBins = length(posBinEdges) - 1;
 nLaps = length(response.completedStartTimes);
-% timeVec = processedTwoPData.(processedTwoPData.resample2PTimeUsed);
+timeVec = processedTwoPData.(processedTwoPData.resample2PTimeUsed);
 speedFilter = response.wheelSpeed > minSpeedBin & response.wheelSpeed < maxSpeedBin;
 
 % Initialise as a 2D cell array 
@@ -95,14 +95,8 @@ end
 response.lapPosition2PFrameIdx = lapPosition2PFrameIdx;
 response.lapPositionRelativeTime = lapPositionRelativeTime;
 
-% disp('Saving updated response struct...');
-% fieldsToSave = fieldnames(response);
-% for i = 1:numel(fieldsToSave)
-%     eval([fieldsToSave{i} ' = response.' fieldsToSave{i} ';']);
-% end
-
-
-save(sessionFileInfo.stimFiles(stimIdx).Response,'-struct', 'response', '-append'); %using -append as this is not first save
+disp('Saving updated response struct...');
+save(sessionFileInfo.stimFiles(stimIdx).Response, 'response', '-v7.3');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 disp('Done.');
 end

@@ -27,7 +27,7 @@ else
     signals = processedSignals;
 end
 
-response = load(sessionFileInfo.stimFiles(stimIdx).Response, 'lapPosition2PFrameIdx');
+response = load(pathResp, 'lapPosition2PFrameIdx');
 
 %% Get cell ROIs
 if onlyIncludeROIs
@@ -69,7 +69,5 @@ end
 response.lapPositionActivity = lapPositionActivity;
 
 disp(['Saving updated Response struct (Lap Activity) to ', sessionFileInfo.stimFiles(stimIdx).Response]);
-save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append');
-save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
-% save(sessionFileInfo.stimFiles(stimIdx).Response, 'response', '-append');
+save(sessionFileInfo.stimFiles(stimIdx).Response, 'response', '-append');
 end

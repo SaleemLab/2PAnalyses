@@ -363,16 +363,16 @@ if plotFlag
 end
 %% Save (reformated version 24.01.2026) 
 
-% Get all field names from the struct
-fieldsToSave = fieldnames(processedTwoPData);
-disp('Saving processed data files...');
+% % Get all field names from the struct
+% fieldsToSave = fieldnames(processedTwoPData);
+% disp('Saving processed data files...');
+% 
+% for i = 1:numel(fieldsToSave)
+%     % Dynamically create variables in the local workspace
+%     eval([fieldsToSave{i} ' = processedTwoPData.' fieldsToSave{i} ';']);
+% end
 
-for i = 1:numel(fieldsToSave)
-    % Dynamically create variables in the local workspace
-    eval([fieldsToSave{i} ' = processedTwoPData.' fieldsToSave{i} ';']);
-end
-
-save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData,fieldsToSave{:} , '-v7.3');
+save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData,'-struct', 'processedTwoPData', '-v7.3');
 disp('Saved processedTwoPData');
 
 % No changes made here 24.01.2026
