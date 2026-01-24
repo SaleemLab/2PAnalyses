@@ -31,7 +31,7 @@ function convertToSaleemlabDataDirStructure(mouseID, sessionID)
         [parentPath, fileName, fileExt] = fileparts(sourceFile);
         
         % grandparent folder path -- is this what it is called?
-        [grandParentPath, parentFolderName] = fileparts(parentPath);
+        [grandParentPath, ~] = fileparts(parentPath);
         
         % grandparent folder name :P
         [~, grandParentFolderName] = fileparts(grandParentPath);

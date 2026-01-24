@@ -1,5 +1,6 @@
 function stimList = getStimList(mouseID, session)
 %% Directories 
+%% Uses fall.mat to find the order or stimuli that were concatenated before processing through suite2p. 
 rootDir = ['Z:' filesep fullfile('ibn-vision','DATA','SUBJECTS',mouseID)];
 processedFolder = fullfile(rootDir, 'Processed', session);
 suite2pFolder = fullfile(processedFolder, 'suite2p');
