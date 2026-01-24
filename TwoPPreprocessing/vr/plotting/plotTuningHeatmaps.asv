@@ -1,0 +1,130 @@
+function figHandle = plotTuningHeatmaps(allData)
+% plotGridTuning Plots a grid (Mice x Days of learning) of position tuning.
+% NOTE: Filtering parameters are hardcoded within this function.
+    
+    % --- HARDCODED PARAMETERS ---
+    % 1. Mouse Exclusion
+    excludeMice = {'M24043', 'M24046', 'M24048', 'M24049'}; 
+    
+    % 2. Days and Type to Plot
+    daysToPlot = [1 2 3 4 5];
+    typeToPlot = 'Boutons';
+    
+    % 3. Ratio Threshold Filter (Ratio > Threshold)
+    ratioThreshold = 1; % 
+    useRatioFilter = false; % Always true since the threshold is set
+    % --------------------------
+
+    % Identify Mice (exclude specifically requested ones)
+    uniqueMice = setdiff(unique({allData.MouseID}), excludeMice, 'stable');
+    
+    [nMice, nDays] = deal(length(uniqueMice), length(daysToPlot));
+    figHandle = figure('Position', [100 100 300*nDays 250*nMice]);
+    t = tiledlayout(figHandle, nMice, nDays, 'TileSpacing', 'compact', 'Padding', 'compact');
+    
+    for m = 1:nMice
+        for d = 1:nDays
+            ax = nexttile; 
+            
+            % --- SESSION FILTERING (Metadata) ---
+            thisSession = allData(strcmp({allData.MouseID}, uniqueMice{m}) & ...
+                                  [allData.Day] == daysToPlot(d) & ...
+                                  strcmpi({allData.Type}, typeToPlot));
+            
+            if isempty(thisSession)
+                axis(ax, 'off'); 
+                if m==1, title(ax, ['Day ' num2str(daysToPlot(d))]); end
+                continue;
+            end
+            
+            if length(thisSession) > 1
+                warning('Duplicate data found for %s Day %d (%s). Using first.', ...
+                    uniqueMice{m}, daysToPlot(d), typeToPlot);
+                thisSession = thisSession(1); 
+            end
+            
+            % --- RETRIEVE LAP COUNT ---
+            numLaps = thisSession.NumLaps;
+            
+            % --- ROI DATA INITIALIZATION ---
+            OddMeanPlot = thisSession.OddMean;
+            EvenMeanPlot = thisSession.EvenMean;
+            
+            % Start with all ROIs
+            roisToKeepIdx = 1:size(OddMeanPlot, 1);
+            
+            % --- FILTERING LOGIC 1: STABILITY INDEX (Always Active if field exists) ---
+            if isfield(thisSession, 'lapCorr_HalvesStableIdx') && ~isempty(thisSession.lapCorr_HalvesStableIdx)
+                stableRoiIndices = thisSession.lapCorr_HalvesStableIdx;
+                
+                roisToKeepIdx = intersect(roisToKeepIdx, stableRoiIndices);
+            end
+            
+            % --- FILTERING LOGIC 2: RATIO THRESHOLD (Hardcoded to > 40) ---
+            if useRatioFilter
+                if isfield(thisSession, 'ratioVarToTuningVar') && ~isempty(thisSession.ratioVarToTuningVar)
+                    
+                    ratioValues = thisSession.ratioVarToTuningVar;
+                    
+                    % Hardcoded comparison: Find indices where the ratio is less than the hardcoded threshold (40)
+                    ratioIdx = find(ratioValues < ratioThreshold); 
+                    
+                    % Intersect with the current list of ROIs to keep
+                    roisToKeepIdx = intersect(roisToKeepIdx, ratioIdx);
+                    
+                    fprintf('  -> Session %s Day %d: Ratio filter applied (> %g), final ROIs: %d.\n', ...
+                        uniqueMice{m}, daysToPlot(d), ratioThreshold, length(roisToKeepIdx));
+
+                else
+                    warning('Session %s Day %d: Ratio threshold is hardcoded, but ratioVarToTuningVar field is missing or empty. Skipping ratio filter.', ...
+                        uniqueMice{m}, daysToPlot(d));
+                end
+            end
+            
+            % --- FINAL CHECK AND PLOTTING ---
+            
+            if isempty(roisToKeepIdx)
+                warning('Session %s Day %d: No ROIs satisfy ALL active filters. Skipping plot.', ...
+                    uniqueMice{m}, daysToPlot(d));
+                axis(ax, 'off');
+                continue;
+            end
+            
+            % Apply the final combined indices
+            OddMeanPlot = OddMeanPlot(roisToKeepIdx, :);
+            EvenMeanPlot = EvenMeanPlot(roisToKeepIdx, :);
+            
+            % Pass filtered data to helper
+            plotTuningInAxes(ax, OddMeanPlot, EvenMeanPlot);
+            
+            % Formatting Labels
+            
+            % --- TITLE: INCLUDES LAP COUNT ---
+            lapText = sprintf(' (Laps: %d)', numLaps);
+            if m==1
+                % Include Day number and Lap count for the top row
+                title(ax, ['Day ' num2str(daysToPlot(d)) lapText]); 
+            else
+                % Include only Lap count for the rows below
+                title(ax, lapText); 
+            end
+
+            if d==1, ylabel(ax, uniqueMice{m}, 'Interpreter', 'none', 'FontSize', 10); end
+            
+            % Only show X-labels on the bottom-most plots
+            if m ~= nMice
+                set(ax, 'XTickLabel', {}); 
+                xlabel(ax, ''); 
+            end
+        end
+    end
+    
+    % Global Title
+    filterInfo = sprintf(' (Ratio < %g Filtered)', ratioThreshold);
+    title(t, sprintf('%s Tuning Heatmaps Across Days: LapHalves Correlation (r<0.4)  %s', typeToPlot, filterInfo), 'FontSize', 14);
+    
+   
+    hardcodedSavePath = 'Z:\ibn-vision\USERS\Sonali\Figures\Heatmaps_SpatialTuningCurves\TuningCurves-HalvesCorr.png';
+    saveas(figHandle, hardcodedSavePath); 
+    % ----------------------------------
+end

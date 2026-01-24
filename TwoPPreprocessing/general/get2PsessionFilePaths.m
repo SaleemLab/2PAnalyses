@@ -31,7 +31,7 @@ rootDir = ['Z:' filesep fullfile('ibn-vision','DATA','SUBJECTS',animal_name)];
 bonsai_folder = fullfile(rootDir, 'Bonsai', session_name);
 
 % These two mouse folder have been moved to the other research drive 
-if strcmp(animal_name, 'M25041') || strcmp(animal_name, 'M25012') || strcmp(animal_name, 'M25057') || strcmp(animal_name, 'M25057') 
+if strcmp(animal_name, 'M25041') || strcmp(animal_name, 'M25012') || strcmp(animal_name, 'M25057') || strcmp(animal_name, 'M25058') 
     newTempTiffRootDir = ['Y:' filesep fullfile('ibn-vision','DATA','SUBJECTS',animal_name)];
     ophys_folder = fullfile(newTempTiffRootDir, 'Ophys', session_name);
 else

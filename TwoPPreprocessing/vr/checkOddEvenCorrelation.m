@@ -7,9 +7,18 @@ function [r, p, stableIdx] = checkOddEvenCorrelation(sessionFileInfo, response, 
 %   stableIdx - [nStableROIs x 1] indices of ROIs with r > 0.5
 
 %% Handle optional inputs
-if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end % changed 3 to 2 
+if nargin < 3; signalToUse = 'dFF'; end % changed dff jan 2026 
 if nargin < 4; applySpatialSmoothing = true; end 
-if nargin < 5; plotFlag = false; end
+if nargin < 5; plotFlag = true; end
+
+%% Save figure save path
+figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+if ~exist(figSaveDir, 'dir')
+    mkdir(figSaveDir);
+end
+
+filename = fullfile(figSaveDir, ...
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' signalToUse '_oddEvenCorr_SortedbyOdd.png']);
 
 %% Get data 
 % lapPositionActivity is (ROI x Laps x Position)
@@ -135,8 +144,14 @@ if plotFlag
     title(sprintf('Even Laps (n=%d)', size(evenLaps, 2)));
     xlabel('Position (cm)');
     ylabel('Stable ROIs (Sorted)');
+    
 
-    % saveas(fig1,'\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25041\Analysis\20250416\Figures\StableROIs.png')
+    %% Save
+    set(gcf, 'PaperUnits', 'inches', ...
+             'PaperPosition', [0 0 11 8.5], ...
+             'PaperOrientation', 'landscape');
+    print(gcf, filename, '-dpng', '-r300');
+    
 end
 
 end

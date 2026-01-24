@@ -2,8 +2,6 @@ function [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFil
 
 %
 % Computes and adds the shuffle matrix to the input 'response' structure.
-% ASSUMPTION: If multiple runs are stitched, response.lapPosition2PFrameIdx 
-% already reflects the global frame indices corresponding to the stitched signal.
 %
 % vrStimNamesToStitch: Cell array of VR stimulus names whose RAW signals (processedTwoPData) 
 %                      will be stitched together to form the continuous time series for shuffling.

@@ -57,7 +57,7 @@ function figHandle = plotPositionTuning_GridAcrossMice(filteredTable, varargin) 
         'TileSpacing', 'compact', 'Padding', 'compact');
 
     if applySmoothing
-        w = gausswin(6);
+        w = gausswin(5);
         w = w / sum(w);
     end
 

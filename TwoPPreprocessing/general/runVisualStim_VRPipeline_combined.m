@@ -6,13 +6,14 @@ clear; clc;
 % The mouseInfo is generated from the filteredTable
 vrKeywords = {'VRCorr'};
 rfKeywords = {'RFMapping'};
-doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002'};
-signalName = 'dFFNeuropilCorrected';
+doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002', };
+signalName = 'dFF'; %changed to dff 2026 jan
 % filteredTable now holds the key metadata (TypeImaged) needed for parameter setting.
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25057', 'M25058'}); %, 'TypeImaged', 'Boutons'
+    'MouseID', {'M25126'}, ...
+    'Session', {'20260123'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -27,7 +28,7 @@ end
 %% DEFINE PARAMETER SETS BASED ON IMAGING TYPE
 % Parameters for Somas Imaging;
 paramsSomas.interpRate = 60;
-paramsSomas.frameRate = 7.5;
+%paramsSomas.frameRate = 30; %changed
 paramsSomas.pdthreshold = 10;
 paramsSomas.isZcorrected = false;
 paramsSomas.zScoreProcessedSignals = true;
@@ -53,7 +54,7 @@ rfpostStimTime = 3;     % seconds
 method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
 
 %% INITIALISE ERROR LOG
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVR_VisualStimPipeline_20251203.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVR_VisualStimPipeline_20260124.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 % If the log file doesn't exist, create it with headers
 if ~exist(logFilePath, 'file')
@@ -123,7 +124,8 @@ for thisMouse = 1:size(mouseInfo, 1)
             vrStimNames = {};
             otherVisualStim = {};
             rfStimNames = {};
-
+            % Will currently pull out all VRCorr stim names; baseline and
+            % manipulations grouped together 
             for thisStim = 1:length(stimList)
                 if any(contains(stimList{thisStim}, vrKeywords, 'IgnoreCase', true))
                     vrStimNames{end+1} = stimList{thisStim};
@@ -136,7 +138,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             end
 
             % A. General file processing for the entire session.
-            sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, stimList, 1); % Overwrite is a must
+            sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, stimList, 1); % Overwrite is a must @Sonali cant rememeber why; take a look.. 
             sessionFileInfo = get2PMetadata(sessionFileInfo); % This function will not run as the tif files have been moved to a different repo.
             [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected); % Uses dynamic planeNums, isZcorrected
             sessionFileInfo = processPeripheralFiles(sessionFileInfo);
@@ -171,19 +173,23 @@ for thisMouse = 1:size(mouseInfo, 1)
                 for thisVRStim = 1:length(vrStimNames)
                     vrStimName = vrStimNames{thisVRStim};
                     fprintf('Processing VR Stim: %s\n', vrStimName);
+                    try
+                    % Preprocessing steps
+                        [~, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, vrStimName);
+                        [~, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, interpRate);
+                        [~, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
+                        [~, ~, ~, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', vrStimName);
+                        [~, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo, vrStimName);
+                        [~, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
+                        [~, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName, zScoreProcessedSignals, applyTemporalSmoothing, prctlF, windowSize);
+    
+                        % Calculates and saves LapPositionActivity (un-shuffled)
+                        [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName);
+                        clear response;
 
-                    % --- Preprocessing Steps (Assumed correct) ---
-                    [~, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, vrStimName);
-                    [~, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, interpRate);
-                    [~, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
-                    [~, ~, ~, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', vrStimName);
-                    [~, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo, vrStimName);
-                    [~, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
-                    [~, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName, zScoreProcessedSignals, applyTemporalSmoothing, prctlF, windowSize);
-
-                    % Calculates and saves LapPositionActivity (un-shuffled)
-                    [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName);
-                    clear response;
+                    catch
+                        fprintf('WARNING: Could not preprocess VRStim name %s and will not be able to combine across VRRuns if appropriate..\n', vrStimName)
+                    end
                 end
 
                 % Determine Path

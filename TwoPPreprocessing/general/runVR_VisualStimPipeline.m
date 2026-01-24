@@ -3,18 +3,18 @@ clear; clc;
 
 %% DEFINE MICE, SESSIONS, AND KEYWORDS
 % Define all mice and their sessions to be processed
-mouseInfo = {
-    'M25041', {'20250415A'};...
-    % 'M25041', {'20250417A'};...
-    % 'M25040', {'20250511A', '20250507'};...
-    % Add new mice here, e.g.: 'M25042', {'YYYYMMDD', 'YYYYMMDD'};
-};
+% mouseInfo = {
+%     'M25041', {'20250415A'};...
+%     % 'M25041', {'20250417A'};...
+%     % 'M25040', {'20250511A', '20250507'};...
+%     % Add new mice here, e.g.: 'M25042', {'YYYYMMDD', 'YYYYMMDD'};
+% };
 % Keywords to identify stimulus types from filenames
 vrKeywords = {'VRCorr'};
 rfKeywords = {'RFMapping'};
 
-% filteredTable = filterMasterTable('Exclude', 0, 'Suite2PPreprocessing', 1, 'TargetArea', {'V1'});
-% mouseInfo = sessionsToProcess(filteredTable);
+filteredTable = filterMasterTable('Exclude', 0, 'Suite2PPreprocessing', 1, 'TargetArea', {'V1'});
+mouseInfo = sessionsToProcess(filteredTable);
 %% SET PROCESSING PARAMETERS:
 
 
@@ -76,10 +76,10 @@ for thisMouse = 1:size(mouseInfo, 1)
             
             % General file processing for the entire session
             sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, stimList);
-            % sessionFileInfo = get2PMetadata(sessionFileInfo);
-            % [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected, planeNums);
-            % sessionFileInfo = processPeripheralFiles(sessionFileInfo);
-            % sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
+            sessionFileInfo = get2PMetadata(sessionFileInfo);
+            [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected, planeNums);
+            sessionFileInfo = processPeripheralFiles(sessionFileInfo);
+            sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
             
             % B. Process all VR Stimuli
             if ~isempty(vrStimNames)
@@ -88,31 +88,31 @@ for thisMouse = 1:size(mouseInfo, 1)
                     vrStimName = vrStimNames{thisVRStim};
                     fprintf('Processing VR Stim: %s\n', vrStimName);
 
-                    % [~, sessionFileInfo]        = getVRBonsaiFiles(sessionFileInfo, vrStimName);
-                    % [~, sessionFileInfo]        = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, 60);
-                    % [~, sessionFileInfo]        = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
-                    % [~, ~, ~, sessionFileInfo]  = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', vrStimName, true, true);
-                    % [~, sessionFileInfo]        = extractVRAndPeripheralData(sessionFileInfo, vrStimName, true);
-                    % [~, sessionFileInfo]        = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
-                    % [~, sessionFileInfo]        = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName); % default is overwrite
-                    % [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, true);
-                    % % Get roi stability matrix
-                    % plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
+                    [~, sessionFileInfo]        = getVRBonsaiFiles(sessionFileInfo, vrStimName);
+                    [~, sessionFileInfo]        = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, 60);
+                    [~, sessionFileInfo]        = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
+                    [~, ~, ~, sessionFileInfo]  = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,60,'TwoPFrameTime', vrStimName, true, true);
+                    [~, sessionFileInfo]        = extractVRAndPeripheralData(sessionFileInfo, vrStimName, true);
+                    [~, sessionFileInfo]        = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
+                    [~, sessionFileInfo]        = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName); % default is overwrite
+                    [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, true);
+                    % Get roi stability matrix
+                    plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
                 end
             end
             
              % 
             % % B.2. Combine multiple VR runs within sessions 
-            % if ~isempty(vrStimName)
-            %     fprintf('Checking for and combining Response across multiple VR runs if present')
-            % 
-            % 
-            %     responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'VRCorr', 'Response');
-            %     response = combineResponseForVRRuns(responseVRRuns, sessionFileInfo);
-            %     plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
-            % 
-            % end
-            % fprintf('  Session %s processed successfully!\n', sessionName);
+            if ~isempty(vrStimName)
+                fprintf('Checking for and combining Response across multiple VR runs if present')
+
+
+                responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'VRCorr', 'Response');
+                response = combineResponseForVRRuns(responseVRRuns, sessionFileInfo);
+                plotSortedPopulationResponse_OddEven(sessionFileInfo, response, 'dFFNeuropilCorrected', true);
+
+            end
+            fprintf('  Session %s processed successfully!\n', sessionName);
                
             % could change this to all tuning stimuli 
             if ~isempty(otherVisualStim)

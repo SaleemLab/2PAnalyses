@@ -33,7 +33,7 @@ function [bonsaiData, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo
 
 if nargin < 3; method = 1; end % Set default
 if nargin < 4; samplingRate = 60; end % Set default
-if nargin < 5; plotFlag = false; end % false  
+if nargin < 5; plotFlag = true; end % false  
 
 %%
 for iStim = 1:length(sessionFileInfo.stimFiles)
@@ -221,9 +221,9 @@ switch method
             if plotFlag
                 figure;
                 hold on;
-                plot(rawPDArduinoTime(1:500), rawPDValue(1:500), 'DisplayName', 'Original Photodiode Signal');
-                plot(rawQuadArduinoTime(1:500), 10*rawQuadValue(1:500), 'r', 'DisplayName', 'Uncorrected Quad');
-                plot(lagCorrQuadArduinoTime(1:500), 12*rawQuadValue(1:500), 'g', 'DisplayName', 'Corrected Quad');
+                plot(rawPDArduinoTime(1:400), rawPDValue(1:400), 'DisplayName', 'Original Photodiode Signal');
+                plot(rawQuadArduinoTime(1:400), 10*rawQuadValue(1:400), 'r', 'DisplayName', 'Uncorrected Quad');
+                plot(lagCorrQuadArduinoTime(1:400), 12*rawQuadValue(1:400), 'g', 'DisplayName', 'Corrected Quad');
                 scatter(pdstart(1:40), 7*ones(1, 40), 'DisplayName', 'PD On Time'); % Scatter plot photodiode start times
                 scatter(pdend(1:40), 6*ones(1, 40), 'DisplayName', 'PD off Time');   % Scatter plot photodiode end times
                 title('Method 2: Photodiode vs Corrected Quad Signal');

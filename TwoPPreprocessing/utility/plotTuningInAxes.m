@@ -32,4 +32,5 @@ function plotTuningInAxes(ax, oddData, evenData)
     set(ax, 'XTick', [0 50 70 90 110 140], ...
             'XTickLabel', {'0','50','70','90','110','140'});
     xlabel('Position (cm)');
+    colorbar;
 end

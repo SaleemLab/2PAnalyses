@@ -6,10 +6,19 @@ function [r, p, stableIdx] = checkHalvesCorrelation(sessionFileInfo, response, s
 %   p         - [nROIs x 1] vector of p-values for each correlation
 %   stableIdx - [nStableROIs x 1] indices of ROIs with r > 0.4
 %% Handle optional inputs
-if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end
+if nargin < 3; signalToUse = 'dFF'; end %changed to dff Jan 2026
 if nargin < 4; applySpatialSmoothing = true; end
 if nargin < 5; plotFlag = true; end
 
+
+%% Save figure save path
+figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+if ~exist(figSaveDir, 'dir')
+    mkdir(figSaveDir);
+end
+
+filename = fullfile(figSaveDir, ...
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' signalToUse '_halvesCorr_SortedbyOdd.png']);
 %% Get data
 % lapPositionActivity is (ROI x Laps x Position)
 lapPositionActivity = response.lapPositionActivity.(signalToUse);
@@ -152,7 +161,12 @@ if plotFlag
     xlabel('Position (cm)');
     ylabel('Stable ROIs (Sorted)');
     
-    % Save functionality commented out for generality
-    % saveas(fig1,'\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25041\Analysis\20250416\Figures\StableROIs_Halves.png')
+    %% Save
+    set(gcf, 'PaperUnits', 'inches', ...
+             'PaperPosition', [0 0 11 8.5], ...
+             'PaperOrientation', 'landscape');
+    print(gcf, filename, '-dpng', '-r300');
+    
+   
 end
 end

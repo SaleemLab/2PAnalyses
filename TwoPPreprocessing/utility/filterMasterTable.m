@@ -16,7 +16,7 @@ function filteredTable = filterMasterTable(varargin)
     defaultSession = string.empty;
     defaultDay = [];
     defaultHasStimulus = string.empty;
-    defaultExclude = [];
+    defaultExclude = []; %
     
     % Add the parameters
     addParameter(p, 'MouseID', defaultMouseID);

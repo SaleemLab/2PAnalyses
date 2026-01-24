@@ -12,7 +12,7 @@ function plotAllNeuronSummariesToPDF_withThresholds(sessionFileInfo, response, a
 %   - OddEven correlation (added ..) 
 
 if nargin < 3
-    applySmoothing = true;
+    applySmoothing = false;
 end
 
 if nargin < 4
@@ -36,7 +36,7 @@ if exist(outputFilePath, 'file') == 2
     
     % Variance Metrics
     varToTuningVar = loadedMetrics.tuningCurveVariance.ratioVarToTuningVar;
-    varToTuningRange = loadedMetrics.tuningCurveVariance.ratioVarToTuningRange;
+    varToTuningRange = loadedMetrics.tuningCurveVariance;
 
     % Halves Correlation
     halvesCorrIdxRho = loadedMetrics.lapCorr_Halves.rho;
@@ -128,7 +128,7 @@ for neuronIdx = 1:nROIs
         isBoutonKept = roisToKeepMask(neuronIdx); 
         
         % Quality Checks
-        isTuningQualityPass = varToVarVal <= THRESHOLD_VAR_TO_VAR;
+        isTuningQualityPass = (varToVarVal <= THRESHOLD_VAR_TO_VAR);
         isRangeQualityPass = varToRangeVal <= THRESHOLD_VAR_TO_RANGE;
         isHalvesSig = halvesRho >= THRESHOLD_HALVES_CORR;
         isOddEvenSig = oddEvenRho >= THRESHOLD_ODDEVEN_CORR;

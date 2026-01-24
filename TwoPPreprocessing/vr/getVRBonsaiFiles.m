@@ -11,7 +11,8 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
 end
 
 % numVRstim = sum(VRInfo.isVRstim);
-% for iVR = 1:numVRstim
+% for iVR = 1:numVRstim 
+% This would work fine with multiple VRCorr file names.. 
 iStim = find(bonsaiData.isVRstim==1);
 
 % Construct file path for saving Bonsai data

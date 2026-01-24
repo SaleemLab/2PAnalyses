@@ -12,7 +12,7 @@ function figHandle = plotPooledPopulation(allData, targetArea, varargin)
     addParameter(p, 'TypeToPlot', 'Boutons', @ischar);
     addParameter(p, 'SavePath', '', @ischar);
     parse(p, allData, targetArea, varargin{:});
-    
+
     daysToPlot = p.Results.DaysToPlot;
     typeRequested = p.Results.TypeToPlot;
     nDays = length(daysToPlot);
@@ -23,7 +23,7 @@ function figHandle = plotPooledPopulation(allData, targetArea, varargin)
     for d = 1:nDays
         day = daysToPlot(d);
         ax = nexttile;
-        
+
         % FIND ALL sessions that match: Day AND Area AND Type
         % Note: Changed 'TargetArea' to 'Area' to match getTuningData.m
         daySessions = allData([allData.Day] == day & ...
@@ -41,7 +41,7 @@ function figHandle = plotPooledPopulation(allData, targetArea, varargin)
         pooledEven = vertcat(daySessions.EvenMean);
 
         plotTuningInAxes(ax, pooledOdd, pooledEven);
-        
+
         % Labels
         title(ax, ['Day ' num2str(day)]);
         if d==1
@@ -52,7 +52,7 @@ function figHandle = plotPooledPopulation(allData, targetArea, varargin)
             colorbar; 
         end
     end
-    
+
     % Global title for context
     title(t, sprintf('Pooled Population: %s (%s)', targetArea, typeRequested), ...
         'Interpreter', 'none', 'FontSize', 14);
