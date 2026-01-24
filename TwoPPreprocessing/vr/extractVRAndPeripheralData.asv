@@ -46,19 +46,22 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
 end
 iStim = find(bonsaiData.isVRstim==1);
 
+2PDataPath = sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData;
+
 if exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file') && ...
    exist(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'file') && ...
-   exist(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'file')
+   exist(2PDataPath, 'file')
     
     % Load peripheral and bonsai structs
     load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
     load(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
     
-    % "Map" string to see which timebase was used
-    load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'resample2PTimeUsed');
+    % 1. Load the "Map" string to see which timebase was used
+    load(sessionFileInfo.stimFiles(iStim).processed, 'resample2PTimeUsed');
     
+    % 2. Use that string to load only the specific time vector needed
     % This avoids loading massive F or spks matrices
-    timeData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, resample2PTimeUsed);
+    timeData = load(2PDataPath, resample2PTimeUsed);
     t = timeData.(resample2PTimeUsed); 
     
 else
@@ -127,8 +130,7 @@ EndTimeAll = NaN(length(trackIDs), 1); % Preallocate with NaNs for safety
 
 if ~isempty(lapStartTimeAll)
     x = response.mouseVirtualPosition;  % Virtual Position trace
-    % t = processedTwoPData.(processedTwoPData.resample2PTimeUsed); % t was
-    % loaded in the load data sections above.. 
+    t = processedTwoPData.(processedTwoPData.resample2PTimeUsed); % Find the closest twoP time? Mouse position time? @Aman
     startIdx = zeros(length(trackIDs), 1); % Index into time vector for each lap start
 
     for nlap = 1:length(trackIDs)
