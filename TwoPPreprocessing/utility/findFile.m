@@ -19,6 +19,6 @@ function filePath = findFile(fileArray, keyword)
     end
     
     if isempty(filePath)
-        warning('No file matching the keyword "%s" was found.', keyword);
+        fprintf('No file matching the keyword "%s" was found.\n', keyword);
     end
 end
