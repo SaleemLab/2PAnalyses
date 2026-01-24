@@ -286,7 +286,19 @@ if nargin < 2 || plotFlag
 end
 
 
-%% Saving
-save(sessionFileInfo.stimFiles(iStim).Response, 'response');
+%% Saving (reformatted 24.01.2026)
+% Get all field names from the struct
+fieldsToSave = fieldnames(response);
+disp('Saving response data files...');
+
+for i = 1:numel(fieldsToSave)
+    % Dynamically create variables in the local workspace
+    eval([fieldsToSave{i} ' = response.' fieldsToSave{i} ';']);
+end
+
+save(sessionFileInfo.stimFiles(iStim).Response,fieldsToSave{:} , '-v7.3');
+disp('Saved Response');
+
+% save(sessionFileInfo.stimFiles(iStim).Response, 'response');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end
