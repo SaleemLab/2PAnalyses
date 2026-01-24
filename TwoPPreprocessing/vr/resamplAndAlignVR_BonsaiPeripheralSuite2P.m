@@ -366,9 +366,14 @@ end
 % Get all field names from the struct
 fieldsToSave = fieldnames(processedTwoPData);
 disp('Saving processed data files...');
-save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData', '-v7.3');
-disp('Saved processedTwoPData');
 
+for i = 1:numel(fieldsToSave)
+    % Dynamically create variables in the local workspace
+    eval([fieldsToSave{i} ' = processedTwoPData.' fieldsToSave{i} ';']);
+end
+
+save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData,fieldsToSave{:} , '-v7.3');
+disp('Saved processedTwoPData');
 
 % No changes made here 24.01.2026
 save(sessionFileInfo.stimFiles(iStim).BonsaiData, "bonsaiData");
