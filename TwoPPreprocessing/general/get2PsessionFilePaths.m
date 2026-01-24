@@ -43,6 +43,9 @@ end
 processed_folder = fullfile(rootDir, 'Processed', session_name);
 suite2p_folder = fullfile(processed_folder, 'suite2p');
 
+% eyetracking files 
+eyetracking_folder = fullfile(rootDir, 'EyeTracking', session_name);
+
 save_folder = fullfile(rootDir, 'Analysis', session_name);
 if ~exist(save_folder, 'dir')
     mkdir(save_folder);
@@ -58,6 +61,7 @@ if exist([save_folder filesep save_fileName])~=2 || rerun_process == 1
     sessionFileInfo.Directories.bonsai = bonsai_folder;
     sessionFileInfo.Directories.ophys = ophys_folder;
     sessionFileInfo.Directories.suite2p = suite2p_folder;
+    sessionFileInfo.Directories.eyetracking = eyetracking_folder;
     sessionFileInfo.Directories.save_folder = fullfile(rootDir, 'Analysis', sessionFileInfo.session_name);
 
     % Stim list
@@ -65,7 +69,7 @@ if exist([save_folder filesep save_fileName])~=2 || rerun_process == 1
     % Define files to exclude
     exclude = {'excluded_file1.csv', 'excluded_file2.tif'};
 
-    %% Process 'Bonsai' files (CSV and BIN files)
+    %% Process 'Bonsai' files (CSV and BIN files, Json too)
     disp('Collecting Bonsai')
     for iStim = 1:length(stim_list)
         sessionFileInfo.stimFiles(iStim).name = stim_list{iStim};
@@ -88,6 +92,34 @@ if exist([save_folder filesep save_fileName])~=2 || rerun_process == 1
                 sessionFileInfo.stimFiles(iStim).bonsai_filepaths{end+1} = binFilePath;
             end
         end
+        
+        jsonFiles = dir(fullfile(bonsai_folder, '*.json'));
+        for iPlane = 1:length(jsonFiles)
+            jsonFilePath = fullfile(bonsai_folder, jsonFiles(iPlane).name);
+            if ~ismember(jsonFiles(iPlane).name, exclude) && contains(jsonFiles(iPlane).name, stim_list{iStim})
+                sessionFileInfo.stimFiles(iStim).bonsai_filepaths{end+1} = jsonFilePath;
+            end
+        end
+        
+        %% Process eyetracking files
+        disp('Collecting eyetracking avi&csv files')
+        aviFiles = dir(fullfile(eyetracking_folder, '*.avi'));
+        sessionFileInfo.stimFiles(iStim).eyetracking_filepaths = {};
+        for iPlane = 1:length(aviFiles)
+            aviFilePath = fullfile(eyetracking_folder, aviFiles(iPlane).name);
+            if ~ismember(aviFiles(iPlane).name, exclude) && contains(aviFiles(iPlane).name, stim_list{iStim})
+                sessionFileInfo.stimFiles(iStim).eyetracking_filepaths{end+1} = aviFilePath;
+            end
+        end
+        
+        csv_eyetrack_Files = dir(fullfile(eyetracking_folder, '*.csv'));
+        for iPlane = 1:length(csv_eyetrack_Files)
+            csv_eyetrack_FilePath = fullfile(eyetracking_folder, csv_eyetrack_Files(iPlane).name);
+            if ~ismember(csv_eyetrack_Files(iPlane).name, exclude) && contains(csv_eyetrack_Files(iPlane).name, stim_list{iStim})
+                sessionFileInfo.stimFiles(iStim).eyetracking_filepaths{end+1} = csv_eyetrack_FilePath;
+            end
+        end
+
 
         %% Process 'Ophys' TIFF files
         disp('Collecting Ophys Tiff')
