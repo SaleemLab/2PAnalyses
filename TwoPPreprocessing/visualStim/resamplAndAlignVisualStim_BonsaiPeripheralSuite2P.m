@@ -2,8 +2,8 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %   Aligns and interpolates all VR experiment signals (Suite2P, Bonsai, peripheral)
 %   to a unified 2P timebase using the Arduino clock.
 %
-%   - Overwrites processedTwoPData file completely.
-%   - Appends/Updates bonsaiData and peripheralData in their existing files.
+%   - Overwrites processedTwoPData file as a FLATTENED file (-struct).
+%   - Appends/Updates bonsaiData and peripheralData as nested structs.
 
 %% Define default parameters
 if nargin < 2, samplingRate = 60; end
@@ -13,11 +13,9 @@ if nargin < 6, trimNaNs = true; end
 if nargin < 7, overwrite = true; end 
 
 %% File Paths
-% Identify specific stimulus file index
 bonsaiData = []; 
 isStim = strcmp(StimName, {sessionFileInfo.stimFiles.name});
 thisStim = find(isStim, 1);
-
 if isempty(thisStim)
     error('Stimulus %s not found in sessionFileInfo', StimName);
 end
@@ -32,12 +30,12 @@ stimFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_p
 outputSavePath = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
 sessionFileInfo.stimFiles(thisStim).processedMergedBonsaiSuite2pData = outputSavePath;
 
-%% Overwrite Check
-% If output file exists AND overwrite is FALSE, load and return.
+%% Overwrite Check (Updated for Flattened Loading)
 if exist(outputSavePath, 'file') && ~overwrite
-    disp(['Processed 2P Data for ' StimName ' already exists. Loading...']);
+    disp(['Processed 2P Data for ' StimName ' already exists. Loading flattened file...']);
     
-    load(outputSavePath, 'processedTwoPData');
+    % Reconstruct the struct from individual variables in the flat file
+    processedTwoPData = load(outputSavePath);
     
     if exist(fileBonsai, 'file')
         load(fileBonsai, 'bonsaiData');
@@ -57,13 +55,11 @@ end
 
 %% Load raw data streams 
 disp(['Processing ' StimName '...']);
-
 if ~exist(fileMerged, 'file'), error('Merged data file not found: %s', fileMerged); end
 if ~exist(filePeripheral, 'file'), error('Peripheral data file not found: %s', filePeripheral); end
 
 load(fileMerged, 'twoPData');
 load(filePeripheral, 'peripheralData');
-
 if ~exist(fileBonsai, 'file')
     warning('Bonsai data file not found, continuing without it: %s', fileBonsai);
 else
@@ -76,7 +72,7 @@ raw2PTimes = vertcat(twoPData.(mainTimeToUse));
 resample2PTimes = unique2PTimes(1):1/samplingRate:unique2PTimes(end);
 sampleTimes = resample2PTimes;
 generalInterpMethod     = 'linear';
-trialInfoInterpMethod   = 'nearest'; % To use for descretised time stamps. Eg StimOnsetTime
+trialInfoInterpMethod   = 'nearest'; 
 
 %% Interpolate: Two-photon time vectors
 timeFields = {'TwoPFrameTime', 'ArduinoTime'}; 
@@ -125,36 +121,27 @@ if isfield(peripheralData, 'Wheel')
     peripheralData.Wheel.sampleTimes = sampleTimes';
 end
 
-%% additional step to clean gray screen :S
-% GrayScreen Check: Remove fields if necessary 
+%% GrayScreen Check: Remove fields if necessary 
 if contains(StimName, 'GrayScreen', 'IgnoreCase',true)
-    
-    % Does peripheralData exist as a variable in the current scope? This
-    % should always exist.. 
     if exist('peripheralData', 'var')
         peripheralfieldsToRemove = {'Quadstate', 'Photodiode'};
         existingFieldsPeripheral = intersect(fieldnames(peripheralData), peripheralfieldsToRemove);
-        
         if ~isempty(existingFieldsPeripheral)
             peripheralData = rmfield(peripheralData, existingFieldsPeripheral);
             fprintf('GrayScreen detected. In peripheralData, removed fields: %s\n', strjoin(existingFieldsPeripheral, ', '));
         end
     end
     
-    % Does bonsaiData exist as a variable in the current scope? This may or
-    % may not exist.. 
     if ~isempty(bonsaiData)
         bonsaiFieldsToRemove = {'MousePos'};
         existingFieldsBonsai = intersect(fieldnames(bonsaiData), bonsaiFieldsToRemove);
-        
         if ~isempty(existingFieldsBonsai)
-            % Corrected: The result is assigned back to bonsaiData.
             bonsaiData = rmfield(bonsaiData, existingFieldsBonsai);
             fprintf('GrayScreen detected. In bonsaiData, removed fields: %s\n', strjoin(existingFieldsBonsai, ', '));
         end
-    
     end 
 end
+
 %% Interpolate: Peripheral - Photodiode
 disp('Processing Peripheral Data: PD')
 if isfield(peripheralData, 'Photodiode')
@@ -169,19 +156,17 @@ disp('Processing Peripheral Data: Quad')
 if isfield(peripheralData, 'Quadstate')
     rawValue = peripheralData.Quadstate.rawValue;
     rawTime = peripheralData.Quadstate.rawArduinoTime;
-
     [uniqueRawTime, idx] = unique(rawTime);
     uniqueRawValue = double(rawValue(idx));
     
-    Value = interp1(uniqueRawTime, uniqueRawValue, sampleTimes, 'previous', NaN)'; %try using pervious/linear/linear and then round..  
-    peripheralData.Quadstate.Value = Value; %
+    Value = interp1(uniqueRawTime, uniqueRawValue, sampleTimes, 'previous', NaN)'; 
+    peripheralData.Quadstate.Value = Value;
     peripheralData.Quadstate.sampleTimes = sampleTimes';
 end
 
-%% 11. Interpolate: Bonsai - TrialInfo
+%% Interpolate: Bonsai - TrialInfo
 disp('Processing Bonsai Data: StimOnset Info')
 fieldsToProcess = { 'ArduinoTimeRaw', 'ArduinoTime' };
-
 for thisField = 1:size(fieldsToProcess, 1)
     rawField = fieldsToProcess{thisField, 1};
     targetField = fieldsToProcess{thisField, 2};
@@ -193,38 +178,27 @@ for thisField = 1:size(fieldsToProcess, 1)
     end
 end
 
-%% 12. Trim NaN padding
+%% Trim NaN padding
 if trimNaNs
-    disp('Trimming NaN padding from start/end of signals...');
+    disp('Trimming NaN padding...');
     combinedValidMask = true(size(sampleTimes));
     
-    % Check processedTwoPData only
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.F), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.spks), 1);
     
-    % Check peripheralData
-    % if isfield(peripheralData, 'Wheel'), combinedValidMask = combinedValidMask & isfinite(peripheralData.Wheel.Value)'; end
-    % if isfield(peripheralData, 'Photodiode'), combinedValidMask = combinedValidMask & isfinite(peripheralData.Photodiode.Value)'; end
-    % if isfield(peripheralData, 'Quadstate'), combinedValidMask = combinedValidMask & isfinite(peripheralData.Quadstate.Value)'; end
-    % 
     if ~any(combinedValidMask)
         warning('Trimming NaNs would remove all data. Skipping trim.');
     else
         processedTwoPData.trimmedNaNPadding = true;
-        processedTwoPData.trimmedMetaData = ['Trimming ' num2str(numel(sampleTimes)) ' samples down to ' num2str(sum(combinedValidMask)) ' samples.'];
-        disp(processedTwoPData.trimmedMetaData);
-        
         newSampleTimes = sampleTimes(combinedValidMask);
         
-        % Trim processedTwoPData
         processedTwoPData.F = processedTwoPData.F(:, combinedValidMask);
         processedTwoPData.Fneu = processedTwoPData.Fneu(:, combinedValidMask);
         processedTwoPData.spks = processedTwoPData.spks(:, combinedValidMask);
         processedTwoPData.TwoPFrameTime = processedTwoPData.TwoPFrameTime(combinedValidMask);
         processedTwoPData.ArduinoTime = processedTwoPData.ArduinoTime(combinedValidMask);
         
-        % Trim peripheralData
         if isfield(peripheralData, 'Wheel')
             peripheralData.Wheel.Value = peripheralData.Wheel.Value(combinedValidMask);
             peripheralData.Wheel.sampleTimes = peripheralData.Wheel.sampleTimes(combinedValidMask);
@@ -239,37 +213,24 @@ if trimNaNs
         end
         
         % Filter TrialInfo data
-        minTime = newSampleTimes(1);
-        maxTime = newSampleTimes(end);
-        
-        % Priority: Check ArduinoTime first
         if isfield(bonsaiData, 'ArduinoTime') && ~isempty(bonsaiData.ArduinoTime)
             referenceTime = bonsaiData.ArduinoTime;
-            fprintf('Trimming trials based on ArduinoTime.\n');
-        else
-            referenceTime = [];
-        end
-        
-        if ~isempty(referenceTime)
+            minTime = newSampleTimes(1);
+            maxTime = newSampleTimes(end);
             keepTrials = (referenceTime >= minTime) & (referenceTime <= maxTime);
             nTotalTrials = numel(referenceTime);
             
             infoFields = fieldnames(bonsaiData);
-            infoFields = setdiff(infoFields, {'stimEventsTable'}, 'stable');
-            
-            for thisField = 1:numel(infoFields)
-                fieldName = infoFields{thisField};
-                currentData = bonsaiData.(fieldName);
-                if numel(currentData) == nTotalTrials
-                    bonsaiData.(fieldName) = currentData(keepTrials);
+            for f = 1:numel(infoFields)
+                if numel(bonsaiData.(infoFields{f})) == nTotalTrials
+                    bonsaiData.(infoFields{f}) = bonsaiData.(infoFields{f})(keepTrials);
                 end
             end
-            fprintf('Filtered Data: Kept %d / %d trials within valid time range.\n', sum(keepTrials), nTotalTrials);
         end
     end
 end
 
-%% 13. Sanity check plots
+%% Sanity check plots
 if plotFlag
     % 2P Times
     figure('Name', ['TwoP Arduino Frame Times: ' StimName]);
@@ -320,26 +281,26 @@ if plotFlag
     end
 end
 
-%% 14. Save
+%% Save Section (Flattened processedTwoPData only)
 disp('Saving processed data files...');
 
-% processedTwoPData: New file, so we standard SAVE (Overwrite logic applies)
-save(outputSavePath, 'processedTwoPData', '-v7.3');
+% Save processedTwoPData: Unpack struct into individual variables
+save(outputSavePath, '-struct', 'processedTwoPData', '-v7.3');
+disp(['Saved Flattened processedTwoPData to: ' outputSavePath]);
 
-% bonsaiData: APPEND to update the existing file without deleting other vars
+% bonsaiData: Standard append as a struct
 if exist(fileBonsai, 'file')
     save(fileBonsai, 'bonsaiData', '-append');
-    disp('Updated bonsaiData (Appended)');
+    disp('Updated bonsaiData (Appended Struct)');
 end
 
-% peripheralData: APPEND to update the existing file without deleting other vars
+% peripheralData: Standard append as a struct
 if exist(filePeripheral, 'file')
     save(filePeripheral, 'peripheralData', '-append');
-    disp('Updated peripheralData (Appended)');
+    disp('Updated peripheralData (Appended Struct)');
 end
 
 % Update session info
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
-disp('Saved sessionFileInfo');
-
+disp('Done.');
 end
