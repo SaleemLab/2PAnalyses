@@ -361,10 +361,16 @@ if plotFlag
         title('Quadstate: Raw vs Lag-Corrected'); legend; ylabel('Quad'); xlabel('Time');
     end
 end
-%% Save
+%% Save (reformated version 24.01.2026) 
+
+% Get all field names from the struct
+fieldsToSave = fieldnames(processedTwoPData);
 disp('Saving processed data files...');
 save(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData', '-v7.3');
 disp('Saved processedTwoPData');
+
+
+% No changes made here 24.01.2026
 save(sessionFileInfo.stimFiles(iStim).BonsaiData, "bonsaiData");
 disp('Saved bonsaiData');
 save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, "peripheralData");
