@@ -35,7 +35,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             peripheralData.Photodiode.rawBonsaiTime        = photodiode_table.BonsaiTime(keep_idx);
             peripheralData.Photodiode.rawValue             = photodiode_table.PDOutput(keep_idx);
             peripheralData.Photodiode.rawRenderFrameCount  = photodiode_table.RenderFrameCount(keep_idx); 
-            peripheralData.Photodiode.rawLastSyncPulseTime = photodiode_table.LastSyncPulseTime(keep_idx);
+            peripheralData.Photodiode.rawLastSyncPulseTime = photodiode_table.LastSyncPulseTime(keep_idx)./1000; % Has always been saved in ms 
         end
     
     elseif exist(matrixArduino_path, 'file')
@@ -48,7 +48,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             [~,keep_idx,~] = unique(matrixArduino_table.Seconds);
             peripheralData.Photodiode.rawArduinoTime       = matrixArduino_table.Seconds(keep_idx); 
             peripheralData.Photodiode.rawValue             = matrixArduino_table.("Value.PhotodiodeValue")(keep_idx);
-            peripheralData.Photodiode.rawLastSyncPulseTime = matrixArduino_table.("Value.LastSyncPulseTime")(keep_idx);
+            peripheralData.Photodiode.rawLastSyncPulseTime = matrixArduino_table.("Value.LastSyncPulseTime")(keep_idx)./1000; % saved in ms 
         end
     else
         peripheralData.Photodiode = [];
