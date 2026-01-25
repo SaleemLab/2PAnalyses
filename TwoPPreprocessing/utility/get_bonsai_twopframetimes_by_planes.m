@@ -26,19 +26,15 @@ function [plane_data] = get_bonsai_twopframetimes_by_planes(filepath, nplanes)
 % Reads CSV file of frame times and splits into frametimes per plane.
 % Supports legacy '2P' files and UCL-Open 'MatrixArduino' files.
 
-% Use 'preserve' to keep dots like 'Value.Last2PFrameTime'
 twop_csv = readtable(filepath, 'VariableNamingRule', 'preserve');
-
-% --- DETECT FORMAT AND MAP COLUMNS ---
 vars = twop_csv.Properties.VariableNames;
 
 if ismember('TwoPFrameTime', vars)
-    % LEGACY FORMAT
+    % legacy format
     timeCol = "TwoPFrameTime";
     syncCol = "LastSyncPulseTime";
     arduinoCol = "ArduinoTime";
-    
-    % Convert ms to s for legacy
+
     twop_csv.(timeCol) = twop_csv.(timeCol) ./ 1000;
     twop_csv.(syncCol) = twop_csv.(syncCol) ./ 1000;
     twop_csv.(arduinoCol) = twop_csv.(arduinoCol) ./ 1000;
@@ -47,31 +43,40 @@ elseif ismember('Value.Last2PFrameTime', vars)
     % UCL-OPEN FORMAT
     timeCol = "Value.Last2PFrameTime";
     syncCol = "Value.LastSyncPulseTime";
-    arduinoCol = "Seconds"; 
-    
-    % Convert UCL-Open ms values to seconds
+    arduinoCol = "Seconds";
+
     twop_csv.(timeCol) = twop_csv.(timeCol) ./ 1000;
     twop_csv.(syncCol) = twop_csv.(syncCol) ./ 1000;
-    
-    % Note: 'Seconds' is typically already in seconds in this format, 
-    % so no division is applied to arduinoCol here.
+    % Arduino time does not need to be converted to seconds; already saved
+    % here
+
+
+    %% Remove duplicate 2P frame timestamps @AMAN
+    % This removes the entire row (including the extra Seconds/SyncPulse entries)
+    % to ensure the clock remains aligned with unique microscope frames.
+    % Only keeps the first instance of each unique 2P frame time. New
+    % logging is triggered based on ArduinoTime where previous legacy
+    % version was tiggered based on TwoPFrameTimes and did not require
+    % this additional step.
+    [~, uniqueIdx, ~] = unique(twop_csv.(timeCol), 'stable');
+    twop_csv = twop_csv(uniqueIdx, :);
+
 else
     error('Could not find 2P frame time columns in file: %s', filepath);
 end
 
-% --- CLEANUP ---
-% Remove all rows where the 2P time is 0 (microscope hadn't started yet)
+% Remove rows where 2P time clock is 0
 rows_to_remove = (twop_csv.(timeCol) == 0);
 twop_csv(rows_to_remove, :) = [];
 
-% --- STANDARDIZE COLUMN NAMES FOR PIPELINE ---
-% Standardizing headers so the main merge function remains compatible
+% standardising headers
 twop_csv.TwoPFrameTime = twop_csv.(timeCol);
 twop_csv.ArduinoTime    = twop_csv.(arduinoCol);
 twop_csv.LastSyncPulseTime = twop_csv.(syncCol);
 
-% --- SPLIT BY PLANE ---
+%  split by planes
 for p = 1:nplanes
-    plane_data.(['plane' num2str(p-1)]) = twop_csv(p:nplanes:end, :); 
+    planeName = ['plane' num2str(p-1)];
+    plane_data.(planeName) = twop_csv(p:nplanes:end, :);
 end
 end
