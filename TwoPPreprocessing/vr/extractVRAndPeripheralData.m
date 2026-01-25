@@ -79,6 +79,7 @@ displacement(displacement > 100) = 0;   % Positive large jumps
 % Calculate speed (in cm/s)
 response.wheelSpeed = displacement ./ [0; diff(peripheralData.Wheel.sampleTimes)]; % Change to peripheralData.Wheel.ArduinoTime
 
+
 %% Virtual position and virtual speed
 mouseVirtualPosition = nan(1,length(bonsaiData.MousePos.Value));
 trackIDFromPosition = nan(1,length(bonsaiData.MousePos.Value));
@@ -86,16 +87,51 @@ trackIDFromPosition = nan(1,length(bonsaiData.MousePos.Value));
 % Diao's track 1 excluding the contextual
 % Convert raw mouse positions between -1141 and -1000 into virtual positions.
 % The conversion involves adding 1140 to the raw mouse position and taking the absolute value.
-mouseVirtualPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000)) ...
-    = abs(bonsaiData.MousePos.Value(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000))+1140);
-trackIDFromPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000)) = 1; % Only one track (in Sonali's exps)
-mouseVirtualPosition(mouseVirtualPosition>140) = 140;
+% adds +1140 to these values
+% -1140 becomes 0
+% -1141 becomes -1
+% -1000 becomes 140 
 
-response.mouseVirtualPosition = mouseVirtualPosition';
+if contains(VRStimName, 'VRCorr', 'IgnoreCase', true)
+    % condition one 
+    mouseVirtualPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000)) ...
+        = floor(abs(bonsaiData.MousePos.Value(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000))+1140)) + 1;
+    
+    trackIDFromPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000)) = 1; % Only one track (in Sonali's exps)
+    
+    
+    mouseVirtualPosition(mouseVirtualPosition > 140) = 140;
+    mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
+
+    response.mouseVirtualPosition = mouseVirtualPosition';
+
+elseif contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor') % this is temporary; might move to a new function @aman 
+    % condition two 
+    bonsaiData.MousePos.Value(bonsaiData.MousePos.Value < 0) = 0;
+    mouseVirtualPosition = floor(bonsaiData.MousePos.Value) + 1;
+    
+  
+    mouseVirtualPosition(mouseVirtualPosition > 140) = 140;
+    mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
+    
+    trackIDFromPosition(:) = 2; %@AMAN 
+    response.mouseVirtualPosition = mouseVirtualPosition;
+end
+
+
 response.trackIDFromMousePosition = trackIDFromPosition';
 response.mouseRecordedPosition = bonsaiData.MousePos.Value;
 
 
+%% Save additional landmark information if running the UCL-open version @Aman - also temp? move to a few function? 
+if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
+    response.landmarkNames = bonsaiData.TrialInfo.LandmarkNames;
+    response.landmarkPositions = bonsaiData.TrialInfo.LandmarkPositions;
+    response.landmarkSizes = bonsaiData.TrialInfo.LandmarkSizes;
+    response.landmarkCenterOffsets = bonsaiData.TrialInfo.LandmarkCenterOffsets;
+    response.landmarkRewardValence = bonsaiData.TrialInfo.LandmarkRewardValence;
+    response.numLandmarks = bonsaiData.TrialInfo.NumLandmarks;
+end 
 %% Lap track Info
 % Save track ID as 1 for all the laps.
 response.trackIDs = ones(1, length(bonsaiData.TrialInfo.StartTimeAll))';
