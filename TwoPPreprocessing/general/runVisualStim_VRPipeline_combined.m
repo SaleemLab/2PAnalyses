@@ -4,7 +4,7 @@ clear; clc;
 %% DEFINE MICE, SESSIONS, AND KEYWORDS
 % Define all mice and their sessions to be processed
 % The mouseInfo is generated from the filteredTable
-vrKeywords = {'VRCorr'};
+vrKeywords = {'VRCorr', 'BaselineCorridor', 'LandManipCorridor'};
 rfKeywords = {'RFMapping'};
 doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002', 'M25126_VRCorr_20260123_00001', 'M25126_VRCorrBaseline_20260123_00002', 'M25126_VRCorrWithManipulations_20260123_00003'};
 signalName = 'dFF'; %changed to dff 2026 jan 
@@ -12,7 +12,7 @@ signalName = 'dFF'; %changed to dff 2026 jan
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25012'}, ...
+    'MouseID', {'M25040'}, ...
     'Session', {'20250510'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
@@ -40,7 +40,7 @@ paramsSomas.windowSize = 60; % The rolling window over which to calculate F0.
 
 % Parameters for Bouton Imaging
 paramsBoutons.interpRate = 60;
-paramsBoutons.frameRate = 7.28;
+%paramsBoutons.frameRate = 7.28;
 paramsBoutons.pdthreshold = 10;
 paramsBoutons.isZcorrected = true;
 paramsBoutons.zScoreProcessedSignals = true;
@@ -54,7 +54,7 @@ rfpostStimTime = 3;     % seconds
 method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
 
 %% INITIALISE ERROR LOG
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runVR_VisualStimPipeline_20260124.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runNewVRCorr_VisualStimPipeline_20260125.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 % If the log file doesn't exist, create it with headers
 if ~exist(logFilePath, 'file')
@@ -117,14 +117,15 @@ for thisMouse = 1:size(mouseInfo, 1)
             % Suite2p; These stim list will be extracted
             % the order of stimuli that stimuli were concatenated before
             % feeding into Suite2p.
-            stimList = getStimList(mousenumber, sessionName);
+            stimList = getStimList(mousenumber, sessionName); % If the names of tif files have been changed after running through suite2p this will not work! 
+
             fprintf('  Found stimuli: %s\n', strjoin(stimList, ', '));
 
             % Identify which stimuli are VR and which are others (including RF)
             vrStimNames = {};
             otherVisualStim = {};
             rfStimNames = {};
-            % Will currently pull out all VRCorr stim names; baseline and
+            % Will currently pull out all Corr stim names; baseline and
             % manipulations grouped together 
             for thisStim = 1:length(stimList)
                 if any(contains(stimList{thisStim}, vrKeywords, 'IgnoreCase', true))
@@ -137,7 +138,8 @@ for thisMouse = 1:size(mouseInfo, 1)
                 end
             end
 
-            % A. General file processing for the entire session.
+            % A. General file processing for the entire session; includes
+            % all stimuli TODO: Integrate sparsenoise 
             sessionFileInfo = get2PsessionFilePaths(mousenumber, sessionName, stimList, 1); % Overwrite is a must @Sonali cant rememeber why; take a look.. 
             sessionFileInfo = get2PMetadata(sessionFileInfo); % This function will not run as the tif files have been moved to a different repo.
             [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected); % Uses dynamic planeNums, isZcorrected
@@ -175,7 +177,8 @@ for thisMouse = 1:size(mouseInfo, 1)
                     fprintf('Processing VR Stim: %s\n', vrStimName);
                     try
                     % Preprocessing steps
-                        [~, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, vrStimName);
+                       
+                        [~, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, vrStimName); % Reads and saves all tables; no additional computation done here 
                         [~, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, interpRate);
                         [~, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName); 
                         [~, ~, ~, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', vrStimName);
@@ -184,7 +187,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         [~, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName, zScoreProcessedSignals, applyTemporalSmoothing, prctlF, windowSize);
     
                         % Calculates and saves LapPositionActivity (un-shuffled)
-                        [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName);
+                        [~, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName);
                         clear response;
 
                     catch
@@ -252,7 +255,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                     % For boutons specifically
                     if strcmpi(typeImaged, 'Boutons')
                         disp('Finding highly correlated boutons for this session')
-                        [~,~,~,~] = findHightlyCorrelatedROIs(sessionFileInfo);
+                        [~,~,~,~] = findHightlyCorrelatedROIs(sessionFileInfo); %TODO: flatten!!! 
                     end
 
                 end
