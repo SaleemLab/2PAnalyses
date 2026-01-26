@@ -94,25 +94,26 @@ trackIDFromPosition = nan(1,length(bonsaiData.MousePos.Value));
 
 if contains(VRStimName, 'VRCorr', 'IgnoreCase', true)
     % condition one 
-    mouseVirtualPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000)) ...
-        = floor(abs(bonsaiData.MousePos.Value(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000))+1140)) + 1;
+    mouseVirtualPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -990)) ...
+        = floor(abs(bonsaiData.MousePos.Value(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -990))+1140)) + 1;
     
-    trackIDFromPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -1000)) = 1; % Only one track (in Sonali's exps)
+    trackIDFromPosition(find(bonsaiData.MousePos.Value >= -1141 & bonsaiData.MousePos.Value < -990)) = 1; % Only one track (in Sonali's exps)
     
     
     mouseVirtualPosition(mouseVirtualPosition > 140) = 140;
-    mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
+    % mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
 
     response.mouseVirtualPosition = mouseVirtualPosition';
 
 elseif contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor') % this is temporary; might move to a new function @aman 
     % condition two 
-    bonsaiData.MousePos.Value(bonsaiData.MousePos.Value < 0) = 0;
-    mouseVirtualPosition = floor(bonsaiData.MousePos.Value) + 1;
+    bonsaiData.MousePos.Value(bonsaiData.MousePos.Value < 0) = 0; % Positions less than 0 are all assigned as 0 
+    mouseVirtualPosition = bonsaiData.MousePos.Value;
     
   
-    mouseVirtualPosition(mouseVirtualPosition > 140) = 140;
-    mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
+    mouseVirtualPosition(mouseVirtualPosition > 140) = 140; % Change in future.. [currently the location goes beyond 140 because end of track is gray screen and the animal cannot see past this..] 
+
+    % mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
     
     trackIDFromPosition(:) = 2; %@AMAN 
     response.mouseVirtualPosition = mouseVirtualPosition;
@@ -132,7 +133,7 @@ if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
     response.landmarkRewardValence = bonsaiData.TrialInfo.LandmarkRewardValence;
     response.numLandmarks = bonsaiData.TrialInfo.NumLandmarks;
 end 
-%% Lap track Info
+%% Lap track Info TODO: change to include block structure 
 % Save track ID as 1 for all the laps.
 response.trackIDs = ones(1, length(bonsaiData.TrialInfo.StartTimeAll))';
 % LapCounts
@@ -207,6 +208,8 @@ if ~isempty(lapStartTimeAll)
             end
 
             % If lap starts somewhere mid-track, align to the first time position = 0
+            % For when the animal moves very fast and the position starts
+            % at 5cm for example. 
             if sum(onTrackX == 0) > 0
                 startPosition = find(onTrackX == 0, 1);
                 if startPosition < length(onTrackX) - 10
@@ -225,6 +228,7 @@ if ~isempty(lapStartTimeAll)
             [lastPosition, lastPositionIndex] = max(onTrackX);
 
             % If track end (140 cm) is reached almost instantly remove early part
+           
             if lastPositionIndex * mean(diff(onTrackT)) < 0.1
                 onTrackX(1:lastPositionIndex) = [];
                 onTrackT(1:lastPositionIndex) = [];
@@ -240,7 +244,7 @@ if ~isempty(lapStartTimeAll)
             end
 
             % If the end of track was reached properly
-            if lastPosition >= 139 % sometimes last lap ends before 140 cm
+            if lastPosition >= 139 % sometimes last lap ends before 140 cm; eg 139.99 
                 EndTimeAll(nlap) = onTrackT(lastPositionIndex); % End time when track completed
                 completedLaps = [completedLaps; nlap]; % Save lap number as completed
             else
