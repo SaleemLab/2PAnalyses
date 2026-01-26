@@ -12,8 +12,8 @@ signalName = 'dFF'; %changed to dff 2026 jan
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25040'}, ...
-    'Session', {'20250510'}); %, 'TypeImaged', 'Boutons'
+    'MouseID', {'M25126'}, ...
+    'Session', {'20260123'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -171,7 +171,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             if ~isempty(vrStimNames)
                 fprintf('Found %d VR stimulus file(s).\n', length(vrStimNames));
 
-                % C.1 Preprocessing Loop (Generates individual response.mat files for ALL runs)
+                % C.1 Preprocessing Looop (Generates individual response.mat files for ALL runs)
                 for thisVRStim = 1:length(vrStimNames)
                     vrStimName = vrStimNames{thisVRStim};
                     fprintf('Processing VR Stim: %s\n', vrStimName);

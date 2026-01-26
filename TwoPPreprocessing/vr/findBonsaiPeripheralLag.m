@@ -66,7 +66,9 @@ end
 %     end
 
 % Pick out raw values
+
 rawPDValue              = peripheralData.Photodiode.rawValue;
+rawPDValueSmoothed = smoothdata(rawPDValue,'movmedian',10);
 rawPDArduinoTime        = peripheralData.Photodiode.rawArduinoTime;
 rawQuadValue            = peripheralData.Quadstate.rawValue;
 rawQuadArduinoTime      = peripheralData.Quadstate.rawArduinoTime;
@@ -76,7 +78,7 @@ switch method
     case 1 % Cross correlation of the two signals to find the best lag.
         % Interpolate quad and pd to 60hz using the quadTime
         tempQuadValueInterpolated = interp1(rawQuadArduinoTime, rawQuadValue, rawQuadArduinoTime(1):1/samplingRate:rawQuadArduinoTime(end), 'previous')';
-        tempPDValueInterpolated = interp1(rawPDArduinoTime, rawPDValue, rawQuadArduinoTime(1):1/samplingRate:rawQuadArduinoTime(end), 'linear')';
+        tempPDValueInterpolated = interp1(rawPDArduinoTime, rawPDValueSmoothed, rawQuadArduinoTime(1):1/samplingRate:rawQuadArduinoTime(end), 'linear')';
         [r, lags] = xcorr(normalize(tempQuadValueInterpolated), normalize(tempPDValueInterpolated));
         [~, jointIdx] = max(r);
         bestLag = lags(jointIdx);
@@ -90,9 +92,9 @@ switch method
         if plotFlag
             figure;
             hold on;
-            plot(rawPDArduinoTime(1:500), rawPDValue(1:500), 'DisplayName', 'Original Photodiode Signal');
-            plot(rawQuadArduinoTime(1:500), 10*rawQuadValue(1:500), 'r', 'DisplayName', 'Uncorrected Quad');
-            plot(lagCorrArdinoTime(1:500), 12*rawQuadValue(1:500), 'g', 'DisplayName', 'Corrected Quad');
+            plot(rawPDArduinoTime(1:500), rawPDValueSmoothed(1:500), 'DisplayName', 'Original Photodiode Signal');
+            plot(rawQuadArduinoTime(1:500), 15*rawQuadValue(1:500), 'r', 'DisplayName', 'Uncorrected Quad');
+            plot(lagCorrArdinoTime(1:500), 14*rawQuadValue(1:500), 'g', 'DisplayName', 'Corrected Quad');
             title('Using (xcorr) method 1: Photodiode vs Corrected/Uncorrected Quad Signal');
             legend();
             hold off;
@@ -222,7 +224,7 @@ switch method
                 figure;
                 hold on;
                 plot(rawPDArduinoTime(1:400), rawPDValue(1:400), 'DisplayName', 'Original Photodiode Signal');
-                plot(rawQuadArduinoTime(1:400), 10*rawQuadValue(1:400), 'r', 'DisplayName', 'Uncorrected Quad');
+                plot(rawQuadArduinoTime(1:400), 29*rawQuadValue(1:400), 'r', 'DisplayName', 'Uncorrected Quad');
                 plot(lagCorrQuadArduinoTime(1:400), 12*rawQuadValue(1:400), 'g', 'DisplayName', 'Corrected Quad');
                 scatter(pdstart(1:40), 7*ones(1, 40), 'DisplayName', 'PD On Time'); % Scatter plot photodiode start times
                 scatter(pdend(1:40), 6*ones(1, 40), 'DisplayName', 'PD off Time');   % Scatter plot photodiode end times

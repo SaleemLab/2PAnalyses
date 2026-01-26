@@ -23,7 +23,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 %% Extract activity
-lapActivityFull = response.lapPositionActivity.dFFNeuropilCorrected;
+lapActivityFull = response.lapPositionActivity.dFF;
 
 if neuronIdx < 1 || neuronIdx > size(lapActivityFull, 1)
     error('Invalid neuron index: %d', neuronIdx);

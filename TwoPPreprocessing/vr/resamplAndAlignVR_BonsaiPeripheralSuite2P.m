@@ -43,7 +43,7 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %% Define default paramters and load appropriate data files
 if nargin < 2, samplingRate = 60; end
 if nargin < 3, mainTimeToUse = 'TwoPFrameTime'; end % This is the interrupt-arduino time from the Bonsai Arduino
-if nargin < 5, plotFlag = false; end
+if nargin < 5, plotFlag = true; end
 if nargin < 6, trimNaNs = true; end % 
 
 % if nargin < 5, VR_number = 1; end
@@ -169,10 +169,42 @@ disp('Processing Bonsai Data: Mouse Position')
 if isfield(bonsaiData, 'MousePos')
     rawValue = bonsaiData.MousePos.rawValue;
     rawTime = bonsaiData.MousePos.rawCorrectedArduinoTime;
+    correctedStartTimeAll = bonsaiData.TrialInfo.rawCorrectedArduinoTime;
+
+    % bonsaiData.MousePos.Value = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    % bonsaiData.MousePos.sampleTimes = sampleTimes';
+    newValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+    newTime = sampleTimes';
+
     %     lagCorrT = bonsaiData.MousePos.rawCorrectedArduinoTime;
     % Lag corrected
-    bonsaiData.MousePos.Value = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
-    bonsaiData.MousePos.sampleTimes = sampleTimes';
+    if sum(diff(rawTime)>2) > 3 % For the legacy version, the logging will stop after a lap is finished. So we are detecting when jump in time happened (>1 second and such jumps happened 3 times)
+        tidx = find([diff(rawTime) ;0]>2); % look for index right before the jump
+        % idx = rawValue(tidx)>0;
+        % tidx(idx)=[];
+
+        if sum(rawValue(tidx) < 0)>0 % only grab time point when animal was running on the track
+
+             for i = 1:length(correctedStartTimeAll)
+                 candidateFrame = find(rawTime(tidx) < correctedStartTimeAll(i));
+                 if isempty(candidateFrame)
+                     candidateFrame = 1;
+                 end
+                 [tdiff,idx]= min(abs(correctedStartTimeAll(i)-rawTime(tidx(candidateFrame))));
+
+                 [~,idx1]= min(abs(newTime-rawTime(tidx(idx))));
+                 [~,idx2]= min(abs(newTime-correctedStartTimeAll(i)));
+                 newValue(idx1:idx2) = newValue(idx1);
+             end
+
+            
+        end
+    end
+
+    bonsaiData.MousePos.Value = newValue;
+    bonsaiData.MousePos.sampleTimes = newTime;
+
+
     %     bonsaiData.MousePos.ArduinoTime = interp1(lagCorrT, lagCorrT, sampleTimes, generalInterpMethod, NaN)';
     % Uncorrected %%%%% don't need this
 %     bonsaiData.MousePos.uncorrectedValue = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
@@ -189,7 +221,7 @@ if isfield(bonsaiData, 'TrialInfo')
 end
 
 
-%% NEW: Trim NaN padding if requested 
+%% Trim NaN padding if requested 
 if trimNaNs
     disp('Trimming NaN padding from start/end of signals...');
     % Start with a full mask (sampleTimes is a row vector)

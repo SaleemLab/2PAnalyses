@@ -53,7 +53,12 @@ for iSignal = 1:numSignals
     
     % Initialize storage
     lapPositionActivity.(currentSignalName) = nan(numROIs, nLaps, numBins);
-    
+    % frameIdx = [];
+    % for thisLap = 1:nLaps
+    %     for thisBin = 1:numBins
+    %         frameIdx(thisLap,thisBin) = length(response.lapPosition2PFrameIdx{thisLap, thisBin});
+    %     end
+    % end
     for thisLap = 1:nLaps
         for thisBin = 1:numBins
             frameIdx = response.lapPosition2PFrameIdx{thisLap, thisBin};

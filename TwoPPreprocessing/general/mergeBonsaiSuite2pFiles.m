@@ -13,7 +13,9 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         stimFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_2pData' '_' stimName '.mat'];
         merged_data_filepath = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
         
-        % Determine Plane/Trim logic
+        % Determine Plane/Trim logic % previously added NAN padding and
+        % this caused many issues further up the pipeline during smoothning
+        % step for example. 
         if strcmp(sessionFileInfo.suite2pFiles(end).planeName, 'plane')
             lastPlane_FrameRun = sessionFileInfo.stim_framerun{['plane' '0'], stimName}{1};
             numPlanes = sessionFileInfo.origNPlanes;
@@ -23,9 +25,9 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         end
         trimLength = lastPlane_FrameRun(2) - lastPlane_FrameRun(1) + 1;
         
-        % Search for 2P Times file 
+        % Search for 2P Times file; legacy version 
         twop_filepath = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, '2P');
-        if isempty(twop_filepath)
+        if isempty(twop_filepath) % ucl open version 
             twop_filepath = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'MatrixArduino');
         end
         
@@ -76,7 +78,9 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             twoPData(iPlane).ArduinoTime = planeTimes_trim.ArduinoTime;
             twoPData(iPlane).LastSyncPulseTime = planeTimes_trim.LastSyncPulseTime;
             
-            % Safe check for missing fields that were previously saved 
+            % Safe check for missing fields that were previously saved
+            % @ Aman might save space if I can just remove these before
+            % rerunning pipeline? 
             if ismember('BonsaiTime', planeTimes_trim.Properties.VariableNames)
                 twoPData(iPlane).BonsaiTime = planeTimes_trim.BonsaiTime;
             else

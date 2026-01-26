@@ -51,14 +51,14 @@ elseif ismember('Value.Last2PFrameTime', vars)
     % here
 
 
-    %% Remove duplicate 2P frame timestamps @AMAN
+    %% Remove duplicate 2P frame timestamps @AMAN 
     % This removes the entire row (including the extra Seconds/SyncPulse entries)
     % to ensure the clock remains aligned with unique microscope frames.
     % Only keeps the first instance of each unique 2P frame time. New
     % logging is triggered based on ArduinoTime where previous legacy
     % version was tiggered based on TwoPFrameTimes and did not require
     % this additional step.
-    [~, uniqueIdx, ~] = unique(twop_csv.(timeCol), 'stable');
+    [~, uniqueIdx, ~] = unique(twop_csv.(timeCol), 'stable'); %Original order, first occurrence
     twop_csv = twop_csv(uniqueIdx, :);
 
 else
