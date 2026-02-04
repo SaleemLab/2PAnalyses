@@ -56,7 +56,7 @@ for iStim = 1:length(tempsessionFileInfo.stimFiles)
 
     % 1 'grab' = twopMetadata.numSlices * twopMetadata.channelSave 
     % handles both numeric (1 channel) and string (2 channels)
-    if isstring(twopMetadata.channelSave)
+    if ischar(twopMetadata.channelSave)
         channelSave = str2num(twopMetadata.channelSave); 
     else 
         channelSave = twopMetadata.channelSave;
