@@ -19,7 +19,6 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     %                             
     %
     % Aman and Sonali - Feb 2025
-    % 
 
     % Set default values if not provided
     if nargin < 4
@@ -59,9 +58,8 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     if exist(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'file')
         load(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
         load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'resample2PTimeUsed');
-        timeData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, resample2PTimeUsed); 
-        timeData = timeData(1);
-        timeVec = timeData.(resample2PTimeUsed); %% Double check if this will work for multiple planes 
+        timeData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, resample2PTimeUsed);
+        timeVec = timeData.(resample2PTimeUsed);
         % load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData');
     else
         error('Missing PeripheralData and/or twoPData.');
@@ -71,7 +69,7 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
 
     % Extract PD signals
     pdArduinoTime = peripheralData.Photodiode.sampleTimes;
-    % pdValue       = peripheralData.Photodiode.Value;
+    pdValue       = peripheralData.Photodiode.Value;
     % Smoothning 
     pdValue = movmedian(peripheralData.Photodiode.Value,20);
 
@@ -153,7 +151,7 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
     %% Remove stimulus events that occur after two-photon imaging has stopped 
     % Can move out??
 
-    idxToDrop = find(onARDTimes >= max(timeVec));
+    idxToDrop = find(onARDTimes >= max(processedTwoPData(1).TwoPFrameTime));
 
     if ~isempty(idxToDrop) && max(idxToDrop) <= length(offARDTimes)
         onARDTimes(idxToDrop)  = [];

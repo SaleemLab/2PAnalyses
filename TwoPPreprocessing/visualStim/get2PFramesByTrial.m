@@ -1,4 +1,4 @@
-function [response, sessionFileInfo] = get2PFramesByTrialV3(sessionFileInfo, stimName,  postStimTime, preStimTime, useoffARDTimes)
+function [response, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, stimName,  postStimTime, preStimTime, useoffARDTimes)
 % Extract frames by directly filtering timestamps based on a time window around stimulus events.
 % If off transitions are set as the 'start' of the next stimulus (i.e.,
 % no gray screen) -- include offARDTimes.
@@ -37,6 +37,10 @@ if nargin<4
     preStimTime = 0;
 end
 
+if contains(stimName, 'SparseNoise', 'IgnoreCase',true)
+    postStimTime = 0.7; 
+end 
+
 % Locate the current stimulus in sessionFileInfo
 isStim = false(1, length(sessionFileInfo.stimFiles));
 for iStim = 1:length(sessionFileInfo.stimFiles)
@@ -50,7 +54,7 @@ end
 %% Check for existence of required files and load them
 if exist(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData,'file') && ...
         exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file')
-    load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedTwoPData');
+    processedTwoPData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
     load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 else
     error('Missing: TwoPData and/or bonsaiData files.');
@@ -76,8 +80,8 @@ frameTimes = processedTwoPData.TwoPFrameTime;
 % response = twoPData(thisPlane).planeName;
 
 % Preallocate cell arrays for each trial in this plane
-response(thisPlane).responseFrameIdx = cell(length(combinedStimARDTimes), 1);
-response(thisPlane).responseFrameRelTimes = cell(length(combinedStimARDTimes), 1);
+response.responseFrameIdx = cell(length(combinedStimARDTimes), 1);
+response.responseFrameRelTimes = cell(length(combinedStimARDTimes), 1);
 
 % Loop over each stimulus event
 for iTrial = 1:length(combinedStimARDTimes)
@@ -87,17 +91,19 @@ for iTrial = 1:length(combinedStimARDTimes)
 
     % Logical: true/1 for frames within the window
     frameIdxToAnalyse = (frameTimes >= (combinedStimARDTimes(iTrial) - preStimTime)) & (frameTimes <= (combinedStimARDTimes(iTrial) + postStimTime));
-    response(thisPlane).responseFrameIdx{iTrial} = frameIdxToAnalyse;
+    response.responseFrameIdx{iTrial} = frameIdxToAnalyse;
 
     % Compute relative frame times with respect to the event time
-    response(thisPlane).responseFrameRelTimes{iTrial} = frameTimes(frameIdxToAnalyse) - combinedStimARDTimes(iTrial);
-    response(thisPlane).preStimTime = preStimTime;
-    response(thisPlane).postStimTime = postStimTime;
-    end
+    response.responseFrameRelTimes{iTrial} = frameTimes(frameIdxToAnalyse) - combinedStimARDTimes(iTrial);
+    response.preStimTime = preStimTime;
+    response.postStimTime = postStimTime;
 end
-
 
 save(sessionFileInfo.stimFiles(iStim).Response, 'response');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
-
 end
+
+
+
+
+

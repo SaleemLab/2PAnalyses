@@ -21,7 +21,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
     quad_path          = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'Quad');
     wheel_path         = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'Wheel');
 
-    %% 1. Photodiode Processing
+    %% 1. Photodiode processing
     if exist(photodiode_path, 'file')
         % Preserve naming to prevent warnings about dots in headers
         photodiode_table = readtable(photodiode_path, 'VariableNamingRule', 'preserve');

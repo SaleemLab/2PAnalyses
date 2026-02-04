@@ -1,0 +1,25 @@
+filePath = 'Z:\ibn-vision\USERS\Sonali\SS131-EDDBoutons\2025-02-04 A\2\NiDaqInput0.bin';
+
+fid = fopen(filePath, 'r');
+if fid == -1, error('File not found'); end
+rawBuffer = fread(fid, Inf, '*int16'); 
+fclose(fid);
+
+numChannels = 5;
+% each row is a channel, each column is a value in time?
+dataMatrix = reshape(rawBuffer, numChannels, []);
+
+
+niDaq.photodiode = double(dataMatrix(1, :));
+niDaq.frameclock = double(dataMatrix(2, :));
+niDaq.pockel     = double(dataMatrix(3, :));
+niDaq.piezo      = double(dataMatrix(4, :));
+niDaq.sync       = double(dataMatrix(5, :));
+
+figure('Name', 'NiDaq Channel Check');
+t = 1:min(100, length(niDaq.photodiode)); % Plot first 10k samples
+
+subplot(3,1,1); plot(niDaq.photodiode(t)); title('Photodiode');
+subplot(3,1,2); plot(niDaq.frameclock(t)); title('Frame Clock');
+subplot(3,1,3); plot(niDaq.piezo(t));      title('Piezo');+
+xlabel('Samples');

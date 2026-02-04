@@ -12,7 +12,7 @@ targetArea = filteredTable.TargetArea;
 
 %% Load Data
 % Load 2PMetaData from one session; Using the VR session here
-isVRStim = contains({sessionFileInfo.stimFiles.name}, 'VRCorr');
+isVRStim = contains({sessionFileInfo.stimFiles.name}, 'SparseNoiseTexture') ;
 iStim = find(isVRStim==1);
 if length(iStim) > 1
     iStim = iStim(1); % Take the first match if multiple VRStim files exist
@@ -62,8 +62,11 @@ for thisPlaneIdx = 1:numPlanes
     
 
     iscell            = [iscell; currentPlane.iscell(:,1)];
-    redcell           = [redcell; currentPlane.redcell(:,1)];
-    
+    try
+        redcell           = [redcell; currentPlane.redcell(:,1)];
+    catch
+        fprintf('redcell data missing for this sessions. proceeding...\n')
+    end
     % --- Plane Identity and Stats ---
     roiPlaneIdentity  = [roiPlaneIdentity; repmat(thisPlaneIdx - 1, numROIs, 1)];
     allStatStructuresCell = currentPlane.stat;

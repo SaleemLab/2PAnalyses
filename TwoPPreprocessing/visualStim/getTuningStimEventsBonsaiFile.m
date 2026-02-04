@@ -31,6 +31,9 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
     elseif contains(stimName, 'RFMapping')
         stimTypeKey = 'RFMapping';
         stimTypeTableName = 'StimulusParams'; 
+    elseif contains(stimName, 'SparseNoiseTexture') || contains(stimName, 'SparseNoise')
+        stimTypeKey = 'SparseNoiseTexture';
+        stimTypeTableName = 'Log';
     elseif contains(stimName, {'CheckerBoard', 'DriftingBar', 'FullFieldFlash', 'GrayScreen'}, "IgnoreCase",true)
         fprintf('%s stimulus does not contain BonsaiFile to load. Skipping this file..\n', stimName);
         stimTypeKey = 'N/A';
@@ -60,22 +63,25 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
     end
 
     tuningFilePath = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, stimTypeTableName);
-    stimEventsTable = readtable(tuningFilePath);
+    
     
     % Extract relevant columns based on stimulus type; If adding new cases 
     % save stimulus identity in bonsaiData.stimType 
     switch stimTypeKey
         case 'DirTuning'
+            stimEventsTable = readtable(tuningFilePath);
             bonsaiData.bonsaiStimOnsetRaw = stimEventsTable.Timestamp; % Not sure if this is bonsaiStimOnset! 
             bonsaiData.stimOnsetRenderFrameIdx = stimEventsTable.Frame;
             bonsaiData.stimType = round(rad2deg(stimEventsTable.Value));
         
         case 'DotMotion_SpeedTuning'
+            stimEventsTable = readtable(tuningFilePath);
             bonsaiData.bonsaiStimOnsetRaw = stimEventsTable.BonsaiTime;
             bonsaiData.ArduinoTimeRaw = stimEventsTable.ArduinoTime./1000;
             bonsaiData.stimType = stimEventsTable.VelX1;
             bonsaiData.stimID = stimEventsTable.Id;
         case 'RFMapping'
+            stimEventsTable = readtable(tuningFilePath);
             bonsaiData.stimID = stimEventsTable.Var2;
             bonsaiData.delay = stimEventsTable.Var4; 
             bonsaiData.duration = stimEventsTable.Var6; 
@@ -90,10 +96,41 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
             bonsaiData.RenderFrameCount = stimEventsTable.Var22;
             bonsaiData.LastSyncPulseTime = stimEventsTable.Var23;
             bonsaiData.ArduinoTimeRaw = stimEventsTable.Var24./1000;
+
+        case 'SparseNoiseTexture' %change to a function instead..TODO @sonali
+
+
+            bonsaiData.gridSize = [8 12];
+            fprintf('Using defualt grid size %d for SparseNoiseTexture..\n', bonsaiData.gridSize)
+            fileID=fopen(tuningFilePath);
+            thisBinFile=fread(fileID);
+            fclose(fileID);
+
+            % Translate stimulus into -1:1 scale
+            stimMatrix = zeros(1,length(thisBinFile));
+            stimMatrix(thisBinFile==0)=-1;
+            stimMatrix(thisBinFile==255)=1;
+            stimMatrix(thisBinFile==128)=0;
+
+            % Make a NxM grid from the stimulus log
+            stimMatrix = reshape(stimMatrix, [bonsaiData.gridSize(1), bonsaiData.gridSize(2), length(thisBinFile)/bonsaiData.gridSize(1)/bonsaiData.gridSize(2)]);
+            stimMatrix = stimMatrix(:,:,1:end-1); % The last 'stimulus'
+
+            for thisTrial = 1:size(stimMatrix,3)
+                bonsaiData.stimMatrix{thisTrial,1} = squeeze(stimMatrix(:,:,thisTrial));
+            end
+
+
+            
         otherwise
             error('Unknown stimulus type: %s', stimName);
     end
-    bonsaiData.stimEventsTable = stimEventsTable; 
+    
+    try % SparseNoiseTexture will not have stimEventsTable 
+        bonsaiData.stimEventsTable = stimEventsTable;
+    catch
+        fprintf('Could not save stimEvents raw table in Bonsai.mat for %s...\n', stimName)
+    end    
     
     % Save the extracted Bonsai data (overwrites file if it exists)
     save(saveFilePath, 'bonsaiData');
