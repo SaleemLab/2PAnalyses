@@ -20,7 +20,7 @@ if nargin < 3
 end
 
 if nargin < 4
-    framesToShow = [1 4 6 8 10 12];
+    framesToShow = [1 2 4 6 8 10 12 14];
 end
 
 %% Load session file information and relevant data files
@@ -105,7 +105,7 @@ stimMatrix = reshape(permute(stimulusMatrix, [2 1]), bonsaiData.gridSize(1), bon
 
 %% Define options
 sn_options.grid_size = [bonsaiData.gridSize(1), bonsaiData.gridSize(2)];
-sn_options.mapSampleRate = twopMetadata.scanFrameRate / twopMetadata.numSlices;
+sn_options.mapSampleRate = 60; %twopMetadata.scanFrameRate / twopMetadata.numSlices;
 sn_options.mapsToShow = {'linear', 'black', 'white', 'contrast'};
 sn_options.mapMethod = 'fitlm';
 sn_options.framesToShow = framesToShow;
@@ -113,9 +113,7 @@ sn_options.plotflag = plotflag;
 
 %% Analyse and plot (used gemini for plotting)
 
-
 initMap = cell(numRois, 1);
-
 for iN = 1:numRois
     roiRespTmp = squeeze(roiStimResponses(iN, :, :));
     
@@ -125,18 +123,27 @@ for iN = 1:numRois
     
     for iF = 1:length(figHandles)
         fig = figHandles(iF);
-        sgtitle(fig, sprintf('ROI %d - Map %d', iN, iF));
+        
+        ax = findall(fig, 'type', 'axes');
+        
+    
+        if ~isempty(ax)
+          
+            title(ax(1), sprintf('ROI %d - Map %d', iN, iF), 'FontSize', 12);
+        end
+        
+        drawnow;
         
         if iN == 1 && iF == 1 && exist(pdfFileName, 'file')
             delete(pdfFileName);
         end
-        
+       
         exportgraphics(fig, pdfFileName, 'Append', true, 'ContentType', 'vector');
     end
     
-
     close(figHandles);
     fprintf('Processed ROI %d of %d\n', iN, numRois);
 end
+
 
 end

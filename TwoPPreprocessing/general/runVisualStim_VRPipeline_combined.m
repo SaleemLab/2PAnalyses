@@ -12,7 +12,8 @@ signalName = 'dFF'; %changed to dff 2026 jan
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25132'}); %, 'TypeImaged', 'Boutons'
+    'MouseID', {'M25133'}, ...
+    'Session', {'20260205C'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -180,6 +181,24 @@ for thisMouse = 1:size(mouseInfo, 1)
                     warning('SparseNoiseTexture not found in otherVisualStim list.');
                 end
             end
+                
+
+            % B.3 Process RFMapping
+             if ~isempty(otherVisualStim)
+                rfIdx = find(contains(otherVisualStim, 'RFMapping', 'IgnoreCase', true));
+                if ~isempty(rfIdx)
+                    thisRFName = otherVisualStim{rfIdx(1)};
+                    fprintf('Found RFMapping at index %d: %s\n', rfIdx(1), thisRFName);
+                    [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisRFName, 3,0.5);
+                    [~, sessionFileInfo] = getTrialGroupsV2(sessionFileInfo, thisRFName); 
+                    [rfresponse, sessionFileInfo] = getTrialResponsePSTHsV4(sessionFileInfo, thisRFName, 2, interpRate);
+                    plotRFGrid_byPosition_ROIs(sessionFileInfo, thisRFName)
+                    %plotAllROIPSTHsByPosition(sessionFileInfo, rfresponse);
+                else
+                    warning('SparseNoiseTexture not found in otherVisualStim list.');
+                end
+             end
+
 
             % C. Process all VR Stimuli
             if ~isempty(vrStimNames)

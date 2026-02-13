@@ -41,6 +41,10 @@ if contains(stimName, 'SparseNoise', 'IgnoreCase',true)
     postStimTime = 0.7; 
 end 
 
+if contains(stimName, 'RFMapping', 'IgnoreCase',true)
+    postStimTime = 3; 
+    preStimTime = 0.5;
+end 
 % Locate the current stimulus in sessionFileInfo
 isStim = false(1, length(sessionFileInfo.stimFiles));
 for iStim = 1:length(sessionFileInfo.stimFiles)

@@ -12,8 +12,8 @@ signalName = 'dFF'; %changed to dff 2026 jan
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25131'}, ...
-    'Session', {'20260128A', '20260128B', '20260128C'}); %, 'TypeImaged', 'Boutons'
+    'MouseID', {'M25132'}, ...
+    'Session', {'20260204C'}); %, 'TypeImaged', 'Boutons'
 
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -162,8 +162,6 @@ for thisMouse = 1:size(mouseInfo, 1)
                         [~, ~, ~, sessionFileInfo] = ...
                             resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', otherVisualStimName);  % Plotflag false, trimNaNs true and overwrite true;
                         [~, sessionFileInfo]       = computeNeuropilCorrectionAndDFF(sessionFileInfo, otherVisualStimName, zScoreProcessedSignals, applyTemporalSmoothing, prctlF, windowSize); % Overwrite is true
-                        % This uses interpolated PD times; currently only
-                        % using pd transients to get onsets and offsets. 
                         [~, sessionFileInfo] = getStimTimes(sessionFileInfo, otherVisualStimName, pdThresholdForStimEvents);                     
                     catch
                         fprintf('Missing bonsai data structure for stimulus file: %s\n', otherVisualStimName)
@@ -173,22 +171,35 @@ for thisMouse = 1:size(mouseInfo, 1)
 
             % B.2 Process SparseNoiseTexture
             if ~isempty(otherVisualStim)
-              
                 snIdx = find(contains(otherVisualStim, 'SparseNoiseTexture', 'IgnoreCase', true));
-
                 if ~isempty(snIdx)
                     thisSNName = otherVisualStim{snIdx(1)};
                     fprintf('Found Sparse Noise at index %d: %s\n', snIdx(1), thisSNName);
-
-                    % 2. Get frames specifically for the Sparse Noise stimulus name
-                    [response, sessionFileInfo] = get2PFramesByTrialV3(sessionFileInfo, thisSNName, 0.7, 0, true);
-
-                    % 3. Run the analysis
-                    analyseSparseNoise(sessionFileInfo, plotflag, framesToShow);
+                    [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisSNName); %Defaults for sparseNoise have been set tp 0 prestim and 0.7 post stim 
+                    analyseSparseNoise(sessionFileInfo);
                 else
                     warning('SparseNoiseTexture not found in otherVisualStim list.');
                 end
             end
+                
+
+            % B.3 Process RFMapping
+             if ~isempty(otherVisualStim)
+                rfIdx = find(contains(otherVisualStim, 'RFMapping', 'IgnoreCase', true));
+                if ~isempty(rfIdx)
+                    thisRFName = otherVisualStim{rfIdx(1)};
+                    fprintf('Found RFMapping at index %d: %s\n', rfIdx(1), thisRFName);
+                    [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisRFName, 3,0.5);
+                    [~, sessionFileInfo] = getTrialGroupsV2(sessionFileInfo, thisRFName); 
+                    [rfresponse, sessionFileInfo] = getTrialResponsePSTHsV4(sessionFileInfo, thisRFName, 2, interpRate);
+                    plotRFGrid_byPosition_ROIs(sessionFileInfo, thisRFName)
+                    %plotAllROIPSTHsByPosition(sessionFileInfo, rfresponse);
+                else
+                    warning('SparseNoiseTexture not found in otherVisualStim list.');
+                end
+             end
+
+
             % C. Process all VR Stimuli
             if ~isempty(vrStimNames)
                 fprintf('Found %d VR stimulus file(s).\n', length(vrStimNames));

@@ -36,7 +36,7 @@ framerun = struct();
 if isZcorrected
     %  Z-motion correction applied (One 'plane' folder) ---
     disp('Z-corrected mode: Calculating frame runs once and replicating for all planes...');
-    plane_folder_path = fullfile(suite2pDir, 'plane');
+    plane_folder_path = fullfile(suite2pDir, 'plane_z');
     if ~exist(plane_folder_path, 'dir')
         error('Z-corrected mode failed: Expected folder not found at %s', plane_folder_path);
     end

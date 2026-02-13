@@ -26,14 +26,14 @@ load(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, "twoPData");
 scanZoomFactor = twopMetadata.scanZoomFactor;
 if scanZoomFactor == 6
     micronsPerPix = 0.1318287;
-    selectedPlane = twoPData.ops.selected_plane;
+    referencePlane = twoPData.ops.reference_plane;
 elseif scanZoomFactor == 4
     micronsPerPix = 0.0988692;
-    selectedPlane = [];
+    referencePlane = [];
 else
     fprintf('Microns to pixel conversion missing for zoom: %d \n', scanZoomFactor);
     micronsPerPix = [];
-    selectedPlane = [];
+    referencePlane = [];
 end
 pixelsPerLine = twopMetadata.pixelsPerLine;
 linesPerFrame = twopMetadata.linesPerFrame;
@@ -97,7 +97,7 @@ roiInfo.radiuspix         = radiuspix;
 roiInfo.npix              = npix;
 roiInfo.ypix              = ypix;
 roiInfo.xpix              = xpix;
-roiInfo.selectedPlane     = selectedPlane;
+roiInfo.selectedPlane     = referencePlane;
 
 % Save individual variables to the .mat file for selective loading
 save(sessionFileInfo.otherSessFilePaths.sessionROIData, "roiInfo", "targetArea","typeImaged");

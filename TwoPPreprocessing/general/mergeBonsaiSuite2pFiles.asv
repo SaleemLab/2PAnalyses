@@ -67,10 +67,10 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             twoPData(iPlane).Fneu = fAll.Fneu(:, trimIndices);
             
             % Extract timing data per plane
-            if strcmp(planeName,'plane_z')
+            if strcmp(planeName,'plane')
                 planeTimes_trim = planeTimes_table.plane0(1:trimLength,:);
                 for iTime = 1:trimLength
-                    planeTimes_trim(iTime,:) = planeTimes_table.(['plane' num2str(referencePlaneInfo(iTime))])(iTime, :);
+                    planeTimes_trim(iTime,:) = planeTimes_table.([planeName num2str(referencePlaneInfo(iTime))])(iTime, :);
                 end
             else
                 planeTimes_trim = planeTimes_table.(planeName)(1:trimLength, :);
