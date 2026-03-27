@@ -34,7 +34,13 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
     elseif contains(stimName, 'SparseNoiseTexture') || contains(stimName, 'SparseNoise')
         stimTypeKey = 'SparseNoiseTexture';
         stimTypeTableName = 'Log';
-    elseif contains(stimName, {'CheckerBoard', 'DriftingBar', 'FullFieldFlash', 'GrayScreen'}, "IgnoreCase",true)
+    elseif contains(stimName, 'Contrast')
+        stimTypeKey = 'Contrast';
+        stimTypeTableName = 'stimEvents';
+    elseif contains(stimName, 'Position')
+        stimTypeKey = 'Position';
+        stimTypeTableName = 'stimEvents';
+    elseif contains(stimName, {'CheckerBoard', 'DriftingBar', 'FullFieldFlash', 'GrayScreen', 'Darkness', 'NoDisplay'}, "IgnoreCase",true)
         fprintf('%s stimulus does not contain BonsaiFile to load. Skipping this file..\n', stimName);
         stimTypeKey = 'N/A';
         stimTypeTableName = 'N/A';
@@ -96,7 +102,7 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
             bonsaiData.RenderFrameCount = stimEventsTable.Var22;
             bonsaiData.LastSyncPulseTime = stimEventsTable.Var23;
             bonsaiData.ArduinoTimeRaw = stimEventsTable.Var24./1000;
-
+        
         case 'SparseNoiseTexture' %change to a function instead..TODO @sonali
 
 
@@ -120,6 +126,30 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
                 bonsaiData.stimMatrix{thisTrial,1} = squeeze(stimMatrix(:,:,thisTrial));
             end
 
+
+        case 'Contrast'
+            stimEventsTable = readtable(tuningFilePath);
+            bonsaiData.bonsaiStimOnsetRaw = stimEventsTable.Timestamp; % Not sure if this is bonsaiStimOnset!
+            bonsaiData.stimOnsetRenderFrameIdx = stimEventsTable.Frame;
+            bonsaiData.stimType = stimEventsTable.Var5;
+
+        case 'Position'
+            stimEventsTable = readtable(tuningFilePath, 'VariableNamingRule', 'preserve');
+            
+           
+           
+            bonsaiData.bonsaiStimOnsetRaw = stimEventsTable.Var2; 
+            bonsaiData.stimOnsetRenderFrameIdx = stimEventsTable.Var1;
+            
+            idxLoc = strcmp(stimEventsTable.Var4, 'LocationX');
+            bonsaiData.locationX = stimEventsTable.Var5(idxLoc);
+            
+            idxExt = strcmp(stimEventsTable.Var4, 'ExtentX');
+            bonsaiData.extentX = stimEventsTable.Var5(idxExt);
+            
+            idxTF = strcmp(stimEventsTable.Var4, 'TF');
+            bonsaiData.TF = stimEventsTable.Var5(idxTF);
+            % bonsaiData.stimType = string(bonsaiData.locationX) + "deg_" + string(bonsaiData.extentX) + "width";
 
             
         otherwise

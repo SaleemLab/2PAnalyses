@@ -186,46 +186,45 @@ load(mergedPath, 'processedSignals');
 load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 load(sessionFileInfo.stimFiles(iStim).Response, 'response');
 
-% 3. Build signal matrix
+
 % Using dFF from processedSignals as requested
-dFF = processedSignals.dFF; 
+dFF = processedSignals.dFFNeuropilCorrected; 
 nNeurons = size(dFF, 1);
 
-% 4. Prepare output structure
+
 nGroups = numel(bonsaiData.trialGroups);
 pd = struct('stimValue', [], 'alignedResponses', [], 'meanResponse', [], ...
             'stdResponse', [], 'semResponse', [], 'timeVector', [], 'responseType', []);
 response.psthData = repmat(pd, nGroups, 1);
 
-% 5. Define Global Time Vector
-% Flattened data assumes all ROIs share the timing in response(1)
+
 allTimes = vertcat(response(1).responseFrameRelTimes{:});
 tmin = min(allTimes); 
 tmax = max(allTimes);
 timeVector = linspace(tmin, tmax, round((tmax-tmin)*interpRate));
 
-% 6. Loop through stimulus groups
+
 for g = 1:nGroups
     grp     = bonsaiData.trialGroups(g);
     trIdxs  = grp.trials;
     nTrials = numel(trIdxs);
     
-    % Preallocate [Neurons x Time x Trials]
+    % [Neurons x Time x Trials]
     aligned = nan(nNeurons, numel(timeVector), nTrials);
     
     for ti = 1:nTrials
         trialID = trIdxs(ti);
         
-        % Get timing masks and relative times
+     
         frameMask = response(1).responseFrameIdx{trialID};
         relTimes  = response(1).responseFrameRelTimes{trialID};
         
         if isempty(frameMask), continue; end
         
-        % Extract data for all neurons for this trial
+        % xtract data for all neurons for this trial
         trialData = dFF(:, frameMask);
         
-        % Interpolate
+        %
         for ni = 1:nNeurons
             % Only interpolate if we have valid data for this trial
             if ~all(isnan(trialData(ni,:)))
@@ -249,7 +248,7 @@ for g = 1:nGroups
     response.psthData(g).responseType     = method;
 end
 
-% 7. Save back out
+
 save(sessionFileInfo.stimFiles(iStim).Response, 'response');
 % Note: Only save sessionFileInfo if you actually modified it
 % save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo'); 

@@ -1,4 +1,4 @@
-function [bonsaiData] = getTrialGroups(sessionFileInfo, stimName)
+function [bonsaiData, sessionFileInfo] = getTrialGroups(sessionFileInfo, stimName)
     % Groups trials based on stimulus type from Bonsai data.
     %
     % Extracts stimulus-related trials by identifying unique stimulus

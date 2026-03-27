@@ -17,8 +17,11 @@ firstPlaneFall_FilePath = fullfile(suite2pFolder, firstPlaneFolder, 'Fall.mat');
 % Load the .mat file to access the ops struct
 fAll = load(firstPlaneFall_FilePath);
 ops = fAll.ops;
-tifFileList = ops.filelist; 
-
+if isfield(ops, 'filelist')
+    tifFileList = ops.filelist; 
+elseif isfield(ops, 'file_list')
+    tifFileList = ops.file_list; 
+end
 %% Parse the file list to get the final, correctly formatted stimList
 stimList = parseStimNames(tifFileList);
 end

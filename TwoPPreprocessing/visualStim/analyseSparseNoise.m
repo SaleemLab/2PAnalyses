@@ -1,149 +1,137 @@
-function analyseSparseNoise(sessionFileInfo, plotflag, framesToShow)
-%
-% TODO:
-% (1) Fix the number of rois to run svd on - done
-% (2) Add the option to save the plots in a pdf - done
-% (3) Flatten the response and processedTwoPData.mat files
-
+function [initMap, sessionFileInfo] = analyseSparseNoise(sessionFileInfo,signalToUse, plotflag, framesToShow, saveData)
+% analyseSparseNoise: Extracts RFs, saves to sessionROIData, and exports PDF.
 %
 % Inputs:
-%   - sessionFileInfo (struct): Structure containing stimFiles and associated data file paths.
-%   - gridSize (array): Sparse Noise Grid Sizes (e.g., [x y]); Defult is [6 4]
-%   - plotflag (int): To plot the SVD outputs; Default is to plot (1)
-%   - framesToShow (int:int): Number of frames to show in the plot; Default is 1:3.
-%
+%   - sessionFileInfo: struct containing stimFiles and data file paths.
+%   - plotflag: 1 to plot/save PDF, 0 to just compute (Default: 1)
+%   - framesToShow: indices for the SVD/time-bin plots (Default: [1 2 4 6 8 10 12 14])
+%   - saveData: 1 to save 'sparseNoiseRF' struct to sessionROIData (Default: 1)
 
-% Set default values if not provided
+%% Default parameters
+if nargin < 2, signalToUse = 'dFFNeuropilCorrected'; end 
+if nargin < 3, plotflag = 1; end
+if nargin < 4, framesToShow = [1 2 4 6 8 10 12 14]; end
+if nargin < 5, saveData = 1; end 
 
-if nargin < 3
-    plotflag = 1; % Defualt if to plot
-end
 
-if nargin < 4
-    framesToShow = [1 2 4 6 8 10 12 14];
-end
 
-%% Load session file information and relevant data files
+%% Identify Sparse Noise Stimulus
 for iStim = 1:length(sessionFileInfo.stimFiles)
     bonsaiData.isSparseNoise(iStim) = contains(sessionFileInfo.stimFiles(iStim).name, 'SparseNoiseTexture');
 end
-
 iStim = find(bonsaiData.isSparseNoise==1);
-
 if isempty(iStim)
     error('No SparseNoise stimulus file found in sessionFileInfo.');
 end
 
-% Load data files
+%% Load Data Files
 if exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file') && ...
-        exist(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'file') && ...
-        exist(sessionFileInfo.stimFiles(iStim).Response, 'file') && ...
-        exist(sessionFileInfo.stimFiles(iStim).TwoPMetaData, 'file')
-
-    % Load stimulus data
+   exist(sessionFileInfo.stimFiles(iStim).mergedBonsai2PSuite2pData, 'file') && ...
+   exist(sessionFileInfo.stimFiles(iStim).Response, 'file')
+    
     load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
     load(sessionFileInfo.stimFiles(iStim).Response, 'response');
     processedtwoPData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
-    load(sessionFileInfo.stimFiles(iStim).TwoPMetaData, 'twopMetadata');
 else
-    error('Required data files (BonsaiData.mat, Response.mat, TwoPData.mat) are missing.');
+    error('Required Sparse Noise data files are missing.');
 end
 
-
-%% figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+%% Setup Directory and PDF
 figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
-if ~exist(figSaveDir, 'dir')
-    mkdir(figSaveDir);
+if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
+pdfFileName = fullfile(figSaveDir, [sessionFileInfo.stimFiles(iStim).name '_RFs.pdf']);
+
+% Delete existing PDF to avoid appending to old results
+if plotflag && exist(pdfFileName, 'file')
+    delete(pdfFileName);
 end
 
-pdfFileName = fullfile(figSaveDir, ...
-    [sessionFileInfo.stimFiles(iStim).name '_RFs.pdf']);
-
-%% Extract stimulus timing and matrix
-onARDStimTimes = sort([bonsaiData.onARDTimes; bonsaiData.offARDTimes]);
-stimMatrix = bonsaiData.stimMatrix;
-stimMatrix = stimMatrix(1:length(onARDStimTimes));
-
-%% Loop through each imaging plane; remove this.. currently concaternated across planes
-% numPlanes = length(processedtwoPData);
-% for thisPlane = 1:numPlanes
-% disp("Processing plane " + thisPlane);
-
-% Extract fluorescence data for this plane
-dFF = processedtwoPData.processedSignals.dFF;
-% validROIs = processedtwoPData(thisPlane).iscell(:,1) == 1;
-% rois = dFF(validROIs, :);
-
-% Number of neurons and trials
+%% Extract Fluorescence and Timing
+dFF = processedtwoPData.processedSignals.(signalToUse);
 numRois = size(dFF, 1);
 numTrials = length(response.responseFrameIdx);
 
-% Process responseFramesIdx for this plane
-
+% Map 2P frame indices for each stimulus trial
 framesToAnalyse = cellfun(@find, response.responseFrameIdx, 'UniformOutput', false);
 maxFrames = max(cellfun(@numel, framesToAnalyse));
 twopIndices = nan(numTrials, maxFrames);
-
 for trial = 1:numTrials
     twopIndices(trial, 1:numel(framesToAnalyse{trial})) = framesToAnalyse{trial};
 end
 
-%% Extract responses for each neuron
+% Extract responses per neuron
 roiStimResponses = zeros(numRois, numTrials, maxFrames);
 validMask = ~isnan(twopIndices);
-
 for neuron = 1:numRois
     tempF = dFF(neuron, :);
-    tempIndices = twopIndices(validMask);
-    roiStimResponses(neuron, validMask) = tempF(tempIndices);
+    roiStimResponses(neuron, validMask) = tempF(twopIndices(validMask));
 end
 
-%% Reshape stimulus matrix
-stimulusMatrixCells = cellfun(@(x) x(:)', stimMatrix, 'UniformOutput', false);
+%% Format Stimulus Matrix
+stimulusMatrixCells = cellfun(@(x) x(:)', bonsaiData.stimMatrix(1:numTrials), 'UniformOutput', false);
 stimulusMatrix = cat(1, stimulusMatrixCells{:});
 stimMatrix = reshape(permute(stimulusMatrix, [2 1]), bonsaiData.gridSize(1), bonsaiData.gridSize(2), size(stimulusMatrix, 1));
 
-%% Define options
+%% Analysis Options
 sn_options.grid_size = [bonsaiData.gridSize(1), bonsaiData.gridSize(2)];
-sn_options.mapSampleRate = 60; %twopMetadata.scanFrameRate / twopMetadata.numSlices;
+sn_options.mapSampleRate = 60; 
 sn_options.mapsToShow = {'linear', 'black', 'white', 'contrast'};
 sn_options.mapMethod = 'fitlm';
 sn_options.framesToShow = framesToShow;
 sn_options.plotflag = plotflag;
 
-%% Analyse and plot (used gemini for plotting)
-
+%% Main Analysis Loop
 initMap = cell(numRois, 1);
+
 for iN = 1:numRois
     roiRespTmp = squeeze(roiStimResponses(iN, :, :));
     
+    % Capture current figures to distinguish from new ones
+    existingFigs = findobj('Type', 'figure');
+    
+    % Run Sparse Noise Analysis
     initMap{iN} = sparseNoiseAnalysis(stimMatrix, roiRespTmp, [], [], sn_options);
     
-    figHandles = findobj('Type', 'figure'); 
-    
-    for iF = 1:length(figHandles)
-        fig = figHandles(iF);
+    if plotflag
+        % Identify new figures created for this ROI
+        allFigs = findobj('Type', 'figure');
+        newFigs = setdiff(allFigs, existingFigs);
         
-        ax = findall(fig, 'type', 'axes');
-        
-    
-        if ~isempty(ax)
-          
-            title(ax(1), sprintf('ROI %d - Map %d', iN, iF), 'FontSize', 12);
+        if ~isempty(newFigs)
+            for iF = 1:length(newFigs)
+                fig = newFigs(iF);
+                ax = findall(fig, 'type', 'axes');
+                
+                if ~isempty(ax)
+                    title(ax(1), sprintf('ROI %d - Map %d', iN, iF), 'FontSize', 12);
+                    % Export and append to PDF
+                    exportgraphics(fig, pdfFileName, 'Append', true, 'ContentType', 'vector');
+                end
+            end
+            % Explicitly close new figures to free memory and prevent empty pages
+            close(newFigs);
         end
-        
-        drawnow;
-        
-        if iN == 1 && iF == 1 && exist(pdfFileName, 'file')
-            delete(pdfFileName);
-        end
-       
-        exportgraphics(fig, pdfFileName, 'Append', true, 'ContentType', 'vector');
     end
     
-    close(figHandles);
-    fprintf('Processed ROI %d of %d\n', iN, numRois);
+    if mod(iN, 20) == 0 || iN == numRois
+        fprintf('Processed ROI %d of %d\n', iN, numRois);
+    end
 end
 
+%% Saving Data to sessionROIData 
+if saveData && isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file')
+    
+    sparseNoiseRF.initMap = initMap;
+    sparseNoiseRF.gridSize = bonsaiData.gridSize;
+    sparseNoiseRF.options = sn_options;
+    sparseNoiseRF.stimName = sessionFileInfo.stimFiles(iStim).name;
+    
+    disp(['Appending RF data to: ', sessionFileInfo.otherSessFilePaths.sessionROIData]);
+    save(sessionFileInfo.otherSessFilePaths.sessionROIData, 'sparseNoiseRF', '-append');
+    
+elseif saveData
+    warning('sessionROIData path not found. Data not appended.');
+end
 
+disp('Sparse Noise Analysis Complete.');
 end

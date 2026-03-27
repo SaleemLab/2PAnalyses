@@ -11,11 +11,11 @@ typeImaged = filteredTable.TypeImaged;
 targetArea = filteredTable.TargetArea;
 
 %% Load Data
-% Load 2PMetaData from one session; Using the VR session here
-isVRStim = contains({sessionFileInfo.stimFiles.name}, 'SparseNoiseTexture') ;
-iStim = find(isVRStim==1);
+% Load 2PMetaData from one session; Take any as long as it is not a zstack 
+isStim = ~contains({sessionFileInfo.stimFiles.name}, 'zStack') ;
+iStim = find(isStim==1);
 if length(iStim) > 1
-    iStim = iStim(1); % Take the first match if multiple VRStim files exist
+    iStim = iStim(1);
 end
 disp('Loading TwoPMetaData and TwoPDara structs...');
 load(sessionFileInfo.stimFiles(iStim).TwoPMetaData, "twopMetadata");

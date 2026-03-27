@@ -78,7 +78,7 @@ displacement(displacement > 100) = 0;   % Positive large jumps
 
 % Calculate speed (in cm/s)
 response.wheelSpeed = displacement ./ [0; diff(peripheralData.Wheel.sampleTimes)]; % Change to peripheralData.Wheel.ArduinoTime
-
+response.pupilArea = peripheralData.Pupil.Value.Area;
 
 %% Virtual position and virtual speed
 mouseVirtualPosition = nan(1,length(bonsaiData.MousePos.Value));
@@ -101,74 +101,84 @@ if contains(VRStimName, 'VRCorr', 'IgnoreCase', true)
     
     
     mouseVirtualPosition(mouseVirtualPosition > 140) = 140;
-    % mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
 
     response.mouseVirtualPosition = mouseVirtualPosition';
 
+    % TODO: shift positions to 1 to 200 (currently 0 to 199)
 elseif contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor') % this is temporary; might move to a new function @aman 
     % condition two 
-    bonsaiData.MousePos.Value(bonsaiData.MousePos.Value < 0) = 0; % Positions less than 0 are all assigned as 0 
-    mouseVirtualPosition = bonsaiData.MousePos.Value;
+    % % bonsaiData.MousePos.Value(bonsaiData.MousePos.Value < 0) = 0; % Positions less than 0 are all assigned as 0 
+    % % mouseVirtualPosition = bonsaiData.MousePos.Value;
+    % % 
+    % % 
+    % % % mouseVirtualPosition(mouseVirtualPosition > 140) = 140; % Change in future.. [currently the location goes beyond 140 because end of track is gray screen and the animal cannot see past this..] 
+    % % mouseVirtualPosition(mouseVirtualPosition > 200) = 200; % The last position in vr is 200 but it seems to wobbly between 200.1xx and can also drop down to 199? 
+    % % % mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
+    % % 
+    % % trackIDFromPosition(:) = 2; %@AMAN 
+    % % response.mouseVirtualPosition = mouseVirtualPosition;
     
-  
-    mouseVirtualPosition(mouseVirtualPosition > 140) = 140; % Change in future.. [currently the location goes beyond 140 because end of track is gray screen and the animal cannot see past this..] 
-
-    % mouseVirtualPosition(mouseVirtualPosition < 1)   = 1;
+    rawPos = bonsaiData.MousePos.Value;
+    % ensure no values are below 0 or above 200 before we apply the offset.
+    % cleaning up 'wobble' before shifting 
+    rawPos(rawPos < 0) = 0;
+    rawPos(rawPos > 200) = 200;
     
-    trackIDFromPosition(:) = 2; %@AMAN 
+    % original 0-199 (Track) is now 1-200
+    % original 200 (ITI) is now 201
+    mouseVirtualPosition = rawPos + 1;
+    if contains(VRStimName, 'Baseline')
+        trackIDFromPosition(:) = 2;
+    elseif contains(VRStimName, 'LandManipCorridor')
+        trackIDFromPosition(:) = 3; 
+    end 
+    
     response.mouseVirtualPosition = mouseVirtualPosition;
 end
 
 
-response.trackIDFromMousePosition = trackIDFromPosition';
-response.mouseRecordedPosition = bonsaiData.MousePos.Value;
+% removed because I dont think this makes sense anymore; all coordintes
+% occupy the same virtual positions 1 to 200 unlike masa's previous
+% version. 
+%response.trackIDFromMousePosition = trackIDFromPosition';
+%response.mouseRecordedPosition = bonsaiData.MousePos.Value;
 
-
-%% Save additional landmark information if running the UCL-open version @Aman - also temp? move to a few function? 
-if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
-    response.landmarkNames = bonsaiData.TrialInfo.LandmarkNames;
-    response.landmarkPositions = bonsaiData.TrialInfo.LandmarkPositions;
-    response.landmarkSizes = bonsaiData.TrialInfo.LandmarkSizes;
-    response.landmarkCenterOffsets = bonsaiData.TrialInfo.LandmarkCenterOffsets;
-    response.landmarkRewardValence = bonsaiData.TrialInfo.LandmarkRewardValence;
-    response.numLandmarks = bonsaiData.TrialInfo.NumLandmarks;
-end 
 %% Lap track Info TODO: change to include block structure 
 % Save track ID as 1 for all the laps.
-response.trackIDs = ones(1, length(bonsaiData.TrialInfo.StartTimeAll))';
+%response.trackIDs = ones(1, length(bonsaiData.TrialInfo.StartTimeAll))';
 % LapCounts
-response.lapCount = (1:length(bonsaiData.TrialInfo.StartTimeAll))';  % Unified lap numbering
+response.lapCountAll = (1:length(bonsaiData.TrialInfo.StartTimeAll))';  % Unified lap numbering
 
 % Block ID of each lap; same for all tracks
-blockTransition = [1; diff(response.trackIDs)];
-blockTransition(blockTransition~=0) = 1;
-response.blockIDs = cumsum(blockTransition);
+% blockTransition = [1; diff(response.trackIDs)];
+% blockTransition(blockTransition~=0) = 1;
+% response.blockIDs = cumsum(blockTransition);
 
 % Trial type for each lap
 if isfield(bonsaiData.TrialInfo, 'Trial_type')
-    response.trialType = bonsaiData.TrialInfo.trialType;
+    response.trialTypeAll = bonsaiData.TrialInfo.trialType;
 else
     % calling it 0 i.e., no task component; Masa - 1 is active only and
     % 2 is hybrid(?)
-    response.trialType = zeros(1, length(bonsaiData.TrialInfo.StartTimeAll))';
+    response.trialTypeAll = zeros(1, length(bonsaiData.TrialInfo.StartTimeAll))';
 end
 
 
 %% Find completed and aborted laps
-completedLaps = [];
-abortedLaps = [];
+completedLaps_AbsoluteIdx = [];
+abortedLaps_AbsoluteIdx = [];
 
 lapStartTimeAll = bonsaiData.TrialInfo.StartTimeAll;
-trackIDs = response.trackIDs;
-EndTimeAll = NaN(length(trackIDs), 1); % Preallocate with NaNs for safety
+% trackIDs = response.trackIDAlls;
+EndTimeAll = NaN(length(lapStartTimeAll), 1); % Preallocate with NaNs for safety
 
 if ~isempty(lapStartTimeAll)
     x = response.mouseVirtualPosition;  % Virtual Position trace
     % t = processedTwoPData.(processedTwoPData.resample2PTimeUsed); % t was
     % loaded in the load data sections above.. 
-    startIdx = zeros(length(trackIDs), 1); % Index into time vector for each lap start
+    startIdx = zeros(length(response.lapCountAll), 1); % Index into time vector for each lap start
 
-    for nlap = 1:length(trackIDs)
+    for nlap = 1:length(response.lapCountAll)
         % Find the time index closest to each lap start time
         [~, startIdx(nlap)] = min(abs(t - lapStartTimeAll(nlap)));
     end
@@ -235,7 +245,7 @@ if ~isempty(lapStartTimeAll)
 
                 if isempty(onTrackX)
                     fprintf('Lap %d aborted: only fast 140cm jump found.\n', nlap);
-                    abortedLaps = [abortedLaps; nlap];
+                    abortedLaps_AbsoluteIdx = [abortedLaps_AbsoluteIdx; nlap];
                     EndTimeAll(nlap) = NaN;
                     continue
                 end
@@ -244,34 +254,56 @@ if ~isempty(lapStartTimeAll)
             end
 
             % If the end of track was reached properly
-            if lastPosition >= 139 % sometimes last lap ends before 140 cm; eg 139.99 
+            % if lastPosition >= 139
+            if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
+                %track ends at 200 and ITI is 201, 199.5 is a safe "finish line"
+                condition = lastPosition >= 199.5;
+            elseif contains(VRStimName, 'VRCorr')
+                condition = lastPosition >= 139.5;
+            end
+            % lastPosition >= 199
+            if condition % sometimes last lap ends before 140 cm; eg 139.99 
                 EndTimeAll(nlap) = onTrackT(lastPositionIndex); % End time when track completed
-                completedLaps = [completedLaps; nlap]; % Save lap number as completed
+                completedLaps_AbsoluteIdx = [completedLaps_AbsoluteIdx; nlap]; % Save lap number as completed
             else
                 % If end of track was not reached, use the last recorded time
                 EndTimeAll(nlap) = onTrackT(end);
-                abortedLaps = [abortedLaps; nlap]; % Save lap number as aborted
+                abortedLaps_AbsoluteIdx = [abortedLaps_AbsoluteIdx; nlap]; % Save lap number as aborted
             end
         else
             % Not enough data points to evaluate this lap
             fprintf('Lap %d aborted: insufficient valid position data.\n', nlap);
-            abortedLaps = [abortedLaps; nlap];
+            abortedLaps_AbsoluteIdx = [abortedLaps_AbsoluteIdx; nlap];
             EndTimeAll(nlap) = NaN;
         end
     end
 end
 
-response.completedLaps = completedLaps;
-response.abortedLaps = abortedLaps;
+response.completedLaps_AbsoluteIdx = completedLaps_AbsoluteIdx;
+response.abortedLaps_AbsoluteIdx = abortedLaps_AbsoluteIdx;
 response.endTimeAll = EndTimeAll;
 response.startTimeAll = lapStartTimeAll;
 % Extract lap-wise variables for only completed laps
-response.completedStartTimes = response.startTimeAll(response.completedLaps);
-response.completedEndTimes   = response.endTimeAll(response.completedLaps);
+response.completedStartTimes = response.startTimeAll(completedLaps_AbsoluteIdx);
+response.completedEndTimes   = response.endTimeAll(completedLaps_AbsoluteIdx);
 response.stimName = VRStimName;
 % Final check to ensure all laps were accounted for
-assert(length(completedLaps) + length(abortedLaps) == length(trackIDs), ...
-    'This is to keep Sonali sane: Some laps were not classified into completed or aborted.');
+assert(length(completedLaps_AbsoluteIdx) + length(abortedLaps_AbsoluteIdx) == length(response.lapCountAll), ...
+    'This is to keep Sonali sane: Some laps were not classified into completed or aborted. If you see this something is work and requires debugging..');
+
+%% Save and Filter Landmark Information (Baseline/LandManip only)
+if contains(VRStimName, 'BaselineCorridor') || contains(VRStimName, 'LandManipCorridor')
+    % Renaming with 'completed' prefix to distinguish from raw Bonsai data
+    response.completedLandmarkNames         = bonsaiData.TrialInfo.LandmarkNames(completedLaps_AbsoluteIdx);
+    response.completedLandmarkPositions     = bonsaiData.TrialInfo.LandmarkPositions(completedLaps_AbsoluteIdx);
+    response.completedLandmarkSizes         = bonsaiData.TrialInfo.LandmarkSizes(completedLaps_AbsoluteIdx);
+    response.completedLandmarkCenterOffsets = bonsaiData.TrialInfo.LandmarkCenterOffsets(completedLaps_AbsoluteIdx);
+    response.completedLandmarkRewardValence = bonsaiData.TrialInfo.LandmarkRewardValence(completedLaps_AbsoluteIdx);
+    response.completedNumLandmarks = bonsaiData.TrialInfo.NumLandmarks(completedLaps_AbsoluteIdx);
+    % included movementvisual gain here 
+    response.movementVisualGain = bonsaiData.movementVisualGain;
+end
+
 
 %% Sanity check plot: Lap start and end times across session
 if nargin < 2 || plotFlag
@@ -282,26 +314,26 @@ if nargin < 2 || plotFlag
     nLaps = min(length(startTimes), length(endTimes));
     lapIDs = 1:nLaps;
 
-    completedLaps = response.completedLaps;
-    abortedLaps = response.abortedLaps;
+    completedLaps_AbsoluteIdx = response.completedLaps_AbsoluteIdx;
+    abortedLaps_AbsoluteIdx = response.abortedLaps_AbsoluteIdx;
 
     hold on;
 
     % --- Plot lap connectors ---
     for i = 1:nLaps
-        if ismember(i, completedLaps)
+        if ismember(i, completedLaps_AbsoluteIdx)
             plot([startTimes(i), endTimes(i)], [lapIDs(i), lapIDs(i)], 'k-', 'LineWidth', 1); % black line
-        elseif ismember(i, abortedLaps)
+        elseif ismember(i, abortedLaps_AbsoluteIdx)
             plot([startTimes(i), endTimes(i)], [lapIDs(i), lapIDs(i)], 'r-', 'LineWidth', 1); % red line
         end
     end
 
     % --- Start and End markers ---
-    plot(startTimes(completedLaps), completedLaps, 'go', 'MarkerFaceColor', 'k'); % completed starts
-    plot(endTimes(completedLaps), completedLaps, 'ko', 'MarkerFaceColor', 'k');   % completed ends
+    plot(startTimes(completedLaps_AbsoluteIdx), completedLaps_AbsoluteIdx, 'go', 'MarkerFaceColor', 'k'); % completed starts
+    plot(endTimes(completedLaps_AbsoluteIdx), completedLaps_AbsoluteIdx, 'ko', 'MarkerFaceColor', 'k');   % completed ends
 
-    plot(startTimes(abortedLaps), abortedLaps, 'ro', 'MarkerFaceColor', 'r');     % aborted starts
-    plot(endTimes(abortedLaps), abortedLaps, 'ro', 'MarkerFaceColor', 'r');       % aborted ends
+    plot(startTimes(abortedLaps_AbsoluteIdx), abortedLaps_AbsoluteIdx, 'ro', 'MarkerFaceColor', 'r');     % aborted starts
+    plot(endTimes(abortedLaps_AbsoluteIdx), abortedLaps_AbsoluteIdx, 'ro', 'MarkerFaceColor', 'r');       % aborted ends
 
     % --- Labels and axis formatting ---
     xlabel('Time (s)');
@@ -311,7 +343,7 @@ if nargin < 2 || plotFlag
 
 
     summaryText = sprintf('Total laps: %d\nCompleted: %d\nAborted: %d', ...
-        length(trackIDs), length(completedLaps), length(abortedLaps));
+        length(response.lapCountAll), length(completedLaps_AbsoluteIdx), length(abortedLaps_AbsoluteIdx));
 
     % Add it to the upper-right corner of the axes
     xPos = max(endTimes) + 1;
@@ -325,20 +357,8 @@ if nargin < 2 || plotFlag
 
 end
 
-
-%% Saving (reformatted 24.01.2026)
-% Get all field names from the struct
-% fieldsToSave = fieldnames(response);
-% disp('Saving response data files...');
-% 
-% for i = 1:numel(fieldsToSave)
-%     % Dynamically create variables in the local workspace
-%     eval([fieldsToSave{i} ' = response.' fieldsToSave{i} ';']);
-% end
-
 save(sessionFileInfo.stimFiles(iStim).Response,'-struct', 'response', '-v7.3'); %using -v7.3 as this is first save
 disp('Saved Response');
 
-% save(sessionFileInfo.stimFiles(iStim).Response, 'response');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end

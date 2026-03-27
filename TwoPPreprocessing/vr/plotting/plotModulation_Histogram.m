@@ -36,7 +36,7 @@ function figHandle = plotModulation_Histogram(allData, varargin)
        
             mi = session.Modulation(~isnan(session.Modulation));
             
-            % --- FIX PART 1: Collect all data ---
+            % 
             allValues = [allValues; mi(:)]; 
             
             if ~isempty(mi)
@@ -58,7 +58,7 @@ function figHandle = plotModulation_Histogram(allData, varargin)
         end
     end
     
-    % --- FIX PART 2: Robust Global Limits ---
+    % 
     if ~isempty(allValues)
         % Find 99th percentile to ignore extreme outliers
         xMax = prctile(allValues, 99);

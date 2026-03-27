@@ -15,7 +15,7 @@ function plotAllNeuronSummariesToPDF(sessionFileInfo, response, applySmoothing)
 %   applySmoothing : logical
 
 if nargin < 3
-    applySmoothing = false;
+    applySmoothing = true;
 end
 
 %% Output path
@@ -75,9 +75,10 @@ for neuronIdx = 1:nROIs
          [meanActivity + semActivity, fliplr(meanActivity - semActivity)], ...
          [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
     plot(x, meanActivity, 'k', 'LineWidth', 2);
-    xline(50, 'k--'); xline(70, 'k--'); xline(90, 'k--'); xline(110, 'k--');
-    xticks([0 50 70 90 110 140]);
-    xticklabels({'0', '50', '70', '90', '110', '140'});
+    xline(40, 'k--'); xline(80, 'k--'); xline(120, 'k--'); xline(160, 'k--');
+    % xticks([0 50 70 90 110 140]);
+    xticks([0 40 80 120 160 200]);
+    xticklabels({'0', '40', '80', '120', '160', '200'});
     xlabel('Position (cm)'); ylabel('Mean dFFNeuropilCorrected');
     title(sprintf('%s - ROI %d ', ...
         sessionFileInfo.animal_name, neuronIdx));
@@ -87,9 +88,9 @@ for neuronIdx = 1:nROIs
     subplot(1, 2, 2);
     imagesc(normLapActivity);
     caxis([0 1]); colormap(flipud(gray));
-    xline(50, 'k--'); xline(70, 'k--'); xline(90, 'k--'); xline(110, 'k--');
-    xticks([0 50 70 90 110 140]);
-    xticklabels({'0', '50', '70', '90', '110', '140'});
+    xline(40, 'k--'); xline(80, 'k--'); xline(120, 'k--'); xline(160, 'k--');
+    xticks([0 40 80 120 160 200]);
+    xticklabels({'0', '40', '80', '120', '160', '200'});
     xlabel('Position (cm)'); ylabel('Lap #');
     title('Lap-by-position activity (normalised)');
     colorbar; ylabel(colorbar, sprintf('Activity dFFNeuropilCorrected'));

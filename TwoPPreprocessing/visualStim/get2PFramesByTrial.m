@@ -1,113 +1,115 @@
-function [response, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, stimName,  postStimTime, preStimTime, useoffARDTimes)
-% Extract frames by directly filtering timestamps based on a time window around stimulus events.
-% If off transitions are set as the 'start' of the next stimulus (i.e.,
-% no gray screen) -- include offARDTimes.
-%
-% @Aman :
-% (0) Do we want to save this as a new .mat file called response?
-% (1) Check if its necessary to loop through planes; 
-% (2) Trials will have different length..fill them up with nans 
-%
-% Inputs:
-%   - sessionFileInfo: Structure containing stimFiles and associated data file paths.
-%   - stimName: Name of the stimulus to use for frame extraction.
-%   - useoffARDTimes: Boolean flag; if true, use offARDTimes along with onARDTimes.
-%   - preStimTime: Time before stimulus onset to include.
-%   - postStimTime: Time after stimulus onset to include.
-%
-% Outputs:
-%   - response: A struct array (one per plane) with fields:
-%         .responseFrameIdx         - Cell array of logical arrays indicating frames within the stimulus window.
-%         .responseFrameRelTimes - Cell array of relative frame times.
-%         .preStimTime - PreStimulus time used
-%         .postStimTime - PostStimulus time used
-
-
-%
-% Example:
-% [response] = get2PFramesByTrialV3(sessionFileInfo, 'SparseNoise', true, 0, 0.7)
+%% temp test
+function [response, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, stimName, excludeBadFrames, preStimTime, postStimTime, useoffARDTimes)
+% Extract frames by directly filtering timestamps.
+% If excludeBadFrames is true, relative times for artifact frames are set to NaN
+% to preserve the temporal grid of the trial.
 %
 % Aman and Sonali - Feb 2025
 
-if nargin<5
-    useoffARDTimes = 'false';
+%% Handle Input Defaults
+if nargin < 3, excludeBadFrames = false; end
+if nargin < 5, useoffARDTimes = 'false'; end
+if nargin < 4, preStimTime = 0; end
+
+% Stimulus specific overrides
+if contains(stimName, 'SparseNoiseTexture', 'IgnoreCase',true)
+    postStimTime = 3; useoffARDTimes = 'true'; 
+elseif contains(stimName, 'RFMapping', 'IgnoreCase',true)
+    postStimTime = 4; preStimTime = 2; useoffARDTimes = 'false';
+elseif contains(stimName, 'DotMotion_SpeedTuning','IgnoreCase',true)
+    postStimTime = 4; preStimTime = 2; useoffARDTimes = 'false'; 
+elseif contains(stimName, 'DirTuning','IgnoreCase',true)
+    postStimTime = 4; preStimTime = 2; useoffARDTimes = 'false'; 
 end
 
-if nargin<4
-    preStimTime = 0;
-end
-
-if contains(stimName, 'SparseNoise', 'IgnoreCase',true)
-    postStimTime = 0.7; 
-end 
-
-if contains(stimName, 'RFMapping', 'IgnoreCase',true)
-    postStimTime = 3; 
-    preStimTime = 0.5;
-end 
-% Locate the current stimulus in sessionFileInfo
-isStim = false(1, length(sessionFileInfo.stimFiles));
-for iStim = 1:length(sessionFileInfo.stimFiles)
-    isStim(iStim) = strcmp(stimName, sessionFileInfo.stimFiles(iStim).name);
-end
-iStim = find(isStim, 1);  % take the first match
+% Locate the current stimulus
+isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
+iStim = find(isStim, 1);
 if isempty(iStim)
     error('Stimulus name not found in sessionFileInfo');
 end
 
-%% Check for existence of required files and load them
+%% Load flattened data
 if exist(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData,'file') && ...
         exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file')
-    processedTwoPData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
+    processedData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
     load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 else
-    error('Missing: TwoPData and/or bonsaiData files.');
+    error('Missing files.');
 end
 
-% Create response.mat file and file path to sessionFileInfo
 stimFileName = sprintf('%s_%s_Response_%s.mat', ...
     sessionFileInfo.animal_name, sessionFileInfo.session_name, sessionFileInfo.stimFiles(iStim).name);
-sessionFileInfo.stimFiles(iStim).Response = fullfile(sessionFileInfo.Directories.save_folder,stimFileName);
+sessionFileInfo.stimFiles(iStim).Response = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
 
-
-% Determine the combined event times based on the useoffARDTimes flag
-if useoffARDTimes
+if strcmpi(useoffARDTimes, 'true') || (islogical(useoffARDTimes) && useoffARDTimes)
     combinedStimARDTimes = sort([bonsaiData.onARDTimes; bonsaiData.offARDTimes]);
 else
     combinedStimARDTimes = bonsaiData.onARDTimes;
 end
 
-% Process each plane in twoPData / Possibly not necessary..CHANGE; not
-% iterating through planes anymore.. 
+frameTimes = processedData.TwoPFrameTime;
+if size(frameTimes, 1) > size(frameTimes, 2), frameTimes = frameTimes'; end
 
-frameTimes = processedTwoPData.TwoPFrameTime;
-% response = twoPData(thisPlane).planeName;
-
-% Preallocate cell arrays for each trial in this plane
-response.responseFrameIdx = cell(length(combinedStimARDTimes), 1);
-response.responseFrameRelTimes = cell(length(combinedStimARDTimes), 1);
-
-% Loop over each stimulus event
-for iTrial = 1:length(combinedStimARDTimes)
-    % Define the time window around the stimulus event
-    %             startTimes = combinedTimes(iTrial) - preStimTime;
-    %             endTimes   = combinedTimes(iTrial) + postStimTime;
-
-    % Logical: true/1 for frames within the window
-    frameIdxToAnalyse = (frameTimes >= (combinedStimARDTimes(iTrial) - preStimTime)) & (frameTimes <= (combinedStimARDTimes(iTrial) + postStimTime));
-    response.responseFrameIdx{iTrial} = frameIdxToAnalyse;
-
-    % Compute relative frame times with respect to the event time
-    response.responseFrameRelTimes{iTrial} = frameTimes(frameIdxToAnalyse) - combinedStimARDTimes(iTrial);
-    response.preStimTime = preStimTime;
-    response.postStimTime = postStimTime;
+%% Handle bad frames 
+isBadFrameGlobal = false(size(frameTimes));
+if excludeBadFrames && isfield(processedData, 'badFrames') && ~isempty(processedData.badFrames)
+    tempMask = processedData.badFrames{1};
+    if size(tempMask, 1) > size(tempMask, 2)
+        tempMask = tempMask'; 
+    end
+    len = min(length(isBadFrameGlobal), length(tempMask));
+    isBadFrameGlobal(1:len) = logical(tempMask(1:len));
 end
 
+%% Process Trials
+nTrials = length(combinedStimARDTimes);
+response.responseFrameIdx = cell(nTrials, 1);
+response.responseFrameRelTimes = cell(nTrials, 1);
+response.badTrialMask = false(nTrials, 1); 
+
+for iTrial = 1:nTrials
+    t_start = combinedStimARDTimes(iTrial) - preStimTime;
+    t_end   = combinedStimARDTimes(iTrial) + postStimTime;
+    
+    % Identify all frames in the window 
+    timeWindowMask = (frameTimes >= t_start) & (frameTimes <= t_end);
+    
+    % Check excluded frames to display
+    totalFramesInWindow = sum(timeWindowMask);
+    badFramesInWindow = sum(timeWindowMask & isBadFrameGlobal);
+    
+    if totalFramesInWindow > 0 && ( (totalFramesInWindow - badFramesInWindow) / totalFramesInWindow < 0.5 )
+        response.badTrialMask(iTrial) = true;
+    end
+    
+   
+    % We store the FULL window mask so the indexing into F/spks remains consistent
+    response.responseFrameIdx{iTrial} = timeWindowMask;
+    
+    % Relative Times with NaNs for bad frames
+    if any(timeWindowMask)
+        relTimes = frameTimes(timeWindowMask) - combinedStimARDTimes(iTrial);
+        
+        if excludeBadFrames
+            % 
+            localBadMask = isBadFrameGlobal(timeWindowMask);
+            % Set bad frame relative times to NaN
+            relTimes(localBadMask) = NaN;
+        end
+        
+        response.responseFrameRelTimes{iTrial} = relTimes;
+    else
+        response.responseFrameRelTimes{iTrial} = [];
+    end
+end
+
+response.preStimTime = preStimTime;
+response.postStimTime = postStimTime;
+response.excludeBadFramesUsed = excludeBadFrames;
+
+%% Save
 save(sessionFileInfo.stimFiles(iStim).Response, 'response');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+disp(['Done. ' num2str(sum(response.badTrialMask)) ' trials flagged for data loss.']);
 end
-
-
-
-
-

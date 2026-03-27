@@ -23,14 +23,14 @@ function plotTuningInAxes(ax, oddData, evenData)
     set(ax, 'TickDir', 'out', 'box', 'off', 'FontSize', 10, 'YDir', 'normal');
     
     % Landmarks
-    xline(50, 'k--', 'LineWidth', 1.5);
-    xline(70, 'k--', 'LineWidth', 1.5);
-    xline(90, 'k--', 'LineWidth', 1.5);
-    xline(110, 'k--', 'LineWidth', 1.5);
+    xline(40, 'k--', 'LineWidth', 1.5);
+    xline(80, 'k--', 'LineWidth', 1.5);
+    xline(120, 'k--', 'LineWidth', 1.5);
+    xline(160, 'k--', 'LineWidth', 1.5);
     
     % Ticks
-    set(ax, 'XTick', [0 50 70 90 110 140], ...
-            'XTickLabel', {'0','50','70','90','110','140'});
+    set(ax, 'XTick', [1 40 80 120 160 200], ...
+            'XTickLabel', {'1','40','80','120','160','200'});
     xlabel('Position (cm)');
     colorbar;
 end

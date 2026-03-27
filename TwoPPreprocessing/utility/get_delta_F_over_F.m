@@ -1,3 +1,4 @@
+% Have any made any changes here: 20260310 (SS) 
 function dF_F = get_delta_F_over_F(Fc, F0)
     % Function converted to Matlab from Schroeder Lab  
     % Calculates delta F over F.
@@ -21,5 +22,9 @@ function dF_F = get_delta_F_over_F(Fc, F0)
     
     % dF_F = (Fc - F0) ./ max(1, nanmean(F0, 1));
     % Alternative: 
-    dF_F = (Fc - F0) ./ max(1, F0);
+    
+
+    % prevents tiny fluctuations in dark pixels from looking like huge %
+    % changes for the boutons @Aman 
+    dF_F = (Fc - F0) ./ max(23, F0); %(1,F0) testing ths here; 23 is the absolute zero for black pixels from PMTs 
 end

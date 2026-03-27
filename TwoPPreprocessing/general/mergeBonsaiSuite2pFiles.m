@@ -41,6 +41,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         planeTimes_table = get_bonsai_twopframetimes_by_planes(twop_filepath, numPlanes);
         twoPData = struct(); 
         
+        
         for iPlane = 1:sessionFileInfo.numPlanes
             planeName = sessionFileInfo.suite2pFiles(iPlane).planeName;
             fAll_filepath = findFile(sessionFileInfo.suite2pFiles(iPlane).planes, 'fall');
@@ -49,13 +50,17 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             % Get frame run indices
             if strcmp(planeName, 'plane_z')
                 frameRun = sessionFileInfo.stim_framerun{['plane' '0'], stimName}{1}; %take the first one; does not matter they will all be the same 
-                referencePlaneInfo = fAll.ops.planes_across_time(frameRun(1):(frameRun(1) + trimLength - 1)); % was previoursly called currentplane
+                referencePlaneInfo = fAll.ops.planes_across_time(frameRun(1):(frameRun(1) + trimLength - 1));% was previoursly called currentplane
+                
             else 
                 frameRun = sessionFileInfo.stim_framerun{planeName, stimName}{1};
             end
             trimIndices = frameRun(1):(frameRun(1) + trimLength - 1);
+
+            fullBadFrames = fAll.ops.badframes;
             
             % Populate struct with Suite2p data
+            twoPData(iPlane).badframes = fullBadFrames(trimIndices)'; % this is new 
             twoPData(iPlane).planeName = planeName;
             twoPData(iPlane).ops = fAll.ops;
             twoPData(iPlane).iscell = fAll.iscell;

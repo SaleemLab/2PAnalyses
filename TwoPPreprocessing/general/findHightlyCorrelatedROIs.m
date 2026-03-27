@@ -7,7 +7,7 @@ function [roisToKeep, roisToDiscard, groups, corrMatrixCombined] = findHightlyCo
 % specified in sessionFileInfo.otherSessFilePaths.sessionROIData.
 
 %% Set defaults and initialize
-if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end
+if nargin < 2; signalToUse = 'dFF'; end
 if nargin < 3; VRThreshold_ForBoutonMatch = 0.4; end
 if nargin < 4; NonVRThreshold_ForBoutonMatch = 0.7; end
 if nargin < 5; plotFlag = false; end

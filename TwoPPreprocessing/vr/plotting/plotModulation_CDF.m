@@ -2,7 +2,6 @@ function figHandle = plotModulation_CDF(allData)
 % plotModulation_CDF Plots superimposed CDFs of Modulation Index for specified days,
 % using hardcoded filters for ROI stability and ratio variance.
     
-    % --- HARDCODED PARAMETERS (Matching plotTuningHeatmaps) ---
     % 1. Mouse Exclusion
     excludeMice = {'M24043', 'M24046', 'M24048', 'M24049'}; 
     
@@ -11,7 +10,7 @@ function figHandle = plotModulation_CDF(allData)
     typeToPlot = 'Boutons';
     
     % 3. Ratio Threshold Filter (Ratio > Threshold)
-    ratioThreshold = 40; 
+    ratioThreshold = 10; 
     useRatioFilter = true;
     
     % 4. Hardcoded Save Path (For consistency)

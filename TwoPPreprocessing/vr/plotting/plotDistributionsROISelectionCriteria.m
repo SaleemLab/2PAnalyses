@@ -65,7 +65,7 @@ function plotDistributionsROISelectionCriteria(allData)
                 title(ax, subTitleStr, 'FontSize', 9);
             end
             
-            exportgraphics(fig, pdfFileName, 'Append', true);
+            exportgraphics(fig, pdfFileName);
         end
     end
     close(fig);

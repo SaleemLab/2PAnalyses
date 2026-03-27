@@ -1,4 +1,4 @@
-function [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo, response, vrStimNamesToStitch, overwrite, useZScoredProcessedSignals)
+function [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo, response, vrStimNamesToStitch, useZScoredProcessedSignals)
 
 %
 % Computes and adds the shuffle matrix to the input 'response' structure.
@@ -7,22 +7,21 @@ function [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFil
 %                      will be stitched together to form the continuous time series for shuffling.
 
 %% Handle optional inputs and basic checks
-if nargin < 4, overwrite = true; end 
-if nargin < 5, useZScoredProcessedSignals = true; end
+
+if nargin < 4, useZScoredProcessedSignals = true; end
 
 if isempty(vrStimNamesToStitch)
     error('vrStimNamesToStitch list cannot be empty for shuffle computation.');
 end
 
 % Check required fields
-if ~isfield(response, 'cellROIs') || ~isfield(response, 'lapPosition2PFrameIdx')
-    error('Input response structure is missing required fields (cellROIs or lapPosition2PFrameIdx).');
+if  ~isfield(response, 'lapPosition2PFrameIdx')
+    error('Input response structure is missing required fields (lapPosition2PFrameIdx).');
 end
 
-%% 1. Setup and Initialization
-ROIs = response.cellROIs;
-numROIs = length(ROIs);
-numBins = 140;
+%% 
+[numROIs, ~, numBins] = size(response.lapPositionActivity.dFF); 
+ROIs = 1:numROIs;
 signalNames = {}; % Will be set during the first load
 
 % if overwrite && isfield(response, 'lapPositionActivity_ShuffleMatrix')

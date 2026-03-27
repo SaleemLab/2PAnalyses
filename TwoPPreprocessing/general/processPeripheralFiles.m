@@ -2,6 +2,7 @@ function [sessionFileInfo] = processPeripheralFiles(sessionFileInfo)
 % Process the peripheral files and save the processed info into a directory.
 % Aman and Sonali - Dec 2024
 % Modified by Sonali Jan 2026 to integrate UCL-Open logging structure.
+% Modified by Sonali March 2026 to intergate eye tracking files 
 %
 % NOTE TO SELF: 
 % We are explicitly splitting and saving peripheral data into individual 
@@ -20,6 +21,9 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
     photodiode_path    = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'Photodiode');
     quad_path          = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'Quad');
     wheel_path         = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'Wheel');
+    eyeTrackingTimeStamp_path   = findFile(sessionFileInfo.stimFiles(iStim).eyetracking_filepaths, 'timestamp');
+    eyeTrackingCamLog_path   = findFile(sessionFileInfo.stimFiles(iStim).eyetracking_filepaths, 'EyeCamLog');
+    piezo_path = findFile(sessionFileInfo.stimFiles(iStim).eyetracking_filepaths, 'piezo');
 
     %% 1. Photodiode processing
     if exist(photodiode_path, 'file')
@@ -116,6 +120,42 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         peripheralData.Wheel = [];
     end
     
+%% 5. eye tracking info 
+    if exist(eyeTrackingTimeStamp_path, 'file') && exist(eyeTrackingCamLog_path, 'file')
+        eyeTrackingTimeStamp_table = readtable(eyeTrackingTimeStamp_path, 'VariableNamingRule', 'preserve');
+        eyeTrackingCamLog_table = readtable(eyeTrackingCamLog_path, 'VariableNamingRule', 'preserve');
+
+       [~,keep_idx,~] = unique(eyeTrackingTimeStamp_table.ArduinoTime);
+
+        % Time stamps from this file 
+        peripheralData.Pupil.raw.ArduinoTime       = eyeTrackingTimeStamp_table.ArduinoTime(keep_idx)./1000; 
+        peripheralData.Pupil.raw.LastSyncPulseTime = eyeTrackingTimeStamp_table.LastSyncPulseTime(keep_idx)./1000;
+        peripheralData.Pupil.raw.EyeCamTime = eyeTrackingTimeStamp_table.EyeCamTime(keep_idx);
+
+        peripheralData.Pupil.raw.CentroidX = eyeTrackingCamLog_table.("Item2.Centroid.X");
+        peripheralData.Pupil.raw.CentroidY = eyeTrackingCamLog_table.("Item2.Centroid.Y");
+        peripheralData.Pupil.raw.Area = eyeTrackingCamLog_table.("Item2.Area");
+        peripheralData.Pupil.raw.MajorAxisLength = eyeTrackingCamLog_table.("Item2.MajorAxisLength");
+        peripheralData.Pupil.raw.MinorAxisLength = eyeTrackingCamLog_table.("Item2.MinorAxisLength");
+        peripheralData.Pupil.raw.EyeMsSinceStartOfDay = eyeTrackingCamLog_table.("Item1.eyeMillisSinceStartOfDay");
+
+
+        % [tt,tp] = unique(peripheralData.Pupil.rawArduinoTime);
+        % EyeTimestamps = EyeTimestamps(tp,:);
+
+        % Interpolate to the EyeTimestamps X all the EyeData (align the two
+        % csv files to the arduino time) 
+        disp('Interpolating Pupil data to the pupil timestamps..')
+        peripheralData.Pupil.int.CentroidX = interp1(peripheralData.Pupil.raw.EyeMsSinceStartOfDay,peripheralData.Pupil.raw.CentroidX,peripheralData.Pupil.raw.EyeCamTime,'linear','extrap');
+        peripheralData.Pupil.int.CentroidY = interp1(peripheralData.Pupil.raw.EyeMsSinceStartOfDay,peripheralData.Pupil.raw.CentroidY,peripheralData.Pupil.raw.EyeCamTime,'linear','extrap');
+        peripheralData.Pupil.int.Area = interp1(peripheralData.Pupil.raw.EyeMsSinceStartOfDay,peripheralData.Pupil.raw.Area,peripheralData.Pupil.raw.EyeCamTime,'linear','extrap');
+        peripheralData.Pupil.int.MajorAxisLength = interp1(peripheralData.Pupil.raw.EyeMsSinceStartOfDay,peripheralData.Pupil.raw.MajorAxisLength,peripheralData.Pupil.raw.EyeCamTime,'linear','extrap');
+        peripheralData.Pupil.int.MinorAxisLength = interp1(peripheralData.Pupil.raw.EyeMsSinceStartOfDay,peripheralData.Pupil.raw.MinorAxisLength,peripheralData.Pupil.raw.EyeCamTime,'linear','extrap');
+    
+    else
+        disp('Eye tracking files missing')
+
+    end 
     %% Save individual stim peripheral data
     save(sessionFileInfo.stimFiles(iStim).processedPeripheralData, "peripheralData")
     fprintf('Saved Processed Data: %s\n', sessionFileInfo.stimFiles(iStim).name);

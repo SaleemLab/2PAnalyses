@@ -7,7 +7,7 @@ function filteredTable = filterMasterTable(varargin)
     filepath = "Z:\ibn-vision\USERS\Sonali\datatable\MasterExpDatatable.csv";
     masterTable = loadAndParseMasterTable(filepath);
     
-    %% Input Parser for flexible, name-value pair filtering ---
+
     p = inputParser;
     p.KeepUnmatched = true;
     

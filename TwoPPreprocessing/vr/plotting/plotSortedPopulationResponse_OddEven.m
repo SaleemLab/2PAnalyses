@@ -2,7 +2,6 @@ function plotSortedPopulationResponse_OddEven(sessionFileInfo, response, signalT
 
 %   Plots normalised population response heatmaps (odd vs even laps),
 %   sorted by peak response location in odd laps.
-%   Optionally applies temporal smoothing across position bins at plot time.
 %
 % Inputs:
 %   sessionFileInfo : struct
@@ -29,7 +28,7 @@ if ~exist(figSaveDir, 'dir')
 end
 
 filename = fullfile(figSaveDir, ...
-    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_ROISandNonROIS_SortedbyOdd.png']);
+    [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' signalToUse '_ROISandNonROIS_SortedbyOdd.png']);
 
 %% Extract activity matrix
 lapActivity = response.lapPositionActivity.(signalToUse);
@@ -84,12 +83,12 @@ subplot(1, 2, 1);
 imagesc(normOdd(sortIdx, :));
 caxis([0 1]); colormap(flipud(gray));
 set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
-xline(50, 'k--', 'LineWidth', 1.5);
-xline(70, 'k--', 'LineWidth', 1.5);
-xline(90, 'k--', 'LineWidth', 1.5);
-xline(110, 'k--', 'LineWidth', 1.5);
-xticks([1 50 70 90 110 140]);
-xticklabels({'1', '50', '70', '90', '110', '140'});
+xline(40, 'k--', 'LineWidth', 2.5);
+xline(80, 'k--', 'LineWidth', 2.5);
+xline(120, 'k--', 'LineWidth', 2.5);
+xline(160, 'k--', 'LineWidth', 2.5);
+xticks([1 40 80 120 160]);
+xticklabels({'1', '40', '80', '120', '160', '200'});
 xlabel('Position (cm)');
 ylabel('ROIs');
 title([sessionFileInfo.animal_name ' - Odd laps sorted (' signalToUse ')']);
@@ -100,12 +99,12 @@ subplot(1, 2, 2);
 imagesc(normEven(sortIdx, :));
 caxis([0 1]); colormap(flipud(gray));
 set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
-xline(50, 'k--', 'LineWidth', 2.5);
-xline(70, 'k--', 'LineWidth', 2.5);
-xline(90, 'k--', 'LineWidth', 2.5);
-xline(110, 'k--', 'LineWidth', 2.5);
-xticks([1 50 70 90 110 140]);
-xticklabels({'1', '50', '70', '90', '110', '140'});
+xline(40, 'k--', 'LineWidth', 2.5);
+xline(80, 'k--', 'LineWidth', 2.5);
+xline(120, 'k--', 'LineWidth', 2.5);
+xline(160, 'k--', 'LineWidth', 2.5);
+xticks([1 40 80 120 160]);
+xticklabels({'1', '40', '80', '120', '160', '200'});
 xlabel('Position (cm)');
 ylabel('ROI');
 title([sessionFileInfo.animal_name ' - Even laps sorted (by odd) (' signalToUse ')']);

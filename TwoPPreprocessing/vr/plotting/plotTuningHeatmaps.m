@@ -159,7 +159,7 @@ function figHandle = plotTuningHeatmaps(allData, varargin)
     filterText = getFilterSummary(useStabilityFilter, useRatioFilter, ratioThreshold);
     title(t, sprintf('%s %s Tuning Heatmaps (%s)', typeToPlot, areaToPlot, filterText), 'FontSize', 14);
     
-    % --- SAVE LOGIC MODIFICATION (Using 'print' for high DPI) ---
+    
     savePath = p.Results.SavePath;
     if ~isempty(savePath)
         % Check if the provided path is just a filename (no directory components)

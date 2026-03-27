@@ -145,7 +145,7 @@ for neuronIdx = 1:nROIs
             statusStr = 'Not all criteria met';
         end
         
-        % Detailed text box: Includes 1/0 status and the raw percentile rank in parentheses
+        % Includes 1/0 status and the raw percentile rank in parentheses
         detailText = {
             sprintf('Peak Shuff Sig (>95): %d ', isPeakSig), 
             sprintf('Range Shuff Sig (>95): %d ', isRangeSig), 
@@ -162,15 +162,15 @@ for neuronIdx = 1:nROIs
         titleColor = [0 0 0];
     end
     
-    % --- Line plot (Mean Activity) ---
+    % mean activity
     subplot(1, 2, 1); hold on;
     x = 1:size(meanActivity, 2);
     fill([x fliplr(x)], ...
          [meanActivity + semActivity, fliplr(meanActivity - semActivity)], ...
          [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
     plot(x, meanActivity, 'k', 'LineWidth', 2);
-    xline(50, 'k--'); xline(70, 'k--'); xline(90, 'k--'); xline(110, 'k--');
-    xticks([0 50 70 90 110 140]);
+    xline(40, 'k--'); xline(80, 'k--'); xline(120, 'k--'); xline(160, 'k--');
+    xticks([1 40 80 120 160 200]);
     xlabel('Position (cm)'); ylabel('Mean dFF');
     title(mainTitle, 'Color', titleColor);
     
@@ -185,8 +185,8 @@ for neuronIdx = 1:nROIs
     subplot(1, 2, 2);
     imagesc(normLapActivity);
     caxis([0 1]); colormap(flipud(gray));
-    xline(50, 'k--'); xline(70, 'k--'); xline(90, 'k--'); xline(110, 'k--');
-    xticks([0 50 70 90 110 140]);
+    xline(40, 'k--'); xline(80, 'k--'); xline(120, 'k--'); xline(160, 'k--');
+    xticks([1 40 80 120 160 200]);
     xlabel('Position (cm)'); ylabel('Lap #');
     title('Lap-by-position activity (normalized)');
     colorbar; ylabel(colorbar, 'Normalized Activity');

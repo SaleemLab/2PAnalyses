@@ -1,0 +1,216 @@
+% function plotAllROIConditionSummaries(sessionFileInfo, response, applySmoothing)
+% % plotAllROIConditionSummaries: Standard version with solid lines and 
+% % corrected mapping for completed laps.
+% 
+% if nargin < 3, applySmoothing = true; end
+% 
+% % Pathing 
+% figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+% if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
+% pdfPath = fullfile(figSaveDir, [response.stimName '_ConditionSummary_Solid.pdf']);
+% 
+% % Data extraction 
+% data = response.lapPositionActivity.dFF;
+% [nROIs, nRows, nBins] = size(data);
+% conds = fieldnames(response.trialIndicesByCondition);
+% colors = lines(length(conds));
+% compLaps = response.completedLaps; 
+% 
+% for neuronIdx = 1:nROIs
+%     roiActivity = squeeze(data(neuronIdx, :, :));
+%     if all(isnan(roiActivity), 'all'), continue; end
+% 
+%     % Smoothing 
+%     if applySmoothing
+%         w = gausswin(10); w = w / sum(w);
+%         for iL = 1:nRows
+%             trace = roiActivity(iL, :);
+%             if all(isnan(trace)), continue; end
+%             nanMask = isnan(trace); trace(nanMask) = 0;
+%             smoothed = filtfilt(w, 1, trace);
+%             smoothed(nanMask) = NaN;
+%             roiActivity(iL, :) = smoothed;
+%         end
+%     end
+% 
+%     fig = figure('Visible', 'off', 'Color', 'w', 'Position', [50 50 1400 500]);
+%     t = tiledlayout(1, 2, 'TileSpacing', 'compact');
+% 
+%     % Condition Averages (Solid Lines) ---
+%     nexttile; hold on;
+%     lgdLines = []; lgdNames = {};
+% 
+%     for iC = 1:length(conds)
+%         absIDs = response.trialIndicesByCondition.(conds{iC});
+%         % Map Absolute Trial IDs to Matrix Row Indices 
+%         rowIdx = find(ismember(compLaps, absIDs));
+% 
+%         if ~isempty(rowIdx)
+%             % Calculate mean without error bars
+%             mu = mean(roiActivity(rowIdx, :), 1, 'omitnan');
+% 
+%             % Plot as solid line
+%             l = plot(mu, 'Color', colors(iC, :), 'LineWidth', 2.5);
+%             lgdLines(end+1) = l;
+%             lgdNames{end+1} = sprintf('%s (n=%d)', strrep(conds{iC},'_',' '), length(rowIdx));
+%         end
+%     end
+% 
+%     grid on; title(sprintf('ROI %d', neuronIdx));
+%     ylabel('dFF'); xlabel('Position (cm)');
+%     xticks([1 40 80 120 160 200]); xticklabels({'1', '40', '80', '120', '160', '200'});
+%     % Landmark guides 
+%     for p = [40 80 120 160], xline(p, 'k--'); end
+%     legend(lgdLines, lgdNames, 'Location', 'best', 'FontSize', 8);
+% 
+%     % heatmap
+%     ax2 = nexttile; hold on;
+%     normAct = normalize(roiActivity, 2, 'range');
+%     imagesc(1:nBins, 1:nRows, normAct);
+%     colormap(flipud(gray));
+% 
+%     % Marker Logic 
+%     gutterX = -15;
+%     for iC = 1:length(conds)
+%         absIDs = response.trialIndicesByCondition.(conds{iC});
+%         rowIdx = find(ismember(compLaps, absIDs));
+% 
+%         if ~isempty(rowIdx)
+%             s = scatter(repmat(gutterX, size(rowIdx)), rowIdx, 50, colors(iC, :), 'filled');
+%             s.Clipping = 'off'; 
+%         end
+%     end
+% 
+%     xlim([gutterX-10 nBins]); ylim([0.5 nRows+0.5]);
+%     set(gca, 'YDir', 'normal', 'TickDir', 'out');
+%     xlabel('Position (cm)'); ylabel('Lap idx');
+%     xticks([1 40 80 120 160 200]); xticklabels({'1', '40', '80', '120', '160', '200'});
+%     colorbar;
+% 
+%     exportgraphics(fig, pdfPath, 'Append', true);
+%     close(fig);
+% end
+% end
+
+function plotAllROIConditionSummaries(sessionFileInfo, response, applySmoothing)
+% plotAllROIConditionSummaries_Split: Layout with separate Omit and Swap panels.
+% Left: Baseline vs Omits (Warm) | Mid: Baseline vs Swaps (Cool) | Right: Heatmap
+
+if nargin < 3, applySmoothing = true; end
+
+figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
+pdfPath = fullfile(figSaveDir, [response.stimName '_ConditionSummary.pdf']);
+
+% Data extraction 
+data = response.lapPositionActivity.dFFNeuropilCorrected;
+[nROIs, nRows, nBins] = size(data);
+conds = fieldnames(response.trialIndicesByCondition);
+compLaps = response.completedLaps; 
+
+% Define Color Maps
+colorMap = struct();
+warmColors = [1 0 0; 1 0.5 0]; % Red, Orange
+coolColors = [0 0.447 0.741; 0 0.8 0.8]; % Blue, Cyan
+omitCount = 1;
+swapCount = 1;
+
+for iC = 1:length(conds)
+    name = lower(conds{iC});
+    if contains(name, 'baseline') || contains(name, 'norm')
+        colorMap.(conds{iC}) = [0 0 0]; % Black
+    elseif contains(name, 'omit')
+        colorMap.(conds{iC}) = warmColors(mod(omitCount-1, size(warmColors,1))+1, :);
+        omitCount = omitCount + 1;
+    elseif contains(name, 'swap')
+        colorMap.(conds{iC}) = coolColors(mod(swapCount-1, size(coolColors,1))+1, :);
+        swapCount = swapCount + 1;
+    else
+        colorMap.(conds{iC}) = [0.5 0.5 0.5]; % Gray for unknown
+    end
+end
+
+for neuronIdx = 1:nROIs
+    roiActivity = squeeze(data(neuronIdx, :, :));
+    if all(isnan(roiActivity), 'all'), continue; end
+    
+    if applySmoothing
+        w = gausswin(10); w = w / sum(w);
+        for iL = 1:nRows
+            trace = roiActivity(iL, :);
+            if all(isnan(trace)), continue; end
+            nanMask = isnan(trace); trace(nanMask) = 0;
+            smoothed = filtfilt(w, 1, trace);
+            smoothed(nanMask) = NaN;
+            roiActivity(iL, :) = smoothed;
+        end
+    end
+
+    fig = figure('Visible', 'off', 'Color', 'w', 'Position', [10 50 1600 450]);
+    t = tiledlayout(1, 3, 'TileSpacing', 'compact');
+    title(t, sprintf('ROI %d', neuronIdx), 'FontWeight', 'bold');
+
+    %% Baseline vs omits
+    ax1 = nexttile; hold on;
+    title('Omit conditions');
+    renderConditionLines(conds, {'baseline', 'omit'}, response, compLaps, roiActivity, colorMap);
+    ylabel('dFF'); xlabel('Position (cm)');
+    set(gca, 'XTick', [1 40 80 120 160 200]);
+
+    %% Baseline vs swaps
+    ax2 = nexttile; hold on; 
+    title('Swap conditions');
+    renderConditionLines(conds, {'baseline', 'swap'}, response, compLaps, roiActivity, colorMap);
+    xlabel('Position (cm)');
+    set(gca, 'XTick', [1 40 80 120 160 200]);
+
+    %% Heatmap (all trials) 
+    nexttile; hold on;
+    normAct = normalize(roiActivity, 2, 'range');
+    imagesc(1:nBins, 1:nRows, normAct);
+    colormap(flipud(gray));
+    
+    % Marker Logic on Heatmap
+    gutterX = -15;
+    for iC = 1:length(conds)
+        absIDs = response.trialIndicesByCondition.(conds{iC});
+        rowIdx = find(ismember(compLaps, absIDs));
+        if ~isempty(rowIdx)
+            s = scatter(repmat(gutterX, size(rowIdx)), rowIdx, 30, colorMap.(conds{iC}), 'filled');
+            s.Clipping = 'off'; 
+        end
+    end
+    
+    xlim([gutterX-10 nBins]); ylim([0.5 nRows+0.5]);
+    set(gca, 'YDir', 'normal', 'TickDir', 'out');
+    xlabel('Position (cm)'); ylabel('Lap Index');
+    xline(40, 'k--'); xline(80, 'k--'); xline(120, 'k--'); xline(160, 'k--');
+    set(gca, 'XTick', [1 40 80 120 160 200]);
+    title('Lap-Position-Activity');
+    
+
+    exportgraphics(fig, pdfPath, 'Append', true);
+    close(fig);
+end
+end
+
+function renderConditionLines(conds, keywords, response, compLaps, roiActivity, colorMap)
+    % Helper to plot only matching conditions for a subplot
+    lgdLines = []; lgdNames = {};
+    for iC = 1:length(conds)
+        name = lower(conds{iC});
+        if any(cellfun(@(x) contains(name, x), keywords))
+            absIDs = response.trialIndicesByCondition.(conds{iC});
+            rowIdx = find(ismember(compLaps, absIDs));
+            if ~isempty(rowIdx)
+                mu = mean(roiActivity(rowIdx, :), 1, 'omitnan');
+                l = plot(mu, 'Color', colorMap.(conds{iC}), 'LineWidth', 3);
+                lgdLines(end+1) = l;
+                lgdNames{end+1} = sprintf('%s (n=%d)', strrep(conds{iC},'_',' '), length(rowIdx));
+            end
+        end
+    end
+    % Add landmark lines
+    for p = [40 80 120 160], xline(p, 'k--'); end
+    if ~isempty(lgdLines), legend(lgdLines, lgdNames, 'Location', 'best', 'FontSize', 7); end
+end

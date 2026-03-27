@@ -121,12 +121,9 @@ function stim_ranges = calculate_stim_ranges_direct_map(sessionFileInfo, frames_
         error('get2PFrameTimes:mismatch', err_msg);
     end
 
-    % --- The NEW, DIRECT Calculation using CUMSUM ---
-    % 1. Pre-calculate all start and end points from Suite2p's data.
     end_points = cumsum(frames_per_tiff);
     start_points = [1, end_points(1:end-1) + 1];
 
-    % 2. Assign the ranges directly, one for each stimulus.
     for iStim = 1:nStimuli
         stimName = sessionFileInfo.stimFiles(iStim).name;
         stim_ranges.(stimName) = [start_points(iStim), end_points(iStim)];

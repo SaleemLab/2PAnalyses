@@ -112,7 +112,7 @@ end
 filename = fullfile(figSaveDir, ...
     [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' signalToUse '_TuningVarFigures.png']);
 %% Get data 
-if response.signalsZScored
+if response.lapPositionActivityZScored
     disp('Using zScored-lapPositionActivity for computations..')
 else
     disp('Using lapPositionActivity (without zscoring) for computations..')

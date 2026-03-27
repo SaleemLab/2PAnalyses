@@ -208,7 +208,7 @@ function [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(subjectID, 
     lapActivity = [];
     numLaps = 0;
     errorMessage = '';
-    sfi = struct(); % Initialize sfi just in case of a crash before assignment
+    sfi = struct(); %sfi just in case of a crash before assignment
     
     try
         % Find the path to the session's info file
@@ -220,14 +220,14 @@ function [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(subjectID, 
         
         % Load the session file info
         D = load(sessionInfoPath, 'sessionFileInfo');
-        sfi = D.sessionFileInfo; % <-- sfi is assigned here
+        sfi = D.sessionFileInfo; % 
         
         % Find the correct VR stimulus file
         stimFileNames = string({sfi.stimFiles.name});
-        vrFileIndex = find(contains(stimFileNames, "VRCorr") & contains(stimFileNames, "CombinedRuns"), 1);
+        vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & contains(stimFileNames, "CombinedRuns"), 1);
         
-        if isempty(vrFileIndex) % Fallback: Find last run if no 'CombinedRuns'
-            vrFileIndex = find(contains(stimFileNames, "VRCorr") & ~contains(stimFileNames, "CombinedRuns"), 1, 'last'); 
+        if isempty(vrFileIndex) % Fallback: Find last run if no 'CombinedRuns' Need to find a better fix here 
+            vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & ~contains(stimFileNames, "CombinedRuns"), 1, 'first'); 
         end
         
         if isempty(vrFileIndex)
@@ -243,16 +243,16 @@ function [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(subjectID, 
         end
         
         % Load the response data
-        R = load(responseFilePath, 'response');
+        R = load(responseFilePath);
         
         % Check if the signal exists in the lap data structure
-        if ~isfield(R.response, 'lapPositionActivity') || ~isfield(R.response.lapPositionActivity, signalName)
+        if ~isfield(R, 'lapPositionActivity') || ~isfield(R.lapPositionActivity, signalName)
             errorMessage = 'SignalMissing'; 
             return;
         end
         
         % Extract the signal data
-        lapActivity = R.response.lapPositionActivity.(signalName);
+        lapActivity = R.lapPositionActivity.(signalName);
         numLaps = size(lapActivity, 2);
         
         % Ensure there is more than one lap to be useful

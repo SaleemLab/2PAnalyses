@@ -23,6 +23,7 @@ mouseposFilePath       = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepa
 trialInfoFilePath      = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'TrialInfoLog');
 VrPositionFilePath     = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'VrPosition'); 
 LandmarkChoiceFilePath = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'LandmarkChoice');
+taskLogicFilePath = findFile(sessionFileInfo.stimFiles(iStim).bonsai_filepaths, 'TaskLogicSchema'); 
 
 %% VR mouse position 
 if exist(mouseposFilePath, 'file')
@@ -103,6 +104,13 @@ else
     warning('Trial/Landmark info missing for stimulus: %s', VRStimName);
 end 
 
+if exist(taskLogicFilePath, 'file')
+
+    bonsaiData.taskLogicMetadata = parseTaskLogic(taskLogicFilePath);
+    % assiming constant across blocks 
+    bonsaiData.movementVisualGain = bonsaiData.taskLogicMetadata.movementVisualGain;
+    
+end
 %% Save 
 save(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');

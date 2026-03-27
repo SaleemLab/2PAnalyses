@@ -1,62 +1,69 @@
 function plotPSTH_singleNeuron(psthData, preStimDuration, neuronIdx)
-    % Function to plot baseline-normalized PSTH for a selected neuron
-    %
+    % plotPSTH_singleNeuron plots baseline-normalized PSTH for a selected neuron.
+    % 
     % Inputs:
-    %   - psthData: Structure array containing PSTH results per stimulus type
-    %   - preStimDuration: Time (in seconds) before stimulus onset for baseline correction
-    %   - neuronIdx: Index of the neuron to plot
-    %
+    %   psthData: Structure with fields 'timeVector', 'alignedResponses', 'stimValue'
+    %   preStimDuration: Scalar (e.g., 0.5) representing seconds before 0 to use as baseline
+    %   neuronIdx: Integer index of the neuron
     
     numStimuli = length(psthData);
     
     for thisStim = 1:numStimuli
+        % 1. Setup Data
         timeVector = psthData(thisStim).timeVector;
+        % Force timeVector to be a row vector to prevent 'fill' errors
+        tRow = timeVector(:)'; 
         
-        % Find indices corresponding to the pre-stimulus period
-        preStimIndices = timeVector >= -preStimDuration & timeVector < 0;
+        % Extract responses [Neurons x Time x Trials]
+        resp = psthData(thisStim).alignedResponses;
         
-        % Extract responses
-        alignedResponses = psthData(thisStim).alignedResponses;
-        numNeurons = size(alignedResponses, 1);
-        
-        % Check if neuron index is valid
-        if neuronIdx > numNeurons || neuronIdx < 1
-            warning('Neuron index %d is out of range for stimulus %d. Skipping...', neuronIdx, psthData(thisStim).stimValue);
+        % Safety check for neuron index
+        if neuronIdx > size(resp, 1) || neuronIdx < 1
+            warning('Neuron %d is out of range for Stimulus %d.', neuronIdx, thisStim);
             continue;
         end
         
-        % Compute baseline: Mean response across the pre-stimulus period
-        baselineMean = nanmean(alignedResponses(neuronIdx, preStimIndices, :), [2, 3]); % Across trials
+        % 2. Baseline Correction
+        % Note: We look for time between -preStimDuration and 0
+        preStimIndices = tRow >= -abs(preStimDuration) & tRow < 0;
         
-        % Normalize response by subtracting baseline
-        alignedResponses(neuronIdx, :, :) = alignedResponses(neuronIdx, :, :) - baselineMean;
+        if ~any(preStimIndices)
+            warning('No time points found between -%.2f and 0. Check your timeVector!', preStimDuration);
+            baselineMean = 0; % Fallback
+        else
+            % Average across Time (dim 2) and Trials (dim 3)
+            baselineMean = nanmean(nanmean(resp(neuronIdx, preStimIndices, :), 2), 3);
+        end
         
-        % Compute mean and SEM for this neuron
-        meanResponse = squeeze(nanmean(alignedResponses(neuronIdx, :, :), 3)); % Average across trials
-        semResponse = squeeze(nanstd(alignedResponses(neuronIdx, :, :), 0, 3)) ./ sqrt(size(alignedResponses, 3));
+        % 3. Calculate Mean and SEM (Across Trials)
+        % Get data for this neuron, subtract baseline
+        neuronData = squeeze(resp(neuronIdx, :, :)) - baselineMean;
         
-        % Create figure
-        figure;
+        meanResponse = nanmean(neuronData, 2)'; % Force to row
+        semResponse = (nanstd(neuronData, 0, 2) ./ sqrt(size(neuronData, 2)))'; % Force to row
+        
+        % 4. Plotting
+        figure('Color', 'w', 'Name', sprintf('Neuron %d', neuronIdx));
         hold on;
         
-        % Define the grey shaded stimulus period (e.g., 0-1 sec)
-        grey_x = [0 1 1 0];
-        grey_y = [min(meanResponse) min(meanResponse) max(meanResponse+100) max(meanResponse+100)];
-        fill(grey_x, grey_y, [0.8 0.8 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.3);
+        % Draw Stimulus Shade (Assume stimulus is from 0 to 1 second)
+        % We use 'ylim' later to make this box full-height
+        yl = [min(meanResponse - semResponse), max(meanResponse + semResponse)];
+        fill([0 1 1 0], [yl(1) yl(1) yl(2) yl(2)], [0.9 0.9 0.9], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
         
-        % Shaded error bars
-        x = [timeVector, fliplr(timeVector)];
-        y = [meanResponse - semResponse, fliplr(meanResponse + semResponse)];
-        fill(x, y, [0.8 0.8 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.8);
+        % Draw Shaded SEM
+        xPath = [tRow, fliplr(tRow)];
+        yPath = [(meanResponse - semResponse), fliplr(meanResponse + semResponse)];
+        fill(xPath, yPath, [0.7 0.7 1], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
         
-        % Plot mean response line
-        plot(timeVector, meanResponse, 'k', 'LineWidth', 1.5);
+        % Plot Mean Line
+        plot(tRow, meanResponse, 'b', 'LineWidth', 2);
         
-        % Labels and title
-        title(sprintf('Neuron %d - Stimulus %d', neuronIdx, psthData(thisStim).stimValue));
+        % Formatting
+        title(sprintf('Neuron %d | Stimulus: %s', neuronIdx, num2str(psthData(thisStim).stimValue)));
         xlabel('Time (s)');
-        ylabel('Neural Response (Baseline Normalized)');
+        ylabel('Baseline Subtracted Activity');
         grid on;
-        hold off;
+        set(gca, 'TickDir', 'out');
     end
 end
