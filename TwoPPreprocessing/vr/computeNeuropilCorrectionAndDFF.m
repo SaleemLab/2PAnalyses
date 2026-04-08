@@ -1,145 +1,121 @@
-function [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, stimName, zScoreProcessedSignals, applyTemporalSmoothing, prctlF, windowSize)
-    % Set default arguments
-    if nargin < 3, zScoreProcessedSignals = true; end 
-    if nargin < 4, applyTemporalSmoothing = true; end
-    if nargin < 5, prctlF = 8; end 
-    if nargin < 6, windowSize = 60; end 
+function [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, stimName, zScoreProcessedSignals, applyTemporalSmoothing, prctl_F0, prctl_F, windowSize, smoothW, numN, minNp, maxNp)
+% estimates neuropil correction, dff and dff without any neuropil
+% correction on 60hz interpolated traces from processedTwoPData 
+% 
+%% Set Defaults
+if nargin < 3 || isempty(zScoreProcessedSignals), zScoreProcessedSignals = true; end
+if nargin < 4 || isempty(applyTemporalSmoothing), applyTemporalSmoothing = true; end
+if nargin < 5 || isempty(prctl_F0), prctl_F0 = 8; end
+if nargin < 6 || isempty(prctl_F), prctl_F = 5; end
+if nargin < 7 || isempty(windowSize), windowSize = 60; end
+if nargin < 8 || isempty(smoothW), smoothW = 5; end
+if nargin < 9 || isempty(numN), numN = 20; end
+if nargin < 10 || isempty(minNp), minNp = 10; end
+if nargin < 11 || isempty(maxNp), maxNp = 90; end
 
-    % Hardcoded Absolute Zero (from your ImageJ vasculature measurement)
-    absZero = 23; % measured dark spots in many sessions; primarily over large vasculatures 
+interpolatedFrameRate = 60;
+% PMT Offset logic
+absZero = -23;
 
-    stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}));
-    if isempty(stimIdx), error('Specified VRStimName not found.'); end
+stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}));
+if isempty(stimIdx), error('Specified stimName not found.'); end
 
-    %% Load data
-    disp('Loading F, FNeu, ops...');
-    load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'F', 'Fneu', 'ops');
+%% Load Data
+disp('Loading F, FNeu, ops...');
+load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'F', 'Fneu', 'ops');
 
-    %% Absolute zero correction (this is new @Aman?) 
-    %disp(['Subtracting Absolute Zero Offset: ', num2str(absZero)]);
-    %F = F - absZero;
-    %Fneu = Fneu - absZero;
+%% Absolute zero subtraction & Smoothing
+F = F - absZero; % currently not saving the absolute zero subtracted version anywhere; might be good to? 
+Fneu = Fneu - absZero;
 
-    %% Smoothning (f0 will additionally be smoothed) 
-    if applyTemporalSmoothing
-        disp('Applying temporal smoothing (gausswin 15)...');
-        w = gausswin(15); w = w / sum(w);
-        % Vectorised smoothing along time dimension
-        fSmoothed = filtfilt(w, 1, F')'; 
-        fneuSmoothed = filtfilt(w, 1, Fneu')';
-    else
-        fSmoothed = F; fneuSmoothed = Fneu;
-    end
-
-    %% Neuropil Correction (Using sylvia's functions)
-    disp('Computing neuropil correction...');
-    % handles F0 internally and returns [frames x ROIs]
-    [Fc_frames, ~, ~] = correct_neuropil(fSmoothed', fneuSmoothed', prctlF, windowSize);
-    Fc = Fc_frames'; % Transpose back to [ROIs x frames]
-
-    %%  Delta F/F calculation
-    disp('Computing delta F/F signals...');
-    
-    % dF/F on Raw F (using fSmoothed)
-    f0Raw = get_F0(fSmoothed', prctlF, windowSize);
-    processedSignals.dFF = get_delta_F_over_F(fSmoothed', f0Raw)';
-
-    % dF/F on Neuropil-Corrected F
-    f0c = get_F0(Fc', prctlF, windowSize);
-    processedSignals.dFFNeuropilCorrected = get_delta_F_over_F(Fc', f0c)';
-
-    %% Z-Scoring
-    if zScoreProcessedSignals 
-        disp('Z-scoring signals...');
-        zScoredProcessedSignals.dFFNeuropilCorrected = zscore(processedSignals.dFFNeuropilCorrected, 0, 2);
-        zScoredProcessedSignals.dFF = zscore(processedSignals.dFF, 0, 2);
-    end 
-
-    %% Saving
-    disp('Saving processed data...');
-    save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, ...
-        'processedSignals', 'zScoredProcessedSignals', '-append');
-
-    processedTwoPData.processedSignals = processedSignals;
-    processedTwoPData.zScoredProcessedSignals = zScoredProcessedSignals;
-    processedTwoPData.F = F; 
-    processedTwoPData.ops = ops;
+if applyTemporalSmoothing
+    fprintf('Applying smoothing (gausswin %d)...\n', smoothW);
+    w = gausswin(smoothW); w = w / sum(w);
+    fSmoothed = filtfilt(w, 1, F')';
+    fneuSmoothed = filtfilt(w, 1, Fneu')';
+else
+    fSmoothed = F;
+    fneuSmoothed = Fneu;
 end
 
-%% Older version 
-% function [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, stimName, zScoreProcessedSignals ,applyTemporalSmoothing, prctlF, windowSize)
-% % Set default arguments if not provided
-% if nargin < 3, zScoreProcessedSignals = true; end 
-% if nargin < 4, applyTemporalSmoothing = true; end
-% if nargin < 5, prctlF = 8; end % The percentile from which to take F0 (baseline F).
-% if nargin < 6, windowSize = 60; end % The rolling window over which to calculate F0.
-% 
-% 
-% stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}));
-% if isempty(stimIdx), error('Specified VRStimName not found in sessionFileInfo.'); end
-% 
-% %% Load data
-% disp('Loading F, FNeu, ops...');
-% load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'F', 'Fneu', 'ops');
-% 
-% 
-% %% Pre-processing and Smoothing
-% if applyTemporalSmoothing
-%     disp('Applying temporal smoothing to F and Fneu time-series...');
-%     w = gausswin(9); % 144ms smoothning / SD is 25.6ms
-%     w = w / sum(w);
-% 
-%     numROIs = size(F, 1);
-%     % Using fSmoothed and fneuSmoothed >>>
-%     fSmoothed = zeros(size(F));
-%     fneuSmoothed = zeros(size(Fneu));
-% 
-%     % Loop through each ROI to apply the filter along the time dimension
-%     for i = 1:numROIs
-%         fSmoothed(i, :) = filtfilt(w, 1, F(i, :));
-%         fneuSmoothed(i, :) = filtfilt(w, 1, Fneu(i, :));
-%     end
-% else
-%     disp('Skipping temporal smoothing.');
-%     % Might be good to change variable name here to something more neutral 
-%     fSmoothed = F;
-%     fneuSmoothed = Fneu;
-% end
-% 
-% %% Prepare all four signal matrices
-% disp('Preparing all four signal types...');
-% fs = ops{1}.fs;  % frame rate
-% 
-% % Neuropil-Corrected F (Fc)
-% disp('Computing neuropil correction...');
-% [Fc, ~, ~, ~] = correct_neuropil(fSmoothed', fneuSmoothed', fs);
-% 
-% % Delta F/F on Raw F
-% disp('Computing delta f/f...');
-% f0Raw = get_F0(fSmoothed', fs, prctlF, windowSize)';
-% processedSignals.dFF = get_delta_F_over_F(fSmoothed, f0Raw);
-% 
-% % Delta F/F on Neuropil-Corrected F
-% disp('Computing delta f/f on neuropil corrected f...');
-% f0c = get_F0(Fc, fs, prctlF, windowSize)'; 
-% processedSignals.dFFNeuropilCorrected = get_delta_F_over_F(Fc', f0c);
-% 
-% if zScoreProcessedSignals 
-%     zScoredProcessedSignals.dFFNeuropilCorrected = zscore(processedSignals.dFFNeuropilCorrected, 0,2); %zscore exactly equal to mean and not 1 STD above the mean 
-%     zScoredProcessedSignals.dFF = zscore(processedSignals.dFF, 0,2);
-%     disp('Zscoring Dff and DffNeuropilCorrected signals..')
-% end 
-% 
-% %% Saving (Maintaining the struct as a root variable)
-% disp('Appending processedSignals to the file...');
-% save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'processedSignals', 'zScoredProcessedSignals', '-append');
-% 
-% % Also return for function output (temp) 
-% processedTwoPData.processedSignals = processedSignals;
-% processedTwoPData.zScoredProcessedSignals = zScoredProcessedSignals;
-% processedTwoPData.F = F; 
-% processedTwoPData.ops = ops;
-% 
-% 
-% % save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'processedTwoPData', '-v7.3');
-% end
+%% Transpose once to use in all the functions below: [ROIs x Frames] to [Frames x ROIs]
+fSmoothed = fSmoothed';
+fneuSmoothed = fneuSmoothed';
+
+%% Baseline correction and centering
+disp('Calculating (slow-drift) baseline...');
+tic;
+% get_F0 expects [frames x ROIs]
+f0_F = get_F0(fSmoothed, prctl_F0, windowSize, interpolatedFrameRate);
+
+%% Neuropil Correction
+disp('Computing neuropil correction...');
+% This is the "Corrected Raw Fluorescence" (Fc) required for dF/F
+% From Sylvia's depth from 2p @ signal[:, iROI] = iF - (b * iN + a) +
+% F0[:, iROI];
+% This function removes slow-drifts [F0,N0] from traces and aligns both
+% traces at a zero-baseline. It might be important for neuropil
+% correction to ensure the correction factor (r) is estimated based on
+% common high-frequency fluctuations rather than absolute offsets.
+% F0_F is added back to the corrected trace [Fc]; Performs a first-degree polynomial fit
+[Fc, regPars, ~, ~] = correct_neuropil(fSmoothed, f0_F, fneuSmoothed, interpolatedFrameRate, prctl_F0, prctl_F, windowSize, numN, minNp, maxNp);
+
+%% Delta F/F 
+disp('Computing delta F/F signals...');
+
+% Raw dF/F (using smoothed F and the F0 we already computed)
+% Inputs are [Frames x ROIs]
+dFF = get_delta_F_over_F(fSmoothed, f0_F);
+
+% Neuropil Corrected dF/F
+% Per Sylvia: Normalise corrected signal (Fc) by the original Raw F0 (f0_F)
+dFF_NC = get_delta_F_over_F(Fc, f0_F);
+toc
+
+%% Transpose back: convert [Frames x ROIs] to [ROIs x Frames]
+processedSignals.dFF = dFF';
+processedSignals.dFFNeuropilCorrected = dFF_NC';
+% these are for plotting
+Fc = Fc';
+f0_F = f0_F';
+fSmoothed=fSmoothed';
+fneuSmoothed=fneuSmoothed';
+
+%% Z-Scoring [for boutons]
+if zScoreProcessedSignals
+    disp('Z-scoring signals...');
+    % Standard z-score along the time dimension (dim 2 for [ROIs x Time])
+    zScoredProcessedSignals.dFFNeuropilCorrected = zscore(processedSignals.dFFNeuropilCorrected, 0, 2);
+    zScoredProcessedSignals.dFF = zscore(processedSignals.dFF, 0, 2);
+end
+
+%% Sanity Check Plot
+figure('Name', 'Neuropil Correction Sanity Check', 'Color', 'w', 'Position', [100 100 1200 800]);
+t = (0:size(F,2)-1) / interpolatedFrameRate;
+roisToPlot = 1:min(3, size(F,1));
+for i = 1:length(roisToPlot)
+    roiIdx = roisToPlot(i);
+    subplot(length(roisToPlot), 1, i);
+    hold on;
+    plot(t, fSmoothed(roiIdx,:), 'Color', [0.7 0.7 0.7], 'DisplayName', 'Raw F');
+    plot(t, fneuSmoothed(roiIdx,:), 'Color', [0.4 0.6 0.8], 'LineStyle', ':', 'DisplayName', 'Neuropil');
+    plot(t, f0_F(roiIdx,:), 'b--', 'LineWidth', 1.2, 'DisplayName', 'F0 Baseline');
+    plot(t, Fc(roiIdx,:), 'r', 'LineWidth', 1, 'DisplayName', 'Corrected Fc');
+    ylabel(['ROI ' num2str(roiIdx) ' (a.u.)']);
+    % regPars is [2 x nROIs], row 2 is the slope (r)
+    title(['Neuropil Correction (Slope r = ' num2str(regPars(2,roiIdx), '%.3f') ')']);
+    if i == length(roisToPlot), xlabel('Time (s)'); legend('Location', 'northeastoutside'); end
+    grid on; axis tight;
+end
+
+%% Saving results
+disp('Saving processed data...');
+save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, ...
+    'processedSignals', 'zScoredProcessedSignals', '-append');
+
+processedTwoPData.processedSignals = processedSignals;
+processedTwoPData.zScoredProcessedSignals = zScoredProcessedSignals;
+processedTwoPData.neuropCorrPars = regPars; % new
+processedTwoPData.F = F;
+processedTwoPData.ops = ops;
+end
