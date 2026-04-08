@@ -1,86 +1,94 @@
-% sylvia's function (version below is Liad's)
-function F0 = get_F0(signal, F0_percentile, window_size_sec)
-    % signal: [frames x ROIs]
-    % F0_percentile: usually 8
-    % window_size_sec: usually 60
+function F0 = get_F0(signal, F0_percentile, window_size_sec, plane_rate)
+% % Based on Sylvia Schroeder's Python function [get_F0] in repository
+% 'depth-for-2p'; This version is adapted to use with ordfilt2 for speed.
+% The python version usues pd.rolling() [pandas dataframe]
+% Determines the baseline fluorescence (F0) using optimised rank filtering.
 
-    fs = 60; % fixed interpolated frame rate (I was previously loading fs from ops instead of the interpolated fr @Aman 
 
-    if nargin < 2 || isempty(F0_percentile), F0_percentile = 8; end
-    if nargin < 3 || isempty(window_size_sec), window_size_sec = 60; end
-    
+% signal: [frames x ROIs]
+% F0_percentile: 8 [Sylvia's defult: 'depth-for-2p']
+% window_size_sec: usually 60 [Sylvia's defult: 'depth-for-2p']
+if nargin < 2 || isempty(F0_percentile), F0_percentile = 8; end
+if nargin < 3 || isempty(window_size_sec), window_size_sec = 60; end
+% Here we pass the interpolatd rate [60hz] 
 
-    % Percentile Window (Python: round(fs * window_size / 2)) ---
-    % At 60Hz and 60s window, this is 1800 frames. 
-    perc_win = round(fs * window_size_sec / 2);
-    if mod(perc_win, 2) == 0
-        perc_win = perc_win + 1; 
-    end % Must be odd for ordfilt2
 
-    % Rolling percentile (Python: pd.rolling.quantile) 
-    order = max(1, round((F0_percentile / 100) * perc_win));
-    % Using ordfilt2 for speed. 'symmetric' matches Python's edge behavior.
-    Fc_q = ordfilt2(signal, order, ones(perc_win, 1), 'symmetric');
+nWindow = round(window_size_sec * plane_rate);
 
-    % Gaussian smoothing (Python: scipy.ndimage.gaussian_filter1d) 
-    % Python: sigma = fs * window_size_sec (60 * 60 = 3600 frames)
-    sigma = fs * window_size_sec;
+% Determine the rank (index) for the required percentile
+% ordfilt2 uses 1-based indexing for the rank
+rank_idx = max(1, fix(nWindow * F0_percentile / 100));
 
-    % In MATLAB, imgaussfilt treats the 2nd argument as sigma (standard deviation).
-    % Specify [sigma, 0.001] to filter only along the rows (time), not ROIs.
-    F0 = imgaussfilt(Fc_q, [sigma, 0.001], 'Padding', 'replicate');
+% Create a domain for the filter (1D window applied across time)
+domain = true(nWindow, 1);
+
+
+% Apply ordfilt2 to each ROI
+% ordfilt2 expects 2D input. We process columns to maintain [frames x ROIs]
+% We pad the signal to handle edge effects similar to sliding windows
+% 'symmetric' padding 
+Fc_q = ordfilt2(signal, rank_idx, domain, 'symmetric');
+
+
+% Smoothing step
+% if using plane_rate at 7.5 * 60 = 450 would be ok; 
+% Since we're running this function on 60hz data I have changed this line of
+% code to smooth slightly otherwise the baseline looked like a flat line @Aman 
+smoothWin = round(5 * plane_rate); %60*5=300
+F0 = smoothdata(Fc_q, 1, 'gaussian', smoothWin);
+
 end
 
-% function F0 = get_F0(Fc, fs, prctl_F, window_size)
-%     % Determines the baseline fluorescence (F0) for computing deltaF/F.
-%     %
-%     % This is the FASTEST version, using the `ordfilt2` function from the
-%     % Image Processing Toolbox to perform a highly optimized rolling percentile.
-%     %
-%     % Parameters:
-%     % ----------
-%     % Fc : matrix [t x nROIs]
-%     %     Calcium traces (measured signal) of ROIs.
-%     % fs : float
-%     %     The frame rate (frames/second/plane).
-%     % prctl_F : int, optional
-%     %     The percentile from which to take F0. The default is 8.
-%     % window_size : int, optional
-%     %     The rolling window over which to calculate F0, in seconds. Default is 180.
-%     %
-%     % Returns:
-%     % -------
-%     % F0 : matrix [t x nROIs]
-%     %     The baseline fluorescence (F0) traces for each ROI.
+% THIS VERSION TAKE TOO LONG: Iterates through each frame to compute 8th
+% percentile in a window of 60s 
+% function F0 = get_F0(signal, F0_percentile, window_size_sec, fs)
+% % Determines the baseline fluorescence (F0) for computing deltaF/F.
+% % signal: [frames x ROIs]
+% % F0_percentile: usually 5 [sylvia's defult]
+% % window_size_sec: usually 60 [sylvia's defult]
+% % From cortex lab: removeSlowDrift from +preproc [removed the filetered
+% % trace component and smoothed F0 similar to Sylvia's function in Python from 'depth-for-2p'; currently private repo] 
+% % [https://github.com/sylviaschroeder/CortexLab/blob/master/%2Bpreproc/removeSlowDrift.m]
+% % 
 % 
-%     if nargin < 3 || isempty(prctl_F)
-%         prctl_F = 8;
-%     end
-%     if nargin < 4 || isempty(window_size)
-%         window_size = 60;
-%     end
+% if nargin < 2 || isempty(F0_percentile), F0_percentile = 5; end
+% if nargin < 3 || isempty(window_size_sec), window_size_sec = 60; end
 % 
-%     % Check if the required toolbox is available
-%     if ~license('test', 'image_toolbox')
-%         error('This fast version of get_F0 requires the Image Processing Toolbox.');
-%     end
+% [nFrames, nROIs] = size(signal);
 % 
-%     % 1. Translate window size from seconds into an odd number of frames
-%     window_frames = round(fs * window_size);
-%     if mod(window_frames, 2) == 0
-%         window_frames = window_frames + 1;
-%     end
-% 
-%     % 2. Determine the order (k-th smallest value) needed for the percentile
-%     % For a percentile 'p' in a window of size 'N', the order is (p/100)*N.
-%     order = round((prctl_F / 100) * window_frames);
-%     order = max(order, 1); % The order must be at least 1.
-% 
-%     % 3. Define the filtering neighborhood (a 1D vertical window)
-%     domain = ones(window_frames, 1);
-% 
-%     % 4. Apply the 2D order-statistic filter. It's designed for images but
-%     % works perfectly on our [time x ROIs] matrix with a 1D domain.
-%     % The 'symmetric' option handles the edges of the data correctly.
-%     F0 = ordfilt2(Fc, order, domain, 'symmetric');
+% % extract centered window 
+% n = round(window_size_sec * fs);
+% if mod(n,2) == 0
+%     n = n + 1; % Ensure window is odd for perfect centering
 % end
+% nBefore = floor((n-1)/2);
+% nAfter = n - nBefore - 1;
+% 
+% Fc_q = zeros(nFrames, nROIs);
+% 
+% % Check for parallel pool
+% poolObj = gcp('nocreate');
+% 
+% if isempty(poolObj)
+%     fprintf('Calculating percentile frame-by-frame (Serial)...');
+%     for k = 1:nFrames
+%         % Exact slice logic from removeSlowDrift
+%         tmpTraces = signal(max(1, k-nBefore) : min(nFrames, k+nAfter), :);
+%         Fc_q(k, :) = prctile(tmpTraces, F0_percentile, 1);
+%     end
+% else
+%     fprintf('Calculating percentile frame-by-frame (Parallel)...');
+%     parfor k = 1:nFrames
+%         % Exact slice logic from removeSlowDrift
+%         tmpTraces = signal(max(1, k-nBefore) : min(nFrames, k+nAfter), :);
+%         Fc_q(k, :) = prctile(tmpTraces, F0_percentile, 1);
+%     end
+% end
+% 
+% % sigma_val = 450 (Matches original 7.5Hz logic for a 60s window)
+% sigma_val = 450; 
+% % Using 'smoothdata' with a window of 8*sigma to match SciPy truncation
+% F0 = smoothdata(Fc_q, 1, 'gaussian', 8 * sigma_val);
+% 
+% end
+% 
