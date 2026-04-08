@@ -15,6 +15,9 @@ if nargin < 11 || isempty(maxNp), maxNp = 90; end
 
 interpolatedFrameRate = 60;
 % PMT Offset logic
+% Absolute zero value 
+% was obtained by averaging the darkest frame over many imaging sessions.
+% The  absolute zero value is arbitrary and depends on the voltage range of the PMTs. 
 absZero = -23;
 
 stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}));
@@ -27,6 +30,8 @@ load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'F', '
 %% Absolute zero subtraction & Smoothing
 F = F - absZero; % currently not saving the absolute zero subtracted version anywhere; might be good to? 
 Fneu = Fneu - absZero;
+
+%%
 
 if applyTemporalSmoothing
     fprintf('Applying smoothing (gausswin %d)...\n', smoothW);
