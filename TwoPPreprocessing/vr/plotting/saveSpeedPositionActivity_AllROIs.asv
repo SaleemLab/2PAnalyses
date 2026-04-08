@@ -1,0 +1,47 @@
+function saveSpeedPositionActivity_AllROIs(sessionFileInfo, response, options)
+% saveallroistopdf - loops through all rois and saves them into a single pdf.
+% every roi gets its own page.
+
+    % 
+    if nargin < 3, options = struct(); end
+    if ~isfield(options, 'applySmoothing'), options.applySmoothing = false; end
+    if ~isfield(options, 'smoothSigma'),    options.smoothSigma = [1.1, 1.5]; end
+
+    figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures', 'SpeedPositionSummaries');
+    if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
+
+    % 
+    pdfName = sprintf('%s_%s_AllROIs_SpeedPosition.pdf', ...
+        sessionFileInfo.animal_name, sessionFileInfo.session_name);
+    fullPDFPath = fullfile(figSaveDir, pdfName);
+
+    %
+    if exist(fullPDFPath, 'file'), delete(fullPDFPath); end
+
+    % 
+    numROIs = size(response.speedPositionActivity.matrix, 3);
+    fprintf('starting pdf generation for %d rois...\n', numROIs);
+
+    % 
+    for targetROI = 1:numROIs
+        %
+        plotSpeedPositionActivity_ForROI(sessionFileInfo, response, targetROI, ...
+            options.applySmoothing, options.smoothSigma);
+        
+        % f
+        figHandle = gcf; 
+        
+
+        exportgraphics(figHandle, fullPDFPath, 'ContentType', 'vector', 'Append', true);
+        
+        % 
+        close(figHandle);
+        
+        % 
+        if mod(targetROI, 10) == 0 || targetROI == numROIs
+            fprintf('processed %d/%d rois...\n', targetROI, numROIs);
+        end
+    end
+
+    fprintf('success! all rois saved to: %s\n', fullPDFPath);
+end
