@@ -1,5 +1,5 @@
 function F0 = get_F0_LB(Fc, fs, prctl_F, window_size)
-Liad's version - from repo 'DATA' [Schröder Lab] 
+%Liad's version - from repo 'DATA' [Schröder Lab] 
     % Determines the baseline fluorescence (F0) for computing deltaF/F.
     %
     % This is the FASTEST version, using the `ordfilt2` function from the

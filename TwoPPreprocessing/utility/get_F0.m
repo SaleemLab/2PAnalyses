@@ -26,7 +26,8 @@ domain = true(nWindow, 1);
 % Apply ordfilt2 to each ROI
 % ordfilt2 expects 2D input. We process columns to maintain [frames x ROIs]
 % We pad the signal to handle edge effects similar to sliding windows
-% 'symmetric' padding 
+% 'symmetric' padding. Ordfilt2's default padding otherwise pads the edges
+% with zeros 
 Fc_q = ordfilt2(signal, rank_idx, domain, 'symmetric');
 
 
