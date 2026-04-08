@@ -15,12 +15,19 @@ for thisSession = 1:length(sessionNames)
     sessionFileInfoFilePath = getSessionFileInfoFilePath(MouseID, sessionName);
     disp(['Loading sessionFileInfo for: ' sessionName])
     % Load sessionFileInfo once per session
-    load(sessionFileInfoFilePath, 'sessionFileInfo');
+    sfi = load(sessionFileInfoFilePath);
+    if ~isempty(sfi)
+
+        sessionFileInfo = sfi.sessionFileInfo;
+
+    else 
+        continue
+    end 
     try
         stimList = {sessionFileInfo.stimFiles.name};
         % Filter for all relevant VR stimuli
         combinedStimNames = stimList(contains(stimList, 'CombinedRuns', 'IgnoreCase', true));
-        vrCorrStimNames = stimList(contains(stimList, 'VRCorr', 'IgnoreCase', true));
+        vrCorrStimNames = stimList(contains(stimList, 'BaselinCorridor', 'IgnoreCase', true));
         % Apply the selection logic: CombinedRuns OR VRCorr
         if ~isempty(combinedStimNames)
             vrStimNames = combinedStimNames(1); 

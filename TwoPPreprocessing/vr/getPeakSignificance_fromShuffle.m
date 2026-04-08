@@ -8,7 +8,8 @@ function [isSignificantByPeakShuffling_local, realPeakPercentileRank_local] = ge
 if nargin < 2
     error('Must provide the response struct.');
 end
-signalNames = fieldnames(response.lapPositionActivity);
+signalNames = {'dFF', 'dFFNeuropilCorrected'};
+%signalNames = fieldnames(response.lapPositionActivity);
 if ~isfield(response, 'lapPositionActivity_ShuffleMatrix')
     error('Shuffled data (lapPositionActivity_ShuffleMatrix) not found in response struct. Run getLapPositionActivity_withShuffle first.');
 end

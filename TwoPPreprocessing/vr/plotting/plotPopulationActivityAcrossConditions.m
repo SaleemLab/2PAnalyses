@@ -93,7 +93,7 @@ for i = 1:nPlots
     ax = nexttile;
     normMean = normalize(dataMatrix{i}, 2, 'range');
     imagesc(normMean(sortIdx, :));
-    colormap(ax, flipud(gray)); caxis([0 1]); axis tight;
+    colormap(ax, flipud(gray)); clim([0 1]); axis tight;
     set(ax, 'Box', 'on', 'LineWidth', 0.6, 'XColor', 'k', 'YColor', 'k');
     
     tH = title(sprintf('%s\n(n=%d)', labels{i}, nLapsPerCond(i)), 'FontSize', 10);

@@ -1,12 +1,12 @@
 filePath = "Z:\ibn-vision\DATA\SUBJECTS\M25132\Analysis\20260214A\M25132_20260214A_Response_M25132_RFMapping_20260214_00001.mat";
 load(filePath, 'response');
 
-% Extract the newly created PSTH data
+% 
 psth = response.psthData;
 nROI = size(psth(1).alignedResponses, 1);
 stimVs = vertcat(psth.stimValue);
 
-% --- SAFETY CHECK: Identify Blank [200, 0] ---
+
 blankIdx = find(stimVs(:,1) == 200 & stimVs(:,2) == 0, 1);
 if isempty(blankIdx)
     error('Blank trials ([200, 0]) not found. Verify your getTrialGroups logic.');
@@ -22,7 +22,7 @@ uEl = sort(unique(gridStim(:,2)), 'descend');
 nAz = length(uAz);
 nEl = length(uEl);
 
-%% 2. Process Responsiveness
+%% 
 respWin = [0.5 2]; % Relative to stimulus onset (0s)
 alphaThresh = 0.05;
 responsiveROIs = [];
@@ -34,7 +34,7 @@ bMask = tVecBlank >= respWin(1) & tVecBlank <= respWin(2);
 fprintf('Analyzing %d ROIs for responsiveness...\n', nROI);
 
 for i = 1:nROI
-    % Blank distribution for this neuron
+    %
     rawBlank = psth(blankIdx).alignedResponses(i, :, :);
     blankData = reshape(rawBlank, size(rawBlank, 2), []); 
     blankDist = mean(blankData(bMask, :), 1, 'omitnan');
@@ -59,7 +59,7 @@ end
 
 fprintf('Found %d responsive ROIs out of %d.\n', length(responsiveROIs), nROI);
 
-%% 3. Plotting PSTH Grids
+%% PSTH Grids
 for p = 1:min(15, length(responsiveROIs))
     roiIdx = responsiveROIs(p);
     
@@ -108,8 +108,7 @@ end
 
 
 
-%% Figure 1C: Standard MATLAB Style (White Background) (entirely gemini for plotting) 
-%% Figure 1C: Standard MATLAB Style (Fixed Dimension Errors)
+%% 
 sigma = 0.8; 
 respWin = [0.5 2];
 baseWin = [-2 0]; 
@@ -127,14 +126,14 @@ for p = 10:min(20, length(responsiveROIs))
         muTrace = muTrace(:); 
         tVec = gridPSTH(k).timeVector(:);
         
-        % Baseline Subtraction (Clean)
+
         bVal = mean(muTrace(tVec >= baseWin(1) & tVec < baseWin(2)), 'omitnan');
         muTrace = muTrace - bVal;
         
-        % Update global peak for scaling red traces
+        % global peak for scaling red traces
         traceMax = max(traceMax, max(muTrace));
         
-        % FIX: Find Row (Elevation) and Column (Azimuth) indices separately
+        % 
         rCoord = find(uEl == gridStim(k,2), 1);
         cCoord = find(uAz == gridStim(k,1), 1);
         
@@ -148,10 +147,10 @@ for p = 10:min(20, length(responsiveROIs))
     % Smooth the Heatmap
     rfSmoothed = imgaussfilt(rfMatrix, sigma, 'Padding', 'replicate');
     
-    % --- STEP 2: Create Figure ---
+
     figure('Color', 'w', 'Name', sprintf('ROI %d Standard RF', roiIdx), 'Position', [100 100 800 600]);
     
-    % 1. Plot Heatmap (Grayscale)
+
     imagesc(uAz, uEl, rfSmoothed); 
     hold on;
     colormap(gray); 
@@ -160,13 +159,13 @@ for p = 10:min(20, length(responsiveROIs))
     cb = colorbar;
     ylabel(cb, '$\Delta F/F$ (Baseline Subtracted)', 'Interpreter', 'latex');
     
-    % 2. Scaling Factors
+
     vStep = abs(uEl(1)-uEl(2));
     hStep = abs(uAz(1)-uAz(2));
     vScale = vStep * 0.7; % Height of red trace relative to grid cell
     hScale = hStep * 0.9; % Width of red trace relative to grid cell
 
-    % 3. Overlay Red Traces
+
     for r = 1:nEl
         for c = 1:nAz
             k = find(gridStim(:,1) == uAz(c) & gridStim(:,2) == uEl(r), 1);
@@ -175,7 +174,7 @@ for p = 10:min(20, length(responsiveROIs))
                 muTrace = muTrace(:);
                 tVec = gridPSTH(k).timeVector(:);
                 
-                % Re-apply baseline subtraction
+     
                 muTrace = muTrace - mean(muTrace(tVec >= baseWin(1) & tVec < baseWin(2)), 'omitnan');
                 
                 % Global scaling: Biggest peak in whole session = vScale height
@@ -187,8 +186,7 @@ for p = 10:min(20, length(responsiveROIs))
                 % Horizontal centering on the azimuth
                 normTime = (tVec - min(tVec)) / (max(tVec) - min(tVec));
                 scaledX = (normTime - 0.5) * hScale + uAz(c);
-                
-                % Plot Trace
+    
                 plot(scaledX, scaledY, 'r', 'LineWidth', 1.2); 
                 
                 % Stimulus onset (Time 0) reference marker
@@ -198,7 +196,7 @@ for p = 10:min(20, length(responsiveROIs))
         end
     end
     
-    % --- STEP 3: Standard Aesthetics ---
+
     set(gca, 'YDir', 'normal', 'TickDir', 'out', 'Box', 'off', 'FontSize', 10);
     xlabel('Azimuth (deg)');
     ylabel('Elevation (deg)');
@@ -210,7 +208,6 @@ end
 
 
 %% 
-%% Figure 1C: Two-Panel Spatial Receptive Field Analysis
 sigma_smooth = 0.8; 
 respWin = [0.5 2]; 
 baseWin = [-2 0];  
@@ -241,11 +238,11 @@ for p = 1:min(10, length(responsiveROIs))
         end
     end
 
-    % --- STEP 2: 2D Gaussian Fit (Paper Figure 1C Right Logic) [cite: 461, 463] ---
+
     [X, Y] = meshgrid(uAz, uEl);
     xdata(:,:,1) = X; xdata(:,:,2) = Y;
     
-    % Initial Guess: [Amp, x0, y0, sigAz, sigEl]
+
     [maxAmp, maxIdx] = max(rfMatrix(:));
     x0_guess = [maxAmp, X(maxIdx), Y(maxIdx), 20, 20]; 
     gauss2D = @(x, xdata) x(1) * exp( -((xdata(:,:,1)-x(2)).^2/(2*x(4)^2) + (xdata(:,:,2)-x(3)).^2/(2*x(5)^2)) );
@@ -253,11 +250,9 @@ for p = 1:min(10, length(responsiveROIs))
     opts = optimset('Display','off');
     fitP = lsqcurvefit(gauss2D, x0_guess, xdata, rfMatrix, [0 min(uAz) min(uEl) 2 2], [inf max(uAz) max(uEl) 60 60], opts);
 
-    % --- STEP 3: Generate the Two-Panel Figure ---
     figure('Color', 'w', 'Position', [100 100 1100 500]);
     tlo = tiledlayout(1, 2, 'TileSpacing', 'compact');
     
-    % --- LEFT PANEL: Heatmap + Traces ---
     axLeft = nexttile(tlo);
     imagesc(uAz, uEl, imgaussfilt(rfMatrix, sigma_smooth)); hold on;
     colormap(axLeft, gray); clim([0, max(rfMatrix(:)) + 1e-6]);

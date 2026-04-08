@@ -1,6 +1,6 @@
 
 % Filter table for EVERYTHING (Boutons AND Somas)
-masterTable = filterMasterTable('MouseID', {'M25133', 'M25132'},'Exclude', 0, 'Suite2PPreprocessing', 1, 'TargetArea', 'RSP',  'DayOfExperience', [1,2,3,4,5]); %'DayOfExperience', 100
+masterTable = filterMasterTable('MouseID', {'M25133', 'M25132', 'M26003'},'Exclude', 0, 'Suite2PPreprocessing', 1, 'TargetArea', 'RSP',  'HasStimulus', 'GrayScreen'); %'DayOfExperience', 100
 
 
 % It will use 
@@ -20,7 +20,7 @@ plotBoutonSomaComparison(allData, 'M25037', 'SavePath', 'Z:\ibn-vision\USERS\Son
 
 
 %  Plot RSP Population Pooled
-plotPooledPopulation(allData, 'RSP', 'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\RSP_PooledNewCorridor2026.png', 'DaysToPlot', [1,2,3,4,5], 'TypeToPlot', 'Boutons');
+plotPooledPopulation(allData, 'RSP', 'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\RSP_PooledNewCorridor2026.png', 'DaysToPlot', [1,2,3,4,5], 'TypeToPlot', 'Boutons');
 
 plotModulation_Histogram(allData, 'DaysToPlot', 1:5, ...
     'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\Modulation_Hist_Days1to5_newmice.png');

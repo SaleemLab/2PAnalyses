@@ -11,7 +11,7 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %% Define default parameters
 if nargin < 2, samplingRate = 60; end
 if nargin < 3, mainTimeToUse = 'TwoPFrameTime'; end 
-if nargin < 5, plotFlag = true; end
+if nargin < 5, plotFlag = false; end
 if nargin < 6, trimNaNs = true; end
 if nargin < 7, overwrite = true; end 
 
@@ -171,13 +171,15 @@ end
 %%  Interpolate: Peripheral - Pupil (with clock alignment)  @ Written based on SGS alignEyeData() 02/26
 disp('Processing Peripheral Data: Pupil')
 if isfield(peripheralData, 'Pupil')
-    
+     
     % Sync pupil arduino clock to the 2P arduino clock
     uSyncEye = unique(peripheralData.Pupil.raw.LastSyncPulseTime);
     
-    % We'll use the first plane's sync pulses as the reference; will all be
-    % the same
-    uSyncTwoP = unique(twoPData(1).LastSyncPulseTime);
+    % We'll concatenate across all planes to use the full length of sync
+    % time rather than using it from a single plane 
+    
+    uSyncTwoP = unique(vertcat(twoPData.LastSyncPulseTime));
+    %uSyncTwoP = unique(twoPData(1).LastSyncPulseTime);
     
     % Align the pupil timestamps to the 2P timestamps
     newPupilArduinoTime = align2PSyncPulses(uSyncEye, uSyncTwoP, peripheralData.Pupil.raw.ArduinoTime);
@@ -220,6 +222,10 @@ if trimNaNs
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.F), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.spks), 1);
+    % added new variables here 
+    % combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.dFF), 1);
+    % combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.dFFNeuropilCorrected), 1);
+
     
     if ~any(combinedValidMask)
         warning('Trimming NaNs would remove all data. Skipping trim.');
@@ -230,6 +236,9 @@ if trimNaNs
         processedTwoPData.F = processedTwoPData.F(:, combinedValidMask);
         processedTwoPData.Fneu = processedTwoPData.Fneu(:, combinedValidMask);
         processedTwoPData.spks = processedTwoPData.spks(:, combinedValidMask);
+        % added dFF here
+        % processedTwoPData.dFF = processedTwoPData.dFF(:, combinedValidMask);
+        % processedTwoPData.dFFNeuropilCorrected = processedTwoPData.dFFNeuropilCorrected(:, combinedValidMask);
         processedTwoPData.TwoPFrameTime = processedTwoPData.TwoPFrameTime(combinedValidMask);
         processedTwoPData.ArduinoTime = processedTwoPData.ArduinoTime(combinedValidMask);
         

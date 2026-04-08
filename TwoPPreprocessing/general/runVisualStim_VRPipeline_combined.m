@@ -13,11 +13,11 @@ doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M26003'}, ... 
-    'Session', {'20260325'}); %rerun '20260318' m25131 (checking eye tracking bits here); m26003 20260321 (too)
+    'MouseID', {'M26005', 'M26004', 'M25132'}, ... 
+    'Session', {'20260321', '20260318', '20260226'}); %rerun '20260318' m25131 (checking eye tracking bits here); m26003 20260321 (too)
 mouseInfo = sessionsToProcess(filteredTable);
 % newOrder = [3, 1, 2, 4, 5];
-responseName = {'LandManipCorridor'};
+responseName = {'BaselineCorridor','LandManipCorridor','LandManipCorridor','LandManipCorridor','LandManipCorridor'};
 % 
 % mouseInfo = mouseInfo(newOrder, :);
 
@@ -154,7 +154,9 @@ for thisMouse = 1:size(mouseInfo, 1)
             sessionFileInfo = get2PMetadata(sessionFileInfo); % This function will not run as the tif files have been moved to a different repo.
             [sessionFileInfo] = get2PFrameTimes_SpeedyVersion(sessionFileInfo, isZcorrected); % Uses dynamic planeNums, isZcorrected
             sessionFileInfo = processPeripheralFiles(sessionFileInfo);
-            sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo);
+            sessionFileInfo = mergeBonsaiSuite2pFiles(sessionFileInfo); %  
+            % [sessionFileInfo] = computeNeuropilCorrectionAndDFF_OnRawTraces(sessionFileInfo);
+
             
             [sessionFileInfo] = createSessionROIData(sessionFileInfo);
             % add eye tracking to bonsai.mat 
@@ -164,7 +166,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             % saved like grayscreen or darkness..
             if ~isempty(otherVisualStim)
 
-                ovIdx = find(~contains(otherVisualStim, {'RFMapping', 'DotMotion_SpeedTuning'}, 'IgnoreCase', true) );
+                ovIdx = find(~contains(otherVisualStim, {'RFMapping', 'DotMotion_SpeedTuning', 'archived'}, 'IgnoreCase', true) );
                 if any(ovIdx)
                     disp('Found other visual stimulus file(s).\n');
                     for thisOtherVisualStim = 1:length(ovIdx)
@@ -177,7 +179,8 @@ for thisMouse = 1:size(mouseInfo, 1)
                             
                             [~, ~, ~, sessionFileInfo] = ...
                                 resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', otherVisualStimName);  % Plotflag false, trimNaNs true and overwrite true;
-                            [~, sessionFileInfo]       = computeNeuropilCorrectionAndDFF(sessionFileInfo, otherVisualStimName, zScoreProcessedSignals, applyTemporalSmoothing, prctlF, windowSize); % Overwrite is true
+                            [~, sessionFileInfo]       = computeNeuropilCorrectionAndDFF(sessionFileInfo, otherVisualStimName, zScoreProcessedSignals); % Overwrite is true
+                            %[response] = getRunningSpeedTuningCurves(sessionFileInfo, stimName, useZScoredSignals, shuffle);
                             [~, sessionFileInfo] = getStimTimes(sessionFileInfo, otherVisualStimName, pdThresholdForStimEvents);
                         catch
                             fprintf('Missing bonsai data structure for stimulus file: %s\n', otherVisualStimName)
@@ -213,7 +216,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         [~, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFileInfo, thisName, true);
 
                         [~, ~, ~, sessionFileInfo] = resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo, interpRate, 'TwoPFrameTime', thisName);
-                        [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, thisName, zScoreProcessedSignals, applyTemporalSmoothing);
+                        [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, thisName, zScoreProcessedSignals);
                         [~, sessionFileInfo] = getStimTimes(sessionFileInfo, thisName, pdThresholdForStimEvents);
                         [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
 
@@ -304,8 +307,9 @@ for thisMouse = 1:size(mouseInfo, 1)
                         %plotSortedPopulationResponse_OddEven(sessionFileInfo, response, signalName, true);
 
                         % plotAllNeuronSummariesToPDF_SparseNoiseAndVR(sessionFileInfo, response, applyTemporalSmoothing)
-                        plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName)                       % Run checks
+                        % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName)                       % Run checks
                         plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, 'dFFNeuropilCorrected')
+                        plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, 'dFF')
 
                         [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
                         [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
@@ -353,8 +357,8 @@ for thisMouse = 1:size(mouseInfo, 1)
                     plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, signalName, applyTemporalSmoothing);
                     plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, 'dFFNeuropilCorrected', applyTemporalSmoothing);
 
-                    plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName);
-                    plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing,'dFFNeuropilCorrected');
+                    % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName);
+                    % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing,'dFFNeuropilCorrected');
 
                     % For boutons specifically
                     if strcmpi(typeImaged, 'Boutons')

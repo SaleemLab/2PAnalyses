@@ -8,7 +8,8 @@ function [isSignificantByRangeShuffling_local, realRangePercentileRank_local] = 
 if nargin < 2
     error('Must provide the response struct.');
 end
-signalNames = fieldnames(response.lapPositionActivity);
+%signalNames = fieldnames(response.lapPositionActivity);
+signalNames = {'dFF', 'dFFNeuropilCorrected'};
 if ~isfield(response, 'lapPositionActivity_ShuffleMatrix')
     error('Shuffled data (lapPositionActivity_ShuffleMatrix) not found in response struct. Run getLapPositionActivity_withShuffle first.');
 end

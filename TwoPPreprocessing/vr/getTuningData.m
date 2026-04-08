@@ -86,7 +86,8 @@ function sessionMetrics = getTuningData(sessionTable, varargin)
         tuningCurveMax = max(meanAllLaps, [], 2, 'omitnan'); 
         tuningCurveMin = min(meanAllLaps, [], 2, 'omitnan');
         tuningCurveMean = mean(meanAllLaps, 2, 'omitnan');
-        modulationIndex = (tuningCurveMax - tuningCurveMin) ./ tuningCurveMean;
+        % modulationIndex = (tuningCurveMax - tuningCurveMin) ./ tuningCurveMean;
+        modulationIndex = (tuningCurveMax - tuningCurveMin); % zscored signals
         modulationIndex(tuningCurveMean == 0) = NaN; 
         
         currentSessionData.OddMean = meanOddLaps;
@@ -227,7 +228,11 @@ function [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(subjectID, 
         vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & contains(stimFileNames, "CombinedRuns"), 1);
         
         if isempty(vrFileIndex) % Fallback: Find last run if no 'CombinedRuns' Need to find a better fix here 
-            vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & ~contains(stimFileNames, "CombinedRuns"), 1, 'first'); 
+            if strcmp(sfi.animal_name, 'M25132') || strcmp(sfi.animal_name, 'M25133') 
+                vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & ~contains(stimFileNames, "CombinedRuns"), 1, 'first'); 
+            elseif strcmp(sfi.animal_name, 'M26003')
+                vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & ~contains(stimFileNames, "CombinedRuns"), 1, 'last'); 
+            end 
         end
         
         if isempty(vrFileIndex)

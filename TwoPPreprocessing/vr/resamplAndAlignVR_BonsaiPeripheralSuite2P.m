@@ -45,7 +45,7 @@ function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resa
 %% Define default paramters and load appropriate data files
 if nargin < 2, samplingRate = 60; end
 if nargin < 3, mainTimeToUse = 'TwoPFrameTime'; end % This is the interrupt-arduino time from the Bonsai Arduino
-if nargin < 5, plotFlag = true; end
+if nargin < 5, plotFlag = false; end
 if nargin < 6, trimNaNs = true; end % 
 
 % if nargin < 5, VR_number = 1; end
