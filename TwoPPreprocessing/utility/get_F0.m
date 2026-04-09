@@ -3,6 +3,7 @@ function F0 = get_F0(signal, F0_percentile, window_size_sec, plane_rate)
 % 'depth-for-2p'; This version is adapted to use with ordfilt2 for speed.
 % The python version usues pd.rolling() [pandas dataframe]
 % Determines the baseline fluorescence (F0) using optimised rank filtering.
+% [Ref: get_f0() in preprocess_traces.py] 
 
 
 % signal: [frames x ROIs]

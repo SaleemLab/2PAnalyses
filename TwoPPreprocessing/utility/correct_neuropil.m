@@ -1,9 +1,11 @@
 function [signal, regPars, F_binValues, N_binValues] = correct_neuropil(F, F0, N, plane_rate, prctl_F0, prctl_F, Npil_window_F0, numN, minNp, maxNp)
 % Based on Sylvia Schroeder's Python function [correct_neuropil] in repository 'depth-for-2p'
+% [Ref: correct_neuropil() in preprocess_traces.py] 
 % Estimates the correction factor r for neuropil correction, so that:
 %    C = S - rN
 %    with C: actual signal from the ROI, S: measured signal, N: neuropil
 %  RESTORE BASELINE: Add f0_F back to the corrected centered signal 
+
 
 %Parameters
 %----------

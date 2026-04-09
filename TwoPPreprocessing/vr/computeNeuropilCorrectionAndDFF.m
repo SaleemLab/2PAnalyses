@@ -129,8 +129,6 @@ for i = 1:length(roisToPlot)
 end
 
 %% Saving results
-
-
 processedTwoPData.processedSignals = processedSignals;
 processedTwoPData.zScoredProcessedSignals = zScoredProcessedSignals;
 processedTwoPData.neuropCorrPars = regPars; % new

@@ -1,6 +1,7 @@
 function dF_F = get_delta_F_over_F(Fc, F0)
 % Based on Sylvia Schroeder's Python function [get_delta_F_over_F] in repository 'depth-for-2p'
 % Calculates delta F over F.
+% [Ref: get_delta_F_over_F() in preprocess_traces.py] 
 %
 % Parameters
 % ----------
