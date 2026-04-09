@@ -4,7 +4,7 @@ function saveSpeedPositionActivity_AllROIs(sessionFileInfo, response, options)
 
     % 1. setup defaults and directory
     if nargin < 3, options = struct(); end
-    if ~isfield(options, 'applySmoothing'), options.applySmoothing = false; end
+    if ~isfield(options, 'applySmoothing'), options.applySmoothing = true; end
     if ~isfield(options, 'smoothSigma'),    options.smoothSigma = [1.1, 1.5]; end
 
     figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures', 'SpeedPositionSummaries');
@@ -25,11 +25,10 @@ function saveSpeedPositionActivity_AllROIs(sessionFileInfo, response, options)
     % 5. the loop
     for targetROI = 1:numROIs
         % call your plotting function
-        % note: we use 'Visible', 'off' inside a loop to speed things up
-        % if your function creates the figure, we capture it here
+  
         plotSpeedPositionActivity_ForROI(sessionFileInfo, response, targetROI, ...
             options.applySmoothing, options.smoothSigma);
-        
+        % 
         % find the figure that was just created
         figHandle = gcf; 
         
