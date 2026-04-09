@@ -7,7 +7,7 @@ if nargin < 3 || isempty(zScoreProcessedSignals), zScoreProcessedSignals = true;
 if nargin < 4 || isempty(applyTemporalSmoothing), applyTemporalSmoothing = true; end
 if nargin < 5 || isempty(prctl_F0), prctl_F0 = 8; end
 if nargin < 6 || isempty(prctl_F), prctl_F = 5; end
-if nargin < 7 || isempty(windowSize), windowSize = 60; end
+if nargin < 7 || isempty(windowSize), windowSize = 60; end % Aman: what are units? Time or bins, good to clarify
 if nargin < 8 || isempty(smoothW), smoothW = 5; end
 if nargin < 9 || isempty(numN), numN = 20; end
 if nargin < 10 || isempty(minNp), minNp = 10; end
@@ -28,7 +28,7 @@ disp('Loading F, FNeu, ops...');
 load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'F', 'Fneu', 'ops');
 
 %% Absolute zero subtraction & Smoothing
-F = F - absZero; % currently not saving the absolute zero subtracted version anywhere; might be good to? 
+F = F - absZero; % currently not saving the absolute zero subtracted version anywhere; might be good to? (Aman: just need to save absZero)
 Fneu = Fneu - absZero;
 
 %%
