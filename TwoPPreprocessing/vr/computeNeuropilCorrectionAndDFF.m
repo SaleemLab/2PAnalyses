@@ -1,7 +1,22 @@
 function [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, stimName, zScoreProcessedSignals, applyTemporalSmoothing, prctl_F0, prctl_F, windowSize, smoothW, numN, minNp, maxNp)
 % estimates neuropil correction, dff and dff without any neuropil
 % correction on 60hz interpolated traces from processedTwoPData 
-% 
+% Parameters:
+%   sessionFileInfo        : [struct]  Contains directory paths; must have .stimFiles subfield
+%   stimName               : [string]  Name of the stimulus to process (e.g., 'Gratings')
+%   zScoreProcessedSignals : [boolean] If true, standardizes final dFF traces (mean=0, std=1)
+%   applyTemporalSmoothing : [boolean] If true, applies Gaussian filtering
+%                                      to raw F and Neu
+%   prctl_F0               : [Int]  Percentile for slow-drift baseline (e.g., 8th percentile)
+%   prctl_F                : [Int]  Percentile of the measured signal that will be matched to neuropil.
+%                                      The default is 5. (e.g., 5th)
+%   windowSize             : [Int] Length of moving window in seconds for baseline estimation
+%   smoothW                : [Int] Length of Gaussian smoothing window in SAMPLES/BINS
+%   numN                   : [Int] Number of bins used to partition the distribution of neuropil values.
+%                                  Each bin will be associated with a mean neuropil value and a mean signal value.
+%   minNp                  : [Int] Minimum values of neuropil considered, expressed in percentile.
+%   maxNp                  : [Int] Maximum values of neuropil considered, expressed in percentile.
+
 %% Set Defaults
 if nargin < 3 || isempty(zScoreProcessedSignals), zScoreProcessedSignals = true; end
 if nargin < 4 || isempty(applyTemporalSmoothing), applyTemporalSmoothing = true; end
@@ -18,7 +33,7 @@ interpolatedFrameRate = 60;
 % Absolute zero value 
 % was obtained by averaging the darkest frame over many imaging sessions.
 % The  absolute zero value is arbitrary and depends on the voltage range of the PMTs. 
-absZero = -23;
+absoluteZeroValue = -23;
 
 stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx), error('Specified stimName not found.'); end
@@ -28,8 +43,8 @@ disp('Loading F, FNeu, ops...');
 load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, 'F', 'Fneu', 'ops');
 
 %% Absolute zero subtraction & Smoothing
-F = F - absZero; % currently not saving the absolute zero subtracted version anywhere; might be good to? (Aman: just need to save absZero)
-Fneu = Fneu - absZero;
+F = F - absoluteZeroValue; % currently not saving the absolute zero subtracted version anywhere; might be good to? (Aman: just need to save absZero)
+Fneu = Fneu - absoluteZeroValue;
 
 %%
 
@@ -114,13 +129,17 @@ for i = 1:length(roisToPlot)
 end
 
 %% Saving results
-disp('Saving processed data...');
-save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, ...
-    'processedSignals', 'zScoredProcessedSignals', '-append');
+
 
 processedTwoPData.processedSignals = processedSignals;
 processedTwoPData.zScoredProcessedSignals = zScoredProcessedSignals;
 processedTwoPData.neuropCorrPars = regPars; % new
 processedTwoPData.F = F;
 processedTwoPData.ops = ops;
+processedTwoPData.absoluteZeroValue = absoluteZeroValue; 
+
+disp('Saving processed data...');
+save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, ...
+    'processedSignals', 'zScoredProcessedSignals', 'absoluteZeroValue', '-append');
+
 end

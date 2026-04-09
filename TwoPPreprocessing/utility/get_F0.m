@@ -9,7 +9,7 @@ function F0 = get_F0(signal, F0_percentile, window_size_sec, plane_rate)
 % F0_percentile: 8 [Sylvia's defult: 'depth-for-2p']
 % window_size_sec: usually 60 [Sylvia's defult: 'depth-for-2p']
 if nargin < 2 || isempty(F0_percentile), F0_percentile = 8; end
-if nargin < 3 || isempty(window_size_sec), window_size_sec = 60; end
+if nargin < 3 || isempty(window_size_sec), window_size_sec = 60; end 
 % Here we pass the interpolatd rate [60hz] 
 
 
