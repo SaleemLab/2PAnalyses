@@ -11,6 +11,7 @@ function [initMap, sessionFileInfo] = analyseSparseNoise(sessionFileInfo,signalT
 if nargin < 2, signalToUse = 'dFFNeuropilCorrected'; end 
 if nargin < 3, plotflag = 1; end
 if nargin < 4, framesToShow = [1 2 4 6 8 10 12 14]; end
+%if nargin < 4, framesToShow = [1 5 10 15 20 25 30]; end
 if nargin < 5, saveData = 1; end 
 
 

@@ -41,7 +41,7 @@ function plotSpeedPositionActivity_ForROI(sessionFileInfo, response, targetROI, 
     
     ylabel('\DeltaF/F');
     set(ax1, 'Box', 'off', 'TickDir', 'out', 'XTickLabel', [], 'XLim', [1, numPosBins]);
-    title(sprintf('Soma %d: speed-position activity', targetROI));
+    title(sprintf('Bouton %d: speed-position activity', targetROI));
 
     %speed-position heatmap
     ax2 = subplot('Position', [leftMargin, 0.12, plotWidth, 0.55]); 

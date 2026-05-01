@@ -29,7 +29,7 @@ function [bonsaiData, sessionFileInfo] = getStimTimes(sessionFileInfo, stimName,
         useQuadState = false; % Not recommended to use at this point. 
     end 
     if nargin < 6
-        plotFlag = true;
+        plotFlag = false;
     end
 
     %% Load relevant paths and data

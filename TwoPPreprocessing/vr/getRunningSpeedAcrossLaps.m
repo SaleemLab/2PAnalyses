@@ -84,7 +84,7 @@ else
     warning('Lap timing information not found. Skipping lap-wise analysis.');
 end
 
-%% Calculate Position-Binned Speed (Calculated On-the-Fly)
+%% Calculate Position-Binned Speed 
 if nLaps > 0
     binnedSpeed = nan(nLaps, numBins); 
     
@@ -138,55 +138,59 @@ disp(['Saving updated Response struct (Lap Activity) to ', sessionFileInfo.stimF
 save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append');
 
 %% 
-if nLaps > 0 && ~isempty(binnedSpeed)
-    figure('Name', 'Running Speed Analysis');
-    subplot(121);
-    
-    %mean speed profile across all laps
-    meanSpeedProfile = mean(binnedSpeed, 1, 'omitnan');
-    
-    if any(~isnan(meanSpeedProfile))
-        plot(meanSpeedProfile, 'LineWidth', 2);
-        
-        % Set X-axis to match position (1-140)
-        xlim([1 numBins]);
-        
-        title('Mean Speed');
-        ylabel('Mean Speed (cm/s)');
-        xlabel('Position on Track (cm)');
+if doPlot
+
+    if nLaps > 0 && ~isempty(binnedSpeed)
+        figure('Name', 'Running Speed Analysis');
+        subplot(121);
+
+        %mean speed profile across all laps
+        meanSpeedProfile = mean(binnedSpeed, 1, 'omitnan');
+
+        if any(~isnan(meanSpeedProfile))
+            plot(meanSpeedProfile, 'LineWidth', 2);
+
+            % Set X-axis to match position (1-140)
+            xlim([1 numBins]);
+
+            title('Mean Speed');
+            ylabel('Mean Speed (cm/s)');
+            xlabel('Position on Track (cm)');
+            xticks([1 40 80 120 160 200]);
+            xticklabels({'1', '40', '80', '120', '160', '200'});
+            xline(40, 'k--', 'LineWidth', 2.5);
+            xline(80, 'k--', 'LineWidth', 2.5);
+            xline(120, 'k--', 'LineWidth', 2.5);
+            xline(160, 'k--', 'LineWidth', 2.5);
+            grid on;
+        else
+            text(0.5, 0.5, 'Mean speed profile is empty.', 'HorizontalAlignment', 'center');
+        end
+
+        %  Heatmap of Binned Speed (Lap vs. Position)
+        subplot(122);
+        imagesc(binnedSpeed);
         xticks([1 40 80 120 160 200]);
         xticklabels({'1', '40', '80', '120', '160', '200'});
+
+        yTickPositions = 1:5:nLaps; % Show every 5th lap
+        set(gca, 'YTick', yTickPositions);
+        colorbar;
         xline(40, 'k--', 'LineWidth', 2.5);
         xline(80, 'k--', 'LineWidth', 2.5);
         xline(120, 'k--', 'LineWidth', 2.5);
         xline(160, 'k--', 'LineWidth', 2.5);
-        grid on;
-    else
-        text(0.5, 0.5, 'Mean speed profile is empty.', 'HorizontalAlignment', 'center');
-    end
-    
-     %  Heatmap of Binned Speed (Lap vs. Position)
-     subplot(122);
-     imagesc(binnedSpeed);
-     xticks([1 40 80 120 160 200]);
-     xticklabels({'1', '40', '80', '120', '160', '200'});
-     
-     yTickPositions = 1:5:nLaps; % Show every 5th lap
-     set(gca, 'YTick', yTickPositions);
-     colorbar;
-     xline(40, 'k--', 'LineWidth', 2.5);
-     xline(80, 'k--', 'LineWidth', 2.5);
-     xline(120, 'k--', 'LineWidth', 2.5);
-     xline(160, 'k--', 'LineWidth', 2.5);
-     title('Binned Running Speed Across Laps');
-     xlabel('Position on Track (cm)');
-     ylabel('Lap Number');
-     axis tight;
+        title('Binned Running Speed Across Laps');
+        xlabel('Position on Track (cm)');
+        ylabel('Lap Number');
+        axis tight;
 
-     set(gcf, 'PaperUnits', 'inches', ...
-         'PaperPosition', [0 0 11 8.5], ...
-         'PaperOrientation', 'landscape');
-     print(gcf, pngFilePath, '-dpng', '-r300');
+        set(gcf, 'PaperUnits', 'inches', ...
+            'PaperPosition', [0 0 11 8.5], ...
+            'PaperOrientation', 'landscape');
+        print(gcf, pngFilePath, '-dpng', '-r300');
+
+    end
 
 end
 end

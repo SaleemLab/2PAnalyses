@@ -50,7 +50,7 @@ t = tiledlayout(3,1, 'TileSpacing', 'compact');
 
 % Group metadata for the loop
 masks = {stratStruct.highIdx, stratStruct.medIdx, stratStruct.lowIdx};
-titles = {'High Speed Group (>25 cm/s)', 'Medium Speed Group (10-25 cm/s)', 'Low Speed Group (1-10 cm/s)'};
+titles = {'High Speed Group (>30 cm/s)', 'Medium Speed Group (15-30 cm/s)', 'Low Speed Group (1-15 cm/s)'};
 
 for i = 1:3
     nexttile;

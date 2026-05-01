@@ -11,8 +11,8 @@ function figHandle = plotEvenTuningHeatmaps(allData, varargin)
     
     % --- Optional Filtering Parameters ---
     addParameter(p, 'RatioThreshold', -Inf, @isnumeric); 
-    addParameter(p, 'UseStabilityFilter', false, @islogical);
-    addParameter(p, 'SavePath', "Z:\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\Tuning_EvenLaps_SortedByOdd_RatioStable.png", @ischar); 
+    addParameter(p, 'UseStabilityFilter', true, @islogical);
+    addParameter(p, 'SavePath', "Z:\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\LearningTuning_EvenLaps_SortedByOdd.png", @ischar); 
     
     parse(p, allData, varargin{:});
     

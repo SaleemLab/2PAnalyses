@@ -28,6 +28,9 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
     elseif contains(stimName, 'DotMotion_SpeedTuning')
         stimTypeKey = 'DotMotion_SpeedTuning';
         stimTypeTableName = 'TrialParams';
+    elseif contains(stimName, 'DotMotion_RFMapping')
+        stimTypeKey = 'DotMotion_RFMapping';
+        stimTypeTableName = 'TrialParams';
     elseif contains(stimName, 'RFMapping')
         stimTypeKey = 'RFMapping';
         stimTypeTableName = 'StimulusParams'; 
@@ -81,6 +84,13 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
             bonsaiData.stimType = round(rad2deg(stimEventsTable.Value));
         
         case 'DotMotion_SpeedTuning'
+            stimEventsTable = readtable(tuningFilePath);
+            bonsaiData.bonsaiStimOnsetRaw = stimEventsTable.BonsaiTime;
+            bonsaiData.ArduinoTimeRaw = stimEventsTable.ArduinoTime./1000;
+            bonsaiData.stimType = stimEventsTable.VelX1;
+            bonsaiData.stimID = stimEventsTable.Id;
+
+        case 'DotMotion_RFMapping'
             stimEventsTable = readtable(tuningFilePath);
             bonsaiData.bonsaiStimOnsetRaw = stimEventsTable.BonsaiTime;
             bonsaiData.ArduinoTimeRaw = stimEventsTable.ArduinoTime./1000;

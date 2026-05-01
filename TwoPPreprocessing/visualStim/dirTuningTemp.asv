@@ -1,0 +1,96 @@
+%% --- M25132 Direction Tuning Analysis ---
+% --- Setup PDF Saving ---
+pdfFileName = '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M25132\Analysis\20260312\Figures\M25132_20260312_DirTuningV2.pdf';
+
+[fDir, ~, ~] = fileparts(pdfFileName);
+if ~exist(fDir, 'dir'), mkdir(fDir); end
+if exist(pdfFileName, 'file'), delete(pdfFileName); end 
+
+psthData = response.psthData; 
+timeVec  = psthData(1).timeVector;
+nROI     = size(psthData(1).alignedResponses, 1);
+
+
+allDirs = arrayfun(@(x) x.stimValue, psthData);
+[uDirs, ~, dirMap] = unique(allDirs);
+[sortedDirs, sortIdx] = sort(uDirs); 
+
+% Analysis Window (Matched to your snippet)
+respWin = [0.5 2]; 
+respIdx = timeVec >= respWin(1) & timeVec <= respWin(2);
+
+hFig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 1100 500]);
+
+for iROI = 1:nROI
+    clf(hFig);
+    
+    means = zeros(length(uDirs), 1);
+    sems  = zeros(length(uDirs), 1);
+    
+    % PSTH (Linear) 
+    subplot(1,2,1); hold on;
+    % Using 'copper' or 'autumn' to match the earth-tone style in your image
+    cmap = copper(length(uDirs)); 
+    pHandles = gobjects(length(uDirs), 1);
+    
+    for d = 1:length(uDirs)
+        trials = squeeze(psthData(d).alignedResponses(iROI, :, :)); 
+        meanTrace = mean(trials, 2, 'omitnan');
+        semTrace = std(trials, 0, 2, 'omitnan') ./ sqrt(size(trials, 2));
+        
+        % Calculate average response for the polar plot
+        trialAverages = mean(trials(respIdx, :), 1, 'omitnan');
+        means(d) = mean(trialAverages);
+        sems(d)  = std(trialAverages) / sqrt(length(trialAverages));
+        
+        % Shaded Error Bars
+        fill([timeVec(:); flipud(timeVec(:))], [meanTrace(:)-semTrace(:); flipud(meanTrace(:)+semTrace(:))], ...
+            cmap(d,:), 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+        
+        pHandles(d) = plot(timeVec, meanTrace, 'Color', cmap(d,:), 'LineWidth', 2);
+    end
+    
+    %
+    xlim([-1, 3]);
+    xline(0, 'k--', 'LineWidth', 1); 
+    xlabel('Time (s)'); 
+    ylabel('\DeltaF/F');
+    set(gca, 'Box', 'off', 'TickDir', 'out');
+   
+    
+    % Legend with degree symbols
+    legLabels = string(uDirs) + "°";
+    leg = legend(pHandles, legLabels, 'Location', 'bestoutside');
+    title(leg, 'Orientations');
+    
+    % 
+    subplot(1,2,2);
+ 
+    theta = deg2rad(sortedDirs);
+    rho = means(sortIdx);
+    
+    % 
+    theta_closed = [theta; theta(1)];
+    rho_closed = [rho; rho(1)];
+    
+    polarplot(theta_closed, rho_closed, 'ko-', 'LineWidth', 2, 'MarkerFaceColor', 'w');
+    hold on;
+    
+    % 
+    for k = 1:length(theta)
+        polarplot([theta(k) theta(k)], [means(sortIdx(k))-sems(sortIdx(k)), means(sortIdx(k))+sems(sortIdx(k))], 'k-');
+    end
+    
+    
+    ax = gca;
+    ax.ThetaTick = 0:45:315;
+    set(ax, 'TickDir', 'out', 'Box', 'off');
+
+    sgtitle(sprintf('Bouton %d: Direction Tuning ', iROI), ...
+        'FontSize', 14, 'FontWeight', 'bold');
+    
+    exportgraphics(hFig, pdfFileName, 'Append', true);
+end
+
+close(hFig);
+fprintf('Direction Tuning PDF Export Finished.\n');

@@ -78,7 +78,9 @@ displacement(displacement > 100) = 0;   % Positive large jumps
 
 % Calculate speed (in cm/s)
 response.wheelSpeed = displacement ./ [0; diff(peripheralData.Wheel.sampleTimes)]; % Change to peripheralData.Wheel.ArduinoTime
-response.pupilArea = peripheralData.Pupil.Value.Area;
+if isfield(peripheralData, 'Pupil')
+    response.pupilArea = peripheralData.Pupil.Value.Area;
+end 
 
 %% Virtual position and virtual speed
 mouseVirtualPosition = nan(1,length(bonsaiData.MousePos.Value));

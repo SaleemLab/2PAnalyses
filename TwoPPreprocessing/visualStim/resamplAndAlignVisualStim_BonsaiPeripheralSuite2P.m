@@ -1,11 +1,13 @@
-%%This version excludes bad frames 
+%%This version identifies bad frames from ops and interpolates the bad
+%%frames mask to use later on.. 
 function [processedTwoPData, bonsaiData, peripheralData, sessionFileInfo] = resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo, samplingRate, mainTimeToUse, StimName, plotFlag, trimNaNs, overwrite)
 %   Aligns and interpolates all VR experiment signals (Suite2P, Bonsai, peripheral)
 %   to a unified 2P timebase using the Arduino clock.
 %
 %   - Overwrites processedTwoPData file as a FLATTENED file (-struct).
 %   - Appends/Updates bonsaiData and peripheralData as nested structs.
-%   - Excludes bad frames from ops. 
+%   - Includes bad frames from ops. 
+%   - Trims data trims to the start and end of imaging. 
 %   - Pupil tracking included (03/26)
 
 %% Define default parameters
@@ -82,7 +84,7 @@ processedTwoPData.resample2PTimeUsed = mainTimeToUse;
 
 %% Interpolate: Suite2p data
 disp('Processing Suite2P Data')
-roiFields = {'F', 'Fneu', 'spks'};
+roiFields = {'F', 'Fneu', 'spks'}; %, 'F_chan2', 'Fneu_chan2'
 for thisField = 1:numel(roiFields), processedTwoPData.(roiFields{thisField}) = []; end
 processedTwoPData.badFrames = {}; % Initialized as cell array
 processedTwoPData.roiPlaneIdentity = [];
@@ -223,8 +225,8 @@ if trimNaNs
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.spks), 1);
     % added new variables here 
-    % combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.dFF), 1);
-    % combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.dFFNeuropilCorrected), 1);
+    %combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.F_chan2), 1);
+    %combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu_chan2), 1);
 
     
     if ~any(combinedValidMask)
@@ -236,9 +238,9 @@ if trimNaNs
         processedTwoPData.F = processedTwoPData.F(:, combinedValidMask);
         processedTwoPData.Fneu = processedTwoPData.Fneu(:, combinedValidMask);
         processedTwoPData.spks = processedTwoPData.spks(:, combinedValidMask);
-        % added dFF here
-        % processedTwoPData.dFF = processedTwoPData.dFF(:, combinedValidMask);
-        % processedTwoPData.dFFNeuropilCorrected = processedTwoPData.dFFNeuropilCorrected(:, combinedValidMask);
+        % added new variables here
+        %processedTwoPData.F_chan2 = processedTwoPData.F_chan2(:, combinedValidMask);
+        %processedTwoPData.Fneu_chan2 = processedTwoPData.Fneu_chan2(:, combinedValidMask);
         processedTwoPData.TwoPFrameTime = processedTwoPData.TwoPFrameTime(combinedValidMask);
         processedTwoPData.ArduinoTime = processedTwoPData.ArduinoTime(combinedValidMask);
         

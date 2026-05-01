@@ -1,115 +1,96 @@
 %% temp test
-function [response, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, stimName, excludeBadFrames, preStimTime, postStimTime, useoffARDTimes)
-% Extract frames by directly filtering timestamps.
-% If excludeBadFrames is true, relative times for artifact frames are set to NaN
-% to preserve the temporal grid of the trial.
-%
-% Aman and Sonali - Feb 2025
+function [response, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, stimName, excludeBadFrames, preStimTime, postStimTime)
+%% Handle Input Defaults and Stimulus Overrides
+if nargin < 3, excludeBadFrames = true; end % Default to true to clean data
+if nargin < 4, preStimTime = 2; end
+if nargin < 5, postStimTime = 4; end
 
-%% Handle Input Defaults
-if nargin < 3, excludeBadFrames = false; end
-if nargin < 5, useoffARDTimes = 'false'; end
-if nargin < 4, preStimTime = 0; end
-
-% Stimulus specific overrides
-if contains(stimName, 'SparseNoiseTexture', 'IgnoreCase',true)
-    postStimTime = 3; useoffARDTimes = 'true'; 
-elseif contains(stimName, 'RFMapping', 'IgnoreCase',true)
-    postStimTime = 4; preStimTime = 2; useoffARDTimes = 'false';
-elseif contains(stimName, 'DotMotion_SpeedTuning','IgnoreCase',true)
-    postStimTime = 4; preStimTime = 2; useoffARDTimes = 'false'; 
-elseif contains(stimName, 'DirTuning','IgnoreCase',true)
-    postStimTime = 4; preStimTime = 2; useoffARDTimes = 'false'; 
+% (Your existing stimulus overrides logic here...)
+if contains(stimName, 'RFMapping', 'IgnoreCase',true)
+    postStimTime = 4; preStimTime = 2; 
 end
 
-% Locate the current stimulus
+if contains(stimName, 'DotMotion_SpeedTuning_Contrast')
+    postStimTime = 6; preStimTime = 2;
+end 
+
+if contains(stimName, 'DotMotion_RFMapping')
+    postStimTime = 6; preStimTime = 2;
+end 
+%% Load Data
 isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
 iStim = find(isStim, 1);
-if isempty(iStim)
-    error('Stimulus name not found in sessionFileInfo');
-end
+processedData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
+load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 
-%% Load flattened data
-if exist(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData,'file') && ...
-        exist(sessionFileInfo.stimFiles(iStim).BonsaiData, 'file')
-    processedData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
-    load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
-else
-    error('Missing files.');
-end
-
+% Set output path
 stimFileName = sprintf('%s_%s_Response_%s.mat', ...
-    sessionFileInfo.animal_name, sessionFileInfo.session_name, sessionFileInfo.stimFiles(iStim).name);
+    sessionFileInfo.animal_name, sessionFileInfo.session_name, stimName);
 sessionFileInfo.stimFiles(iStim).Response = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
 
-if strcmpi(useoffARDTimes, 'true') || (islogical(useoffARDTimes) && useoffARDTimes)
-    combinedStimARDTimes = sort([bonsaiData.onARDTimes; bonsaiData.offARDTimes]);
-else
-    combinedStimARDTimes = bonsaiData.onARDTimes;
-end
+%% Setup Timebase
+frameTimes = processedData.TwoPFrameTime(:)'; % Ensure row vector
+combinedStimARDTimes = bonsaiData.onARDTimes;
+nTrials = length(combinedStimARDTimes);
 
-frameTimes = processedData.TwoPFrameTime;
-if size(frameTimes, 1) > size(frameTimes, 2), frameTimes = frameTimes'; end
+% We create a fixed vector from -pre to +post
+Fs = 60; 
+perfectTime = -preStimTime : (1/Fs) : postStimTime;
+nFramesInPerfect = length(perfectTime);
 
-%% Handle bad frames 
+%% Handle Bad Frames
 isBadFrameGlobal = false(size(frameTimes));
-if excludeBadFrames && isfield(processedData, 'badFrames') && ~isempty(processedData.badFrames)
-    tempMask = processedData.badFrames{1};
-    if size(tempMask, 1) > size(tempMask, 2)
-        tempMask = tempMask'; 
-    end
-    len = min(length(isBadFrameGlobal), length(tempMask));
-    isBadFrameGlobal(1:len) = logical(tempMask(1:len));
+if excludeBadFrames && isfield(processedData, 'badFrames')
+    % Suite2p badframes are usually saved as a cell array per plane
+    % We assume they were already interpolated to the 60Hz grid in Fun 2
+    tempMask = processedData.badFrames{1}; 
+    isBadFrameGlobal(1:length(tempMask)) = logical(tempMask);
 end
 
 %% Process Trials
-nTrials = length(combinedStimARDTimes);
+response.alignedTimes = perfectTime; % The "Ground Truth" x-axis
+response.badTrialMask = false(nTrials, 1);
 response.responseFrameIdx = cell(nTrials, 1);
 response.responseFrameRelTimes = cell(nTrials, 1);
-response.badTrialMask = false(nTrials, 1); 
 
 for iTrial = 1:nTrials
+    % Define the window for this specific trial
     t_start = combinedStimARDTimes(iTrial) - preStimTime;
     t_end   = combinedStimARDTimes(iTrial) + postStimTime;
-    
-    % Identify all frames in the window 
-    timeWindowMask = (frameTimes >= t_start) & (frameTimes <= t_end);
-    
-    % Check excluded frames to display
+
+    % Find frames within the window
+    timeWindowMask = (frameTimes >= t_start - 0.1) & (frameTimes <= t_end + 0.1); 
+
+    % --- THE QUALITY CHECK ---
     totalFramesInWindow = sum(timeWindowMask);
     badFramesInWindow = sum(timeWindowMask & isBadFrameGlobal);
-    
-    if totalFramesInWindow > 0 && ( (totalFramesInWindow - badFramesInWindow) / totalFramesInWindow < 0.5 )
+
+    % If > 50% of frames are bad, mark the whole trial
+    if totalFramesInWindow > 0 && ((totalFramesInWindow - badFramesInWindow) / totalFramesInWindow < 0.5)
         response.badTrialMask(iTrial) = true;
     end
-    
-   
-    % We store the FULL window mask so the indexing into F/spks remains consistent
-    response.responseFrameIdx{iTrial} = timeWindowMask;
-    
-    % Relative Times with NaNs for bad frames
-    if any(timeWindowMask)
-        relTimes = frameTimes(timeWindowMask) - combinedStimARDTimes(iTrial);
-        
-        if excludeBadFrames
-            % 
-            localBadMask = isBadFrameGlobal(timeWindowMask);
-            % Set bad frame relative times to NaN
-            relTimes(localBadMask) = NaN;
-        end
-        
-        response.responseFrameRelTimes{iTrial} = relTimes;
-    else
-        response.responseFrameRelTimes{iTrial} = [];
-    end
-end
 
-response.preStimTime = preStimTime;
-response.postStimTime = postStimTime;
-response.excludeBadFramesUsed = excludeBadFrames;
+    % Store the mask for later indexing
+    response.responseFrameIdx{iTrial} = timeWindowMask;
+
+    % --- THE ALIGNMENT FIX ---
+    % Calculate exact relative times for the frames we found
+    relTimes = frameTimes(timeWindowMask) - combinedStimARDTimes(iTrial);
+
+    if excludeBadFrames
+        % Set bad frames to NaN so they are ignored during later interpolation
+        localBadMask = isBadFrameGlobal(timeWindowMask);
+        relTimes(localBadMask) = NaN;
+    end
+
+    response.responseFrameRelTimes{iTrial} = relTimes;
+end
 
 %% Save
+response.preStimTime = preStimTime;
+response.postStimTime = postStimTime;
 save(sessionFileInfo.stimFiles(iStim).Response, 'response');
-save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
-disp(['Done. ' num2str(sum(response.badTrialMask)) ' trials flagged for data loss.']);
+fprintf('Done. %d trials flagged. Alignment grid set to 60Hz.\n', sum(response.badTrialMask));
 end
+
+

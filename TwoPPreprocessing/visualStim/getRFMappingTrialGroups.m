@@ -2,7 +2,6 @@ function [bonsaiData, sessionFileInfo] = getRFMappingTrialGroups(sessionFileInfo
 % Updated version: Matches stimulus parameters to individual triggers
 % Works with the new Response structure where 1 Trigger = 1 Trial.
 
-% 
 isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
 iStim = find(isStim, 1);
 if isempty(iStim), error('Stimulus "%s" not found.', stimName); end
@@ -10,8 +9,7 @@ if isempty(iStim), error('Stimulus "%s" not found.', stimName); end
 load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 load(sessionFileInfo.stimFiles(iStim).Response, 'response');
 
-% 2. Get Trial Counts
-% We expect 160 for RFMapping (10 repeats
+% We expect 160 for RFMapping (10 repeats); This gets trial counts 
 nStimParams = length(bonsaiData.positionX);
 nTrials = length(response.responseFrameIdx);
 
@@ -42,6 +40,12 @@ for thisUniquePosition = 1:size(uniquePositions, 1)
     % trial index and stim index are identical
     trialGroups(thisUniquePosition).stimIndices = tIdx;
 end
+
+if nStimParams ~= nTrials
+    warning('Count mismatch! Bonsai has %d trials, but Photodiode found %d triggers. Check for dropped triggers!', ...
+        nStimParams, nTrials);
+end
+
 
 % Save
 bonsaiData.trialGroups = trialGroups;

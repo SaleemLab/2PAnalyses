@@ -1,9 +1,7 @@
 function [sessionFileInfo] = mergeBonsaiSuite2pFiles(sessionFileInfo)
 % Merges Bonsai and Suite2p data for each stimulus in a session.
-% 
-% NOTE TO SELF: Data is split here because the rest of the pipeline 
-% requires this specific structure for plane-wise analysis.
-% CHECK this function 
+
+
 for iStim = 1:length(sessionFileInfo.stimFiles)
     stimName = sessionFileInfo.stimFiles(iStim).name;
     
@@ -70,6 +68,11 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             twoPData(iPlane).F = fAll.F(:, trimIndices);
             twoPData(iPlane).spks = fAll.spks(:, trimIndices);
             twoPData(iPlane).Fneu = fAll.Fneu(:, trimIndices);
+            if isfield(fAll, 'F_chan2') && isfield(fAll, 'Fneu_chan2') && ...
+                ~isempty(fAll.F_chan2) && ~isempty(fAll.Fneu_chan2)
+                twoPData(iPlane).F_chan2 = fAll.F_chan2(:, trimIndices);
+                twoPData(iPlane).Fneu_chan2 = fAll.F_chan2(:, trimIndices);
+            end
             
             % Extract timing data per plane
             if strcmp(planeName,'plane_z')
@@ -215,3 +218,4 @@ end
 % save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 % disp('Done.');
 % end
+

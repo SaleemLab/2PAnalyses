@@ -53,13 +53,13 @@ function sessionMetrics = getTuningData(sessionTable, varargin)
              currentSessionData.Type = 'Unknown';
         end
         
-        if ismember('GCaMPInjectionSite', row.Properties.VariableNames)
-            currentSessionData.InjectionSite = row.GCaMPInjectionSite{1};
-            currentSessionData.TargetArea = row.TargetArea{1};
-        else
-             currentSessionData.InjectionSite = '';
-             currentSessionData.TargetArea = '';
-        end
+        % if ismember('GCaMPInjectionSite', row.Properties.VariableNames)
+        %     currentSessionData.InjectionSite = row.GCaMPInjectionSite{1};
+        %     currentSessionData.TargetArea = row.TargetArea{1};
+        % else
+        %      currentSessionData.InjectionSite = '';
+        %      currentSessionData.TargetArea = '';
+        % end
         
         % Load Activity Data
         [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse);

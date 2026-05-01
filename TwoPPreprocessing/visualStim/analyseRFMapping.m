@@ -1,112 +1,153 @@
 function [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, stimName)
-% Uses the psth data from response, seperates grid trials and blank trials;
-% Identifies unique Az and El position; 
-% For every position grid each trial is baseline subtracted before mean for
-% a given position is saved. 
-% load data
+% analyseRFMapping: Classifies visual responsiveness based on ANOVA and Signal-to-Noise.
+% This version uses the MEAN response with a relaxed 1.5 SD threshold for debugging.
+
+% 1. Load response data
 iStim = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}), 1);
 load(sessionFileInfo.stimFiles(iStim).Response, 'response');
 psthData = response.psthData;
 stimVs = vertcat(psthData.stimValue);
 nROI = size(psthData(1).alignedResponses, 1);
-% filter grid and blank response [200 0] are the blank trials
+
+% Filter grid and blank response [200 0]
 blankIdx = find(stimVs(:,1) == 200 & stimVs(:,2) == 0, 1);
 gridMask = stimVs(:,1) ~= 200;
 gridPSTH = psthData(gridMask);
 gridStim = stimVs(gridMask, :);
 blankPSTH = psthData(blankIdx);
-% arrangement of grids
+
+% Grid Arrangement
 uAz = sort(unique(gridStim(:,1)), 'ascend');  
 uEl_plot = sort(unique(gridStim(:,2)), 'descend'); 
 nAz = length(uAz); nEl = length(uEl_plot);
 timeVector = psthData(1).timeVector(:);
 nTpts = length(timeVector);
-%this is currently hardcoded 
-respWin = [0.5 3];  % changed from 2 t0 3: 24/03
-baseWin = [-0.75 0];  %changed 24/03 
-% create structure 
+
+% --- FIXED PARAMETERS ---
+respWin = [0.5 3]; 
+baseWin = [-1.0 0];  
+respIdx = timeVector >= respWin(1) & timeVector <= respWin(2);
+baseIdx = timeVector >= baseWin(1) & timeVector < baseWin(2);
+
+% Initialize structure 
 RFMapping = struct('meanGridResponse', cell(nROI, 1), ... 
                    'meanTemporalResponse', cell(nROI, 1), ...
                    'meanBlankResponse', cell(nROI, 1), ...
-                   'correctedTrialsGrid', cell(nROI, 1), ... 
-                   'correctedTrialsBlank', cell(nROI, 1), ...
+                   'baselineSubtracted', cell(nROI, 1), ...      
+                   'baselineSubtractedBlank', cell(nROI, 1), ... 
                    'peakAmplitude', cell(nROI, 1), ...
                    'centerAz', cell(nROI, 1), ...
-                   'centerEl', cell(nROI, 1));
+                   'centerEl', cell(nROI, 1), ...
+                   'pValANOVA', cell(nROI, 1), ...
+                   'isResponsive', cell(nROI, 1)); 
 allCenters = nan(nROI, 2);
-%% Loop for each roi 
+
+%% Loop for each ROI 
 for iROI = 1:nROI
     meanGridResponse = nan(nEl, nAz); 
-    temporalStack = nan(nTpts, nEl, nAz); 
-    correctedGridTrials = cell(nEl, nAz); 
-    maxResponseScale = 1e-6; % Gemini's suggestion to prevent normalisation from crashing.. 
+    peakGridResponse = nan(nEl, nAz); 
+    temporalStack = nan(nTpts, nEl, nAz);
+    trialMatrix = cell(nEl, nAz); 
+    maxResponseScale = 1e-6;
     
-    %  Process Blank trials [trial-by-trial baseline]
-    % bTrials shape: [1, nTpts, nTrials]
+    % Accumulators for ANOVA [Observations x 1]
+    allTrialMeans = []; 
+    groupLabels = [];
+    
+    % --- Process Blank trials ---
     bTrials = blankPSTH.alignedResponses(iROI, :, :);
-    baseIdxB = timeVector >= baseWin(1) & timeVector < baseWin(2);
-    
-    % Calculate baseline for EACH trial and subtract it from that trial
-    trialBaselinesB = mean(bTrials(1, baseIdxB, :), 2, 'omitnan'); % Mean of baseline window per trial
-    bTrialsCorrected = bTrials - trialBaselinesB; % MATLAB implicitly expands trialBaselinesB
-    
-    % Now average the corrected trials
+    trialBaselinesB = mean(bTrials(1, baseIdx, :), 2, 'omitnan'); 
+    bTrialsCorrected = bTrials - trialBaselinesB; 
     meanBlankResponse = mean(bTrialsCorrected, 3, 'omitnan');
-    meanBlankResponse = meanBlankResponse(:); 
-    % Process Grid trials
+    
+    % Collect Blank trial-means for ANOVA and Noise Floor
+    blankTrialMeans = squeeze(mean(bTrialsCorrected(1, respIdx, :), 2, 'omitnan'));
+    allTrialMeans = [allTrialMeans; blankTrialMeans(:)];
+    groupLabels = [groupLabels; repmat(17, numel(blankTrialMeans), 1)]; % Group 17 is Blank 
+    
+    % --- Process Grid trials ---
     for thisPos = 1:numel(gridPSTH)
-        % allTrialsAtPos shape: [1, nTpts, nTrials]
         allTrialsAtPos = gridPSTH(thisPos).alignedResponses(iROI, :, :);
-        
-        % Trial-by-trial baseline subtraction
-        baseIdx = timeVector >= baseWin(1) & timeVector < baseWin(2);
         trialBaselines = mean(allTrialsAtPos(1, baseIdx, :), 2, 'omitnan');
-        correctedTrials = allTrialsAtPos - trialBaselines; % Subtract each trial's own baseline
+        correctedTrials = allTrialsAtPos - trialBaselines; 
         
-        % Now average the corrected trials to get the mean PSTH for this position
         avgAtPos = mean(correctedTrials, 3, 'omitnan');
-        avgAtPos = avgAtPos(:); 
-        
-        % track peak for scaling
+        avgAtPos = avgAtPos(:);
         maxResponseScale = max(maxResponseScale, max(avgAtPos));
         
-        % map to indices
         rowIdx = find(uEl_plot == gridStim(thisPos, 2), 1); 
         colIdx = find(uAz == gridStim(thisPos, 1), 1);
         
-        % time series and grid mean
         temporalStack(:, rowIdx, colIdx) = avgAtPos;
-        meanGridResponse(rowIdx, colIdx) = mean(avgAtPos(timeVector >= respWin(1) & timeVector <= respWin(2)), 'omitnan');
         
-        % Save individual baseline-subtracted trials
-        correctedGridTrials{rowIdx, colIdx} = squeeze(correctedTrials);
+        % Store Mean (used for primary gate in this version)
+        meanGridResponse(rowIdx, colIdx) = mean(avgAtPos(respIdx), 'omitnan');
+        % Store Peak (used for coordinate centering)
+        peakGridResponse(rowIdx, colIdx) = max(avgAtPos(respIdx), [], 'omitnan');
+        
+        % Collect trial-means for ANOVA 
+        posTrialMeans = squeeze(mean(correctedTrials(1, respIdx, :), 2, 'omitnan'));
+        allTrialMeans = [allTrialMeans; posTrialMeans(:)];
+        groupLabels = [groupLabels; repmat(thisPos, numel(posTrialMeans), 1)];
+        
+        trialMatrix{rowIdx, colIdx} = squeeze(correctedTrials)'; 
     end
     
-    % average response magnitude at each (Elevation, Azimuth) location.
-    RFMapping(iROI).meanGridResponse = meanGridResponse;
-    % Full trial-averaged time-courses for every grid position.
+    % --- STATISTICAL CLASSIFICATION ---
+    
+    %  ANOVA across all locations + blank (p < 0.05) 
+    pValANOVA = anova1(allTrialMeans, groupLabels, 'off');
+    % isSelective = pValANOVA < 0.05;
+    % 
+    % % Identify preferred location
+    % [~, mI] = max(meanGridResponse(:));
+    % [r, c] = ind2sub(size(meanGridResponse), mI);
+    % 
+    % prefTrials = trialMatrix{r, c}; % Individual trials at best spot
+    % avgTrialPeak = mean(max(prefTrials, [], 2));
+
+    
+
+    % isResponsive = isSelective && (avgTrialPeak > (3 * blankStd));
+    % % 2. Thresholding
+    blankStd  = std(blankTrialMeans, 'omitnan');
+    blankMean = mean(blankTrialMeans, 'omitnan');
+    
+  
+    prefVal = max(meanGridResponse(:));
+    % 
+    % % Logic: ANOVA p < 0.05 AND Mean(Pref) > Mean(Blank) + 1*SD(Blank)
+    isResponsive = (pValANOVA < 0.05) && (prefVal > (blankMean + 1 * blankStd));
+    
+    % Final Storage
+    RFMapping(iROI).meanGridResponse = meanGridResponse; 
     RFMapping(iROI).meanTemporalResponse = temporalStack;
-    % Average activity during blank trials.
-    RFMapping(iROI).meanBlankResponse = meanBlankResponse;
-    
-    % Store trial-by-trial data
-    RFMapping(iROI).correctedTrialsGrid = correctedGridTrials;
-    RFMapping(iROI).correctedTrialsBlank = squeeze(bTrialsCorrected);
-    
-    % The highest average response recorded across all positions
+    RFMapping(iROI).meanBlankResponse = meanBlankResponse(:);
+    RFMapping(iROI).baselineSubtracted = trialMatrix;
+    RFMapping(iROI).baselineSubtractedBlank = squeeze(bTrialsCorrected)'; 
     RFMapping(iROI).peakAmplitude = maxResponseScale;
+    RFMapping(iROI).pValANOVA = pValANOVA;
+    RFMapping(iROI).isResponsive = isResponsive;
     
-    % find peaks in all grids
-    [~, mI] = max(meanGridResponse(:));
-    [rPeak, cPeak] = ind2sub(size(meanGridResponse), mI);
-    RFMapping(iROI).centerAz = uAz(cPeak);
-    RFMapping(iROI).centerEl = uEl_plot(rPeak);
-    allCenters(iROI, :) = [uAz(cPeak), uEl_plot(rPeak)];
+    if isResponsive
+        % Fix: Use linear index to avoid empty find results from floating point errors
+        [~, mI] = max(meanGridResponse(:));
+        [rPeak, cPeak] = ind2sub(size(meanGridResponse), mI);
+        
+        RFMapping(iROI).centerAz = uAz(cPeak);
+        RFMapping(iROI).centerEl = uEl_plot(rPeak);
+        allCenters(iROI, :) = [uAz(cPeak), uEl_plot(rPeak)];
+    else
+        allCenters(iROI, :) = [NaN, NaN];
+    end
 end
-% save the metadata 
-RFMappingMetadata = struct('stimName', stimName, 'timeVector', timeVector, ...
-    'uAz', uAz, 'uEl', uEl_plot, 'respWin', respWin, 'baseWin', baseWin);
+
+% Save results - Ensuring uAz and uEl are included for plotRFMapping
+RFMappingMetadata = struct('uAz', uAz, 'uEl', uEl_plot, 'timeVector', timeVector, ...
+    'respWin', respWin, 'baseWin', baseWin, 'zThreshold', 1);
+
 savePath = sessionFileInfo.otherSessFilePaths.sessionROIData;
 save(savePath, 'RFMapping', 'RFMappingMetadata', '-append');
-fprintf('RF Mapping for %d ROIs saved to: %s\n', nROI, savePath);
+
+fprintf('Processing complete. %d/%d ROIs classified as visually responsive.\n', sum([RFMapping.isResponsive]), nROI);
 end

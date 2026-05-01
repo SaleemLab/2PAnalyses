@@ -92,7 +92,7 @@ end
 processedTwoPData.resample2PTimeUsed = mainTimeToUse; % For future use.
 %% Interpolate: Suite2p data
 disp('Processing Suite2P Data')
-roiFields = {'F', 'Fneu', 'spks'};
+roiFields = {'F', 'Fneu', 'spks', }; %'F_chan2','Fneu_chan2' 
 %interpMethods = {'linear', 'linear', 'nearest'}; % Change if incorrect
 for thisField = 1:numel(roiFields)
     processedTwoPData.(roiFields{thisField}) = [];
@@ -269,6 +269,10 @@ if trimNaNs
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu), 1);
     combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.spks), 1);
 
+     % added new variables here 
+    % combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.F_chan2), 1);
+    % combinedValidMask = combinedValidMask & all(isfinite(processedTwoPData.Fneu_chan2), 1);
+
     % Check if we'd be removing everything
     if ~any(combinedValidMask)
         warning('Trimming NaNs would remove all data. Skipping trim.');
@@ -285,6 +289,11 @@ if trimNaNs
         processedTwoPData.F = processedTwoPData.F(:, combinedValidMask);
         processedTwoPData.Fneu = processedTwoPData.Fneu(:, combinedValidMask);
         processedTwoPData.spks = processedTwoPData.spks(:, combinedValidMask); 
+        
+        % integrating red channel 
+        % processedTwoPData.F_chan2 = processedTwoPData.F_chan2(:, combinedValidMask);
+        % processedTwoPData.Fneu_chan2 = processedTwoPData.Fneu_chan2(:, combinedValidMask);
+
         processedTwoPData.TwoPFrameTime = processedTwoPData.TwoPFrameTime(combinedValidMask);
         processedTwoPData.ArduinoTime = processedTwoPData.ArduinoTime(combinedValidMask);
 

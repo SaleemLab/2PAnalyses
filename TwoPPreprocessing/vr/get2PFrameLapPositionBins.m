@@ -51,9 +51,19 @@ elseif contains(VRStimName, 'VRCorr')
     posBinEdges = 0:140;
 end 
 
+speedFilter = response.wheelSpeed > minSpeedBin & response.wheelSpeed < maxSpeedBin;
+% speedFilter =  response.wheelSpeed < maxSpeedBin;
+
+% if contains(VRStimName, 'OpenLoop') % test
+%     speedFilter =  response.wheelSpeed < maxSpeedBin;
+% else 
+%     speedFilter = response.wheelSpeed > minSpeedBin & response.wheelSpeed < maxSpeedBin;
+% 
+% end 
 numPosBins = length(posBinEdges) - 1;
 nLaps = length(response.completedStartTimes);
-speedFilter = response.wheelSpeed > minSpeedBin & response.wheelSpeed < maxSpeedBin;
+
+
 
 
 lapPosition2PFrameIdx = cell(nLaps, numPosBins);
@@ -244,3 +254,4 @@ end
 % save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 % disp('Done.');
 % end
+

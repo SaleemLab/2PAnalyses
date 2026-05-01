@@ -1,120 +1,95 @@
 function [alignedFull, response] = alignToPeakTuningCurvePosition(sessionFileInfo, VRStimName, signalToUse, plotFlag)
-% findlandmarktunedrois - identifies rois that peak at specific landmark positions.
-% uses odd laps to find peaks and even laps to validate consistency.
 if nargin < 3, signalToUse = 'dFFNeuropilCorrected'; end
 if nargin < 4, plotFlag = 1; end
-%% load data
+stableThreshold = 0.7; 
+%% Load Data
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx), error('specified vrstimname not found.'); end
-
 responsefilePath = sessionFileInfo.stimFiles(stimIdx).Response;
 sessionROIDataFilePath = sessionFileInfo.otherSessFilePaths.sessionROIData;
-
-% loading lap activity and the trial conditions
 response = load(responsefilePath, 'lapPositionActivity', 'trialIndicesByCondition');
 lapActivity = response.lapPositionActivity.(signalToUse);
 conds = fieldnames(response.trialIndicesByCondition);
 [numROIs, numLaps, numPosBins] = size(lapActivity);
-
-% pick stable rois 
+% Pick stable ROIs using rho
 vars = load(sessionROIDataFilePath, 'lapCorr_Halves');
-stableIdx = vars.lapCorr_Halves.stableIdx;
-%% 
-figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
-if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
-filename = fullfile(figSaveDir, sprintf('%s_%s_%s_%s_AlignedPeakResponses.png', ...
-    sessionFileInfo.animal_name, sessionFileInfo.session_name, signalToUse, VRStimName));
-
-
-%% smoothing (spatial filtering)
+stableMask = vars.lapCorr_Halves.rho >= stableThreshold;
+%% Smoothing
 w = gausswin(15); w = w / sum(w);
 smoothedActivity = lapActivity;
 for iCell = 1:numROIs
     for iLap = 1:numLaps
         trace = squeeze(lapActivity(iCell, iLap, :));
         if all(isnan(trace)), continue; end
-        nanMask = isnan(trace);
-        trace(nanMask) = 0;
-        smoothed = filtfilt(w, 1, trace);
-        smoothed(nanMask) = NaN;
+        nanMask = isnan(trace); trace(nanMask) = 0;
+        smoothed = filtfilt(w, 1, trace); smoothed(nanMask) = NaN;
         smoothedActivity(iCell, iLap, :) = smoothed;
     end
 end
-
-%% pick out baseline laps and split into odd and even 
+%% Split Baseline Laps
 baseIdx = find(contains(lower(conds), 'baseline') | contains(lower(conds), 'norm'), 1);
 if isempty(baseIdx), baseIdx = 1; end
 baseLaps = response.trialIndicesByCondition.(conds{baseIdx});
-
-% cross-validate and split 
 oddBaseline = baseLaps(1:2:end);
 evenBaseline = baseLaps(2:2:end);
-meanOdd  = squeeze(mean(smoothedActivity(:, oddBaseline, :), 2, 'omitnan'));
-meanEven = squeeze(mean(smoothedActivity(:, evenBaseline, :), 2, 'omitnan'));
-
-normOdd = normalize(meanOdd, 2, 'range');
-normEven = normalize(meanEven, 2, 'range');
-
-%% Look 90cm left/right to see the 80cm twin 
-
-% shiftRange = 90;              
-% shiftBins = -shiftRange:shiftRange;
-
-%%align using full track with nan-padding
-roisToInclude = stableIdx; 
-numBins = numPosBins; % 200 bins for 200cm track
-
-% add nan twice the track size so any peak can be centered at 0 
-alignedFull = nan(length(roisToInclude), numBins * 2 + 1);
+% Filter for stable activity
+stableSmoothed = smoothedActivity(stableMask, :, :);
+numStable = size(stableSmoothed, 1);
+meanOdd  = squeeze(mean(stableSmoothed(:, oddBaseline, :), 2, 'omitnan'));
+meanEven = squeeze(mean(stableSmoothed(:, evenBaseline, :), 2, 'omitnan'));
+%% Reference Normalization
+minOdd = min(meanOdd, [], 2);
+maxOdd = max(meanOdd, [], 2);
+rangeOdd = maxOdd - minOdd;
+rangeOdd(rangeOdd == 0) = 1; 
+normOdd  = (meanOdd - minOdd) ./ rangeOdd;
+normEven = (meanEven - minOdd) ./ rangeOdd;
+%% Align to Peak
+numBins = numPosBins; 
+alignedFull = nan(numStable, numBins * 2 + 1);
 centerIdx = numBins + 1;
-allPeakPos = zeros(length(roisToInclude), 1); % store positions for plotting 
+allPeakPos = zeros(numStable, 1); 
 
-for i = 1:length(roisToInclude)
-    iROI = roisToInclude(i);
+% Exclusion boundaries: 30cm to 170cm
+startBin = 10;
+endBin = 190;
+
+for i = 1:numStable
+    % Find peak ONLY within 30-170cm to avoid initial onsets and offsets
+    [~, relativePeak] = max(normOdd(i, startBin:endBin));
+    peakPos = relativePeak + (startBin - 1); 
     
-    % Find the anchor peak position on odd laps 
-    [~, peakPos] = max(normOdd(iROI, :));
-    allPeakPos(i) = peakPos; % Save for the snake-sort later
+    allPeakPos(i) = peakPos;
     
-    % Get the Even Profile (the data to be plotted)
-    evenProfile = normEven(iROI, :);
+    evenProfile = normEven(i, :);
     
-    % Calculate where the start of the track lands so peakPos hits centerIdx
     targetStart = centerIdx - (peakPos - 1);
     targetEnd = targetStart + numBins - 1;
     
-    % Drop the profile into the NaN canvas
     alignedFull(i, targetStart:targetEnd) = evenProfile;
 end
-
-%% heatmap + mean 
+%% Plotting
 if plotFlag
     fig = figure('Color', 'w', 'Position', [100 100 550 800]);
-    nROIs = size(alignedFull, 1);
     fullShiftBins = (-numBins : numBins); 
     [~, snakeSortIdx] = sort(allPeakPos, 'descend'); 
     
-    % heatmap 
+    % Heatmap
     subplot('Position', [0.15 0.45 0.7 0.45]);
-    imagesc(fullShiftBins, 1:nROIs, alignedFull(snakeSortIdx, :));
+    imagesc(fullShiftBins, 1:numStable, alignedFull(snakeSortIdx, :));
     colormap(flipud(gray));
-    clim([0.25, 0.75]); 
+    clim([0 1]); 
     
     hold on;
     xline(-80, 'r', 'LineWidth', 1.5);
     xline(80, 'b', 'LineWidth', 1.5);
-    xline(0, 'y', 'LineWidth', 1.5);
+    xline(0, 'y', 'LineWidth', 2);
     
-    xlim([-100, 100]); 
-    ylabel('Stable ROIs');
-    title(sprintf('Aligned Population (n=%d)', nROIs));
+    xlim([-100, 100]); ylabel('Sorted Stable ROIs');
+    title(sprintf('Aligned Population (n=%d)', numStable));
+    axis off; 
     
-    % remove ticks and clean axis 
-    axis off;
-    % text(-110, nROIs/2, 'Stable ROIs', 'Rotation', 90, 'HorizontalAlignment', 'center', 'FontSize', 12);
-    % ylabel('Stable ROIs');
-
-    % Mean across spatially aliged bins 
+    % Mean Plot
     subplot('Position', [0.15 0.12 0.7 0.25]);
     popMean = mean(alignedFull, 1, 'omitnan');
     numSamples = sum(~isnan(alignedFull), 1);
@@ -129,22 +104,21 @@ if plotFlag
     xline(80, 'b', 'LineWidth', 1.5);
     xline(0, 'y', 'LineWidth', 1.5);
     
-    xlabel('Distance from peak (cm)');
-    ylabel('Mean Response');
+    xlabel('Distance from peak (cm)'); 
+    ylabel('Mean \DeltaF/F');
     xlim([-100, 100]); 
     xticks([-80, -40, 0, 40, 80]);
-    ylim([min(popMean)*0.9, max(popMean)*1.2]);
+    ylim()
+    %ylim([min(popMean)*0.9, max(popMean)*1.2]);
     
-    % CLEAN UP BOTTOM AXIS
     set(gca, 'Box', 'off', 'TickDir', 'out', 'FontSize', 10);
-    % defaultAxesProperties(gca, true)
     
+    figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+    if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
+    filename = fullfile(figSaveDir, sprintf('%s_%s_%s_%s_PeakAligned.png', ...
+        sessionFileInfo.animal_name, sessionFileInfo.session_name, signalToUse, VRStimName));
     exportgraphics(fig, filename, 'Resolution', 300);
 end
-
 response.peakAlignedBaselineTuningCurve = alignedFull;
-
-disp(['Saving peak aligned-baseline tuning curves to ', sessionFileInfo.stimFiles(stimIdx).Response]);
-save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append');
+save(responsefilePath, '-struct', 'response', '-append');
 end
-

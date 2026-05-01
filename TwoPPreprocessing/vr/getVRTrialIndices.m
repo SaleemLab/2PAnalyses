@@ -103,7 +103,7 @@ trialIndices.Omit_3   = [];
 trialIndices.Omit_4   = [];
 
 % nLaps is the count of completed sequences available
-nLaps = length(response.completedLandmarkNames);
+nLaps = length(response.completedStartTimes);
 
 if contains(VRStimName, 'LandManipCorridor') 
     for thisLap = 1:nLaps

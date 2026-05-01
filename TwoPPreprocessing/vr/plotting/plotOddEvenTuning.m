@@ -1,0 +1,170 @@
+function fig = plotOddEvenTuning(allData, targetArea, days, savePath)
+    numDays = length(days);
+
+    % Wider aspect ratio
+    fig = figure('Color', 'w', 'Position', [50 100 400*(numDays*2) 350]);
+    t = tiledlayout(1, numDays * 2, 'TileSpacing', 'compact', 'Padding', 'none');
+
+    for d = 1:numDays
+        sess = allData([allData.Day] == days(d) & strcmpi({allData.TargetArea}, targetArea));
+
+        odd = []; even = [];
+        for s = 1:length(sess)
+            if isfield(sess(s), 'lapCorr_HalvesStableIdx')
+                idx = sess(s).lapCorr_HalvesStableIdx;
+                if ~isempty(idx)
+                    odd  = [odd;  sess(s).OddMean(idx, :)];
+                    even = [even; sess(s).EvenMean(idx, :)];
+                end
+            end
+        end
+
+        if ~isempty(odd)
+            % Range Normalization
+            oddMin = min(odd, [], 2);
+            oddMax = max(odd, [], 2);
+            rangeVal = oddMax - oddMin;
+            rangeVal(rangeVal == 0) = 1; 
+
+            oddNorm  = (odd  - oddMin) ./ rangeVal;
+            evenNorm = (even - oddMin) ./ rangeVal;
+
+            % Sort by Odd
+            [~, peakPos] = max(oddNorm, [], 2);
+            [~, sortIdx] = sort(peakPos);
+
+            dataStacked = {oddNorm(sortIdx, :), evenNorm(sortIdx, :)};
+            labels = {'Odd', 'Even'};
+
+            for i = 1:2
+                ax = nexttile((d-1)*2 + i); 
+                imagesc(dataStacked{i});
+
+                title(labels{i});
+                colormap(ax, flipud(gray));
+
+                % Base styling (Font size 12)
+                set(ax, 'CLim', [0 1], 'TickDir', 'out', 'YDir', 'normal', 'FontSize', 12);
+
+                % Spatial markers
+                xline([40 80 120 160], 'k--', 'LineWidth', 1.5);
+                xticks([1 40 80 120 160 200]);
+                xticklabels({'1', '40', '80', '120', '160', '200'});
+
+                if i == 1
+                    % LEFT plot: Keep Y-axis labels/ticks
+                    ylabel('Boutons', 'FontWeight','bold');
+                else
+                    % RIGHT plot: Remove Y-axis and ticks
+                    set(ax, 'YTick', [], 'YColor', 'none');
+
+                    % Standard colorbar
+                    cb = colorbar;
+                    ylabel(cb, '\DeltaF/F (norm.)', 'FontSize', 12);
+                    % set(cb, 'Ticks', [0 0.5 1], 'TickLabels', {'0', '0.5', '1'});
+                end
+            end
+        end
+    end
+
+    xlabel(t, 'Position (cm)', 'FontSize', 12, 'FontWeight','bold');
+
+    % Saving Logic
+    if nargin > 3 && ~isempty(savePath)
+        exportgraphics(fig, savePath, 'Resolution', 300);
+    end
+end
+
+% function fig = plotOddEvenTuning(allData, targetArea, days, savePath)
+%     numDays = length(days);
+% 
+%     % 1. Reduce total height significantly to force compression
+%     fig = figure('Color', 'w', 'Position', [50 100 400*(numDays*2) 350]);
+% 
+%     % 3-row layout
+%     t = tiledlayout(3, numDays * 2, 'TileSpacing', 'none', 'Padding', 'none');
+% 
+%     for d = 1:numDays
+%         sess = allData([allData.Day] == days(d) & strcmpi({allData.TargetArea}, targetArea));
+% 
+%         odd = []; even = [];
+%         for s = 1:length(sess)
+%             if isfield(sess(s), 'lapCorr_HalvesStableIdx')
+%                 idx = sess(s).lapCorr_HalvesStableIdx;
+%                 if ~isempty(idx)
+%                     odd  = [odd;  sess(s).OddMean(idx, :)];
+%                     even = [even; sess(s).EvenMean(idx, :)];
+%                 end
+%             end
+%         end
+% 
+%         if ~isempty(odd)
+%             numROIs = size(odd, 1);
+%             oddMin = min(odd, [], 2); oddMax = max(odd, [], 2);
+%             rangeVal = oddMax - oddMin; rangeVal(rangeVal == 0) = 1; 
+%             oddNorm  = (odd  - oddMin) ./ rangeVal;
+%             evenNorm = (even - oddMin) ./ rangeVal;
+% 
+%             [~, peakPos] = max(oddNorm, [], 2);
+%             [~, sortIdx] = sort(peakPos);
+%             dataStacked = {oddNorm(sortIdx, :), evenNorm(sortIdx, :)};
+%             subs = {'Odd', 'Even'};
+% 
+%             % --- ROWS 1-2: HEATMAPS ---
+%             for i = 1:2
+%                 ax = nexttile((d-1)*2 + i, [2 1]); 
+%                 imagesc(dataStacked{i});
+%                 title(sprintf('Day %d %s', days(d), subs{i}), 'FontSize', 12);
+%                 colormap(ax, flipud(gray));
+% 
+%                 % Standard styling
+%                 set(ax, 'CLim', [0 1], 'YDir', 'normal', 'FontSize', 12, 'XTick', []);
+%                 xline([40 80 120 160], 'k:', 'LineWidth', 1, 'Alpha', 0.3);
+% 
+%                 if i == 1
+%                     ylabel('Sorted ROIs');
+%                 else
+%                     set(ax, 'YTick', [], 'YColor', 'none');
+%                     cb = colorbar;
+%                     set(cb, 'Ticks', [0 0.5 1]);
+%                 end
+%             end
+% 
+%             % --- ROW 3: MEAN TRACES ---
+%             for i = 1:2
+%                 axM = nexttile((2 * numDays * 2) + (d-1)*2 + i);
+% 
+%                 popMean = mean(dataStacked{i}, 1);
+%                 plot(popMean, 'k', 'LineWidth', 1.5);
+% 
+%                 % 2. CRITICAL: Tighten the Y-axis to remove bottom space
+%                 % Setting YLim exactly to [0 max] and removing the "Loose" box
+%                 yMax = max(popMean);
+%                 set(axM, 'YLim', [0 yMax*1.1], 'YTick', [0 0.2 0.4 0.6], ...
+%                     'TickDir', 'out', 'FontSize', 10, 'Box', 'off');
+% 
+%                 % Align dotted lines
+%                 xline([40 80 120 160], 'k:', 'LineWidth', 1, 'Alpha', 0.3);
+% 
+%                 xticks([1 40 80 120 160 200]);
+%                 xticklabels({'1', '40', '80', '120', '160', '200'});
+% 
+%                 if i == 1 && d == 1
+%                     ylabel('Mean');
+%                 elseif i == 2
+%                     set(axM, 'YTick', [], 'YColor', 'none');
+%                 end
+%             end
+%         end
+%     end
+% 
+%     xlabel(t, 'Position (Bins)', 'FontSize', 12);
+% 
+%     % 3. Final Step: Manually set row heights so the bottom row is tiny
+%     % Row 1 & 2 are for heatmaps, Row 3 is for lines
+%     t.RowHeight = {'1x', '1x', '0.4x'}; 
+% 
+%     if nargin > 3 && ~isempty(savePath)
+%         exportgraphics(fig, savePath, 'Resolution', 300);
+%     end
+% end

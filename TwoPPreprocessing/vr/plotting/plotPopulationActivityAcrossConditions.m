@@ -17,7 +17,7 @@ lapActivity = response.lapPositionActivity.(signalToUse);
 conds = fieldnames(response.trialIndicesByCondition);
 
 if applySmoothing
-    w = gausswin(10); w = w / sum(w);
+    w = gausswin(15); w = w / sum(w);
     for iCell = 1:nROIs
         for iLap = 1:size(lapActivity, 2)
             trace = squeeze(lapActivity(iCell, iLap, :));

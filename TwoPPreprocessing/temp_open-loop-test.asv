@@ -1,0 +1,140 @@
+closedLoopPosition=readtable("\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Open-loop\replay-withTrialData-run1\ses-Plimbo_BaselineCorridor_CL_20260415_date-2026-04-15T09-47-25\VrPosition\VrPosition.csv", 'VariableNamingRule', 'preserve');
+openLoopPosition=readtable("\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Open-loop\replay-withTrialData-run1\ses-Plimbo_BaselineCorridor_OL_20260415_date-2026-04-15T09-51-05\VrPosition\VrPosition.csv", 'VariableNamingRule', 'preserve');
+
+CLTrialData = readtable("\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Open-loop\replay-withTrialData-run1\ses-Plimbo_BaselineCorridor_OL_20260415_date-2026-04-15T09-51-05\TrialData\TrialData.csv",)
+%% Find first transient 
+threshold = 0.1; 
+idx_start_closed = find(closedLoopPosition.("Value.Z") > threshold, 1);
+idx_start_open = find(openLoopPosition.("Value.Z") > threshold, 1);
+
+t_transient_closed = closedLoopPosition.Seconds(idx_start_closed);
+t_transient_open = openLoopPosition.Seconds(idx_start_open);
+
+% We subtract the transient time so that for BOTH sessions, movement starts at t=0
+t_closed_zeroed = closedLoopPosition.Seconds - t_transient_closed;
+t_open_zeroed = openLoopPosition.Seconds - t_transient_open;
+
+
+figure; 
+plot(t_closed_zeroed, closedLoopPosition.("Value.Z"), 'b', 'LineWidth', 1.5, 'DisplayName', 'Closed Loop');
+hold on;
+plot(t_open_zeroed, openLoopPosition.("Value.Z"), 'r--', 'LineWidth', 1, 'DisplayName', 'Open Loop');
+
+xline(0, '--k', 'First Transient');
+
+ylabel('VR Position (Z)');
+title('CL-OP');
+legend('Location', 'northeast');
+
+
+
+%% load landmark data 
+
+cl_landmarks = readtable("\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M26003\UCLOpenBonsaiFiles\20260414\ses-M26003_BaselineCorridor_ClosedLoopTest3_20260414_Habituation_date-2026-04-14T19-53-25\LandmarkChoice\LandmarkChoice.csv", 'VariableNamingRule', 'preserve');
+ol_landmarks = readtable("\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M26003\UCLOpenBonsaiFiles\20260414\ses-M26003_BaselineCorridor_OpenLoopTest3_20260414_Habituation_date-2026-04-14T19-55-17\LandmarkChoice\LandmarkChoice.csv", 'VariableNamingRule', 'preserve');
+
+cl_onsets = cl_landmarks.Seconds(cl_landmarks.("Value.Value.Position") == 40);
+ol_onsets = ol_landmarks.Seconds(ol_landmarks.("Value.Value.Position") == 40);
+
+num_laps = min(length(cl_onsets), length(ol_onsets)) - 1;
+
+
+%% 
+savePath = '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Figures\Open-loopVR-debugging';
+lapsPerPage = 5;
+numPages = ceil(num_laps / lapsPerPage);
+
+for p = 1:numPages
+    fileName = sprintf('Lap_Comparison_Page_%d.png', p);
+    fullFilePath = fullfile(savePath, fileName);
+    % Create a new large figure for each page
+    figure('Color', 'w', 'Name', sprintf('Laps %d to %d', (p-1)*lapsPerPage+1, min(p*lapsPerPage, num_laps)), ...
+           'Units', 'normalized', 'Position', [0.1 0.1 0.8 0.8]);
+    
+    % Use 2 columns: Left for position, right for speed
+    t_layout = tiledlayout(lapsPerPage, 2, 'TileSpacing', 'compact', 'Padding', 'tight');
+    
+    for i = 1:lapsPerPage
+        thisLap = (p-1)*lapsPerPage + i;
+        if thisLap > num_laps, break; end
+        
+        %
+        t_start_cl = cl_onsets(thisLap);
+        t_end_cl   = cl_onsets(thisLap+1); %use the start of the next lap as trial end 
+        t_start_ol = ol_onsets(thisLap);
+        t_end_ol   = ol_onsets(thisLap+1);
+        
+        % slice and centre
+        idx_c = closedLoopPosition.Seconds >= t_start_cl & closedLoopPosition.Seconds < t_end_cl;
+        tc = closedLoopPosition.Seconds(idx_c) - t_start_cl;
+        zc = closedLoopPosition.("Value.Z")(idx_c);
+        
+        idx_o = openLoopPosition.Seconds >= t_start_ol & openLoopPosition.Seconds < t_end_ol;
+        to = openLoopPosition.Seconds(idx_o) - t_start_ol;
+        zo = openLoopPosition.("Value.Z")(idx_o);
+        
+        % vr position 
+        nexttile((i-1)*2 + 1);
+        plot(tc, zc, 'k', 'LineWidth', 2); hold on;
+        plot(to, zo, 'r--', 'LineWidth', 1.5);
+        
+        % 
+        lap_lms = cl_landmarks(cl_landmarks.Seconds >= t_start_cl & cl_landmarks.Seconds < t_end_cl, :);
+        for j = 1:height(lap_lms)
+            xline(lap_lms.Seconds(j) - t_start_cl, ':', 'HandleVisibility', 'off');
+        end
+        
+        ylabel(['Lap ' num2str(thisLap)]);
+        grid on; ylim([0 205]);
+        if i == 1, title('Z Position (Overlap)'); legend('CL', 'OL'); end
+        
+        % visual speed 
+        nexttile((i-1)*2 + 2);
+      
+        vc = [0; diff(zc)./diff(tc)];
+        vo = [0; diff(zo)./diff(to)];
+        
+        plot(tc, vc, 'k'); hold on;
+        plot(to,vo, 'r--');
+        
+        grid on; ylim([0 80]); % Keeps scale consistent
+        if i == 1, title('Visual Speed'); end
+    end
+    
+    xlabel(t_layout, 'Seconds from lap start');
+    saveas(gcf, fullFilePath);
+end
+
+%%
+v_cl_total = [0; diff(closedLoopPosition.("Value.Z")) ./ diff(closedLoopPosition.Seconds)];
+v_ol_total = [0; diff(openLoopPosition.("Value.Z")) ./ diff(openLoopPosition.Seconds)];
+
+
+% v_cl_total = v_cl_total(~isinf(v_cl_total) & ~isnan(v_cl_total));
+% v_ol_total = v_ol_total(~isinf(v_ol_total) & ~isnan(v_ol_total));
+
+figure('Color', 'w');
+hold on;
+
+% closed 
+histogram(v_cl_total, 'BinWidth', 1, ...
+    'FaceColor', 'k', 'FaceAlpha', 0.5, ...
+    'DisplayName', 'Closed Loop');
+
+% open loop
+histogram(v_ol_total, 'BinWidth', 1, ...
+    'FaceColor', 'r', 'FaceAlpha', 0.4, ...
+    'DisplayName', 'Open Loop');
+
+% Formatting and Annotations
+xlabel('Visual speed');
+ylabel('Count');
+legend('Location', 'northeast');
+grid on;
+
+
+xlim([0 80]); 
+
+
+xline(mean(v_cl_total, 'omitnan'), '--k', 'Mean CL', 'LabelVerticalAlignment', 'bottom');
+xline(mean(v_ol_total, 'omitnan'), '--r', 'Mean OL', 'LabelVerticalAlignment', 'bottom');
