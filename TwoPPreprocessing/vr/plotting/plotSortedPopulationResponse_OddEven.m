@@ -81,7 +81,7 @@ figure('Position', [100 100 1100 500]);
 % --- Odd laps ---
 subplot(1, 2, 1);
 imagesc(normOdd(sortIdx, :));
-caxis([0 1]); colormap(flipud(gray));
+clim([0 1]); colormap(flipud(gray));
 set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
 xline(40, 'k--', 'LineWidth', 2.5);
 xline(80, 'k--', 'LineWidth', 2.5);
@@ -97,7 +97,7 @@ colorbar; ylabel(colorbar, 'Activity (normalised)');
 % --- Even laps ---
 subplot(1, 2, 2);
 imagesc(normEven(sortIdx, :));
-caxis([0 1]); colormap(flipud(gray));
+clim([0 1]); colormap(flipud(gray));
 set(gca, 'TickDir', 'out', 'box', 'off', 'FontSize', 12, 'YDir', 'normal');
 xline(40, 'k--', 'LineWidth', 2.5);
 xline(80, 'k--', 'LineWidth', 2.5);

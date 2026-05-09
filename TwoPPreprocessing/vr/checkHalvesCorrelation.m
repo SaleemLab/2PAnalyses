@@ -6,7 +6,7 @@ function [r, p, stableIdx] = checkHalvesCorrelation(sessionFileInfo, response, s
 %   p         - [nROIs x 1] vector of p-values for each correlation
 %   stableIdx - [nStableROIs x 1] indices of ROIs with r > 0.4
 %% Handle optional inputs
-if nargin < 3; signalToUse = 'dFF'; end %changed to dff Jan 2026
+if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end %changed to dff Jan 2026
 if nargin < 4; applySpatialSmoothing = true; end
 if nargin < 5; plotFlag = true; end
 

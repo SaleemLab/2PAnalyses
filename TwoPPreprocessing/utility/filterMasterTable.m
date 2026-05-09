@@ -15,7 +15,7 @@ function filteredTable = filterMasterTable(varargin)
     defaultMouseID = string.empty;
     defaultSession = string.empty;
     defaultDay = [];
-    defaultHasStimulus = string.empty;
+    defaultHasStimulus =[];
     defaultExclude = []; %
     
     % Add the parameters
@@ -104,7 +104,7 @@ function masterTable = loadAndParseMasterTable(filepath)
     
     % Identify columns that need to be converted to cell arrays of strings
     columnsToParse = {
-        'VRCorr', 'RFMapping', 'GrayScreen', 'DirTuning', ...
+        'VRCorr', 'BaselineCorridor', 'LandManipCorridor' ,'RFMapping', 'GrayScreen', 'DirTuning', ...
         'CheckerBoard', 'DotMotion_SpeedTuning', 'DriftingBar', ...
         'FullFiledFlash', 'SparseNoiseTexture', 'zStack', 'LapsRecorded', 'LapsCompleted'
     };

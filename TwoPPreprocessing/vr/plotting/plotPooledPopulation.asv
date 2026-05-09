@@ -155,39 +155,35 @@ function figHandle = plotPooledPopulation(allData, targetArea, varargin)
                     'FontWeight', 'normal', ...
                     'Clipping', 'off');
             end
-       % --- SLIM COLORBAR (Ticks Right, Label Inside/Left) ---
+            % --- SLIM COLORBAR (Ticks Right, Label Inside/Left) ---
             if d == nDays
                 cb = colorbar(ax);
                 
-                % 1. Force ticks to the right
-                cb.Location = 'eastoutside'; 
-                
-                % 2. Manual position override [left bottom width height]
+            
                 pos = get(ax, 'Position');
-                cb.Position = [pos(1)+pos(3)+0.03, pos(2)+pos(4)*0.3, 0.012, pos(4)*0.4];
+                cb.Position = [pos(1)+pos(3)+0.02, pos(2)+pos(4)*0.3, 0.012, pos(4)*0.4];
                 
-                % 3. Ticks and Styling
+                % 2. Force Ticks to the Right
+                cb.AxisLocation = 'out'; 
                 cb.Ticks = [0.25 0.75];
                 cb.TickLabels = {'0.25', '0.75'};
-                cb.TickDirection = 'out';
+                cb.TickDir = 'right';
                 cb.Box = 'off';
                 
-                % 4. FORCE LABEL INSIDE
+                % 3. Force Label to the Left (Inside)
                 cb.Label.String = 'Activity (norm.)';
                 cb.Label.FontSize = 10;
+                
+                % 'bottom' alignment pushes the text to the left of the bar axis
+                cb.Label.VerticalAlignment = 'bottom'; 
                 cb.Label.Rotation = 90;
                 
-                % MANUALLY NUDGE THE LABEL POSITION
-                % On a vertical colorbar, Position(1) is the X-offset.
-                % Negative values move it to the left (inside).
-                % We also center it vertically (0.5) in normalized units.
-                cb.Label.Units = 'normalized';
-                cb.Label.Position = [-0.8, 0.5, 0]; 
-                
-                % Ensure alignment is centered so it doesn't drift
-                cb.Label.HorizontalAlignment = 'center';
-                cb.Label.VerticalAlignment = 'bottom';
+                % 4. Fine-tuning the gap
+                % If the label is too close to the bar, you can slightly 
+                % adjust its horizontal position manually:
+                % cb.Label.Position(1) = -1.5; 
             end
+            
             % --- TITLE ---
             titleColors = {'r', [0.4 0.7 0.2], 'b', 'm', 'k'};
             thisCol = titleColors{mod(d-1,5)+1};

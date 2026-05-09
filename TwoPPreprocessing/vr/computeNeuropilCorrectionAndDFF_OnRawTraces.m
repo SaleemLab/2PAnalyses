@@ -4,11 +4,11 @@ function [sessionFileInfo] = computeNeuropilCorrectionAndDFF_OnRawTraces(session
 
 %% Set dafaults
 if nargin < 2, subtractAbsosuteZero = true; end
-if nargin < 3, applyTemporalSmoothing = false; end 
+if nargin < 3, applyTemporalSmoothing = true; end 
 if nargin < 4 || isempty(prctl_F0), prctl_F0 = 8; end
 if nargin < 5 || isempty(prctl_F), prctl_F = 5; end
 if nargin < 6 || isempty(windowSize), windowSize = 60; end
-if nargin < 7 || isempty(smoothW), smoothW = 15; end
+if nargin < 7 || isempty(smoothW), smoothW = 5; end
 if nargin < 8 || isempty(numN), numN = 20; end
 if nargin < 9 || isempty(minNp), minNp = 10; end
 if nargin < 10 || isempty(maxNp), maxNp = 90; end
@@ -53,13 +53,19 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             else
                 fSmoothed = F; fneuSmoothed = Fneu;
             end
+
+            %% Transpose 
+            fSmoothed = fSmoothed';
+            fneuSmoothed = fneuSmoothed';
             
             %% Baseline Calculation & Centering
             disp('Calculating slow-drift baselines...');
             % We calculate these once and reuse them for dF/F calculation to save time
             % get_F0 expects [frames x ROIs] and transpose back to [ROIs x
             % frames] 
-            f0_F = get_F0(fSmoothed', prctl_F0, windowSize, planeRate)';
+            f0_F = get_F0(fSmoothed, prctl_F0, windowSize, planeRate);
+            
+
             % f0_N = get_F0(fneuSmoothed', prctl_F0, windowSize, fs)';
             %% Neuropil correction 
             
@@ -95,7 +101,8 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             % % F0[:, iROI];
             % Fc = signalTraceCentered + f0_F;
             % 
-            
+
+            [Fc, ~, ~, ~] = correct_neuropil(fSmoothed, f0_F, fneuSmoothed, planeRate, prctl_F0, prctl_F, windowSize, numN, minNp, maxNp);
 
 
 
@@ -103,15 +110,15 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
             disp('Computing delta F/F signals...');
 
             % Raw dF/F (using  F and the F0 we already computed)
-            dFF = get_delta_F_over_F(fSmoothed', f0_F')';
+            dFF = get_delta_F_over_F(fSmoothed, f0_F);
 
             % Neuropil Corrected dF/F
             % Per Sylvia: Normalise corrected signal (Fc) by the original Raw F0 (f0_F)
-            dFFNeuropilCorrected = get_delta_F_over_F(Fc', f0_F')';
+            dFFNeuropilCorrected = get_delta_F_over_F(Fc, f0_F);
             
             
-            twoPData(thisPlane).dFF = dFF; 
-            twoPData(thisPlane).dFFNeuropilCorrected = dFFNeuropilCorrected;
+            twoPData(thisPlane).dFF_OnRaw = dFF'; 
+            twoPData(thisPlane).dFFNeuropilCorrected_OnRaw = dFFNeuropilCorrected';
 
             %% Z-Scoring
             % if zScoreProcessedSignals

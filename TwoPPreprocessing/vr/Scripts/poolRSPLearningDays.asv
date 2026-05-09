@@ -1,0 +1,19 @@
+%poolRSPLearningDays
+%% Grab sessions to load 
+RSPSessions = filterMasterTable('MouseID', {'M25132', 'M25133', 'M26003'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', [1 2 3 4 5]);
+
+%% Load spatial tuning curves
+RSPData = getTuningData(RSPSessions, 'applySmoothing', false); 
+%[RSPData.TargetArea] = deal('RSP');
+%% Heatmaps for individual mice; only include rois that are stable across; Self normalised 
+% first/second halves of laps 
+% Corrected call:
+plotEvenTuningHeatmaps(RSPData, ...
+    'DaysToPlot', [1 2 3 4 5], ...
+    'UseStabilityFilter', true, ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\LearningTuning_EvenLaps_SortedByOdd.png')
+%% Population pooled across days 
+plotPooledPopulation(RSPData, 'RSP',...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\RSP_PooledNewCorridor2026_1-5_withoutRangeNorm.png', ...
+    'DaysToPlot', [1 2 3 4 5], ...
+    'TypeToPlot', 'Boutons');

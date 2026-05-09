@@ -93,31 +93,22 @@ for iROI = 1:nROI
         trialMatrix{rowIdx, colIdx} = squeeze(correctedTrials)'; 
     end
     
-    % --- STATISTICAL CLASSIFICATION ---
+    % Statistical tests 
     
     %  ANOVA across all locations + blank (p < 0.05) 
     pValANOVA = anova1(allTrialMeans, groupLabels, 'off');
-    % isSelective = pValANOVA < 0.05;
-    % 
-    % % Identify preferred location
-    % [~, mI] = max(meanGridResponse(:));
-    % [r, c] = ind2sub(size(meanGridResponse), mI);
-    % 
-    % prefTrials = trialMatrix{r, c}; % Individual trials at best spot
-    % avgTrialPeak = mean(max(prefTrials, [], 2));
-
-    
-
-    % isResponsive = isSelective && (avgTrialPeak > (3 * blankStd));
-    % % 2. Thresholding
+    % Calculate blank trial statistics
     blankStd  = std(blankTrialMeans, 'omitnan');
     blankMean = mean(blankTrialMeans, 'omitnan');
     
-  
-    prefVal = max(meanGridResponse(:));
-    % 
-    % % Logic: ANOVA p < 0.05 AND Mean(Pref) > Mean(Blank) + 1*SD(Blank)
-    isResponsive = (pValANOVA < 0.05) && (prefVal > (blankMean + 1 * blankStd));
+    % Find the index of the preferred location (the bin with the highest mean response)
+    [~, mI] = max(meanGridResponse(:));
+    
+    % Use that index to get the mean response at that preferred location
+    prefVal = meanGridResponse(mI);
+    
+    % Logic: ANOVA p < 0.05 AND Mean(Pref) > (Mean Blank + 2*SD Blank)
+    isResponsive = (pValANOVA < 0.05) && (prefVal > (blankMean + 2 * blankStd));
     
     % Final Storage
     RFMapping(iROI).meanGridResponse = meanGridResponse; 

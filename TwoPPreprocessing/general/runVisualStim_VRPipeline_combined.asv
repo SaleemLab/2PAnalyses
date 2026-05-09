@@ -13,8 +13,8 @@ doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 
 
 filteredTable = filterMasterTable('Exclude', 0, ...
     'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25058', 'M25057'}, ...
-    'Session', {'20250529', '20250530'});
+    'MouseID', {'M25057'}, ...
+    'Session', {'20250529'});
     % ); %rerun '20260318' m25131 (checking eye tracking bits here); m26003 20260321 (too)
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -218,15 +218,15 @@ for thisMouse = 1:size(mouseInfo, 1)
                         [~, sessionFileInfo] = getStimTimes(sessionFileInfo, thisName, pdThresholdForStimEvents);
                        
                      
-                        % % specififc analysis
-                        % if contains(thisName, 'RFMapping')
-                        %     fprintf('  Running RFMapping Analysis...\n');
-                        %     [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
-                        %     [~, sessionFileInfo] = getRFMappingTrialGroups(sessionFileInfo, thisName);
-                        %     [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
-                        %     % plotRFGrid_byPosition_ROIs(sessionFileInfo, thisName);
-                        %     [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, thisName);
-                        %     % plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,false)
+                        % specififc analysis
+                        if contains(thisName, 'RFMapping')
+                            fprintf('  Running RFMapping Analysis...\n');
+                            [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
+                            [~, sessionFileInfo] = getRFMappingTrialGroups(sessionFileInfo, thisName);
+                            [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
+                            % plotRFGrid_byPosition_ROIs(sessionFileInfo, thisName);
+                            [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, thisName);
+                            % plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,false)
 
                         % elseif contains(thisName, 'DotMotion_RFMapping')
                         %     fprintf('  Running DotMotion RFMapping Analysis...\n');
@@ -235,7 +235,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         %     [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
                         %     % plotDotFieldRFs(sessionFileInfo, doSmooth)
 
-                        if contains(thisName, 'DotMotion_SpeedTuning')
+                        elseif contains(thisName, 'DotMotion_SpeedTuning')
                             fprintf('  Running DotMotion Analysis...\n');
                             [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
                             [bonsaiData, sessionFileInfo] = getTrialGroups(sessionFileInfo, thisName);
@@ -342,7 +342,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                     % Combine Response sturctures
                     fprintf('Checking for and combining Response across multiple VR runs...\n')
 
-                    responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'VRCorr', 'Response');
+                    responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'LandManipCorridor', 'Response');
                     % the ucl open vr into this
                     [response, sessionFileInfo] = combineResponseForVRRuns(responseVRRuns, sessionFileInfo);
 

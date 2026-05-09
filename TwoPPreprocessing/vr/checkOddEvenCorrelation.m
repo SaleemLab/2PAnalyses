@@ -7,7 +7,7 @@ function [r, p, stableIdx] = checkOddEvenCorrelation(sessionFileInfo, response, 
 %   stableIdx - [nStableROIs x 1] indices of ROIs with r > 0.5
 
 %% Handle optional inputs
-if nargin < 3; signalToUse = 'dFF'; end % changed dff jan 2026 
+if nargin < 3; signalToUse = 'dFFNeuropilCorrected'; end % changed dff jan 2026 
 if nargin < 4; applySpatialSmoothing = true; end 
 if nargin < 5; plotFlag = true; end
 

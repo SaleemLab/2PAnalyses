@@ -1,4 +1,3 @@
-
 %%---------------------------PARAMETERS---------------------------------
 % Corridor's parameters
 corridorL = 200; % corridor length in cm
@@ -11,7 +10,7 @@ tex_contrast = 0.5;
 
 % BG periodocity and chunk parameters
 BG_contrast = 0.5; % geneated with 0.35 on 22/02/26 BG1_35C; was set to 0.25 in the new version. 
-BGperiodicity = 0.20; %fraction of the corridor's visible length
+BGperiodicity = 0.12; %fraction of the corridor's visible length
 BGchunkWidth = 0.02; %fraction of the corridor's visible length 0.02
 BGdensity = 20; %# dots per chunk
 BG_endGray = 0.5;

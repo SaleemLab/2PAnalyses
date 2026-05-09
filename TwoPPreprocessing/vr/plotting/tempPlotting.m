@@ -2,12 +2,12 @@
 % Filter table for EVERYTHING (Boutons AND Somas)
 % masterTable = filterMasterTable('MouseID', {'M25131', 'M26005', 'M26004'}, 'Session', {'20260318', '20260321', '20260322'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', 200); %'DayOfExperience', 100
 % masterTable = filterMasterTable('MouseID', {'M25132', 'M26003'}, 'Session', {'20260312', '20260313', '20260325', '20260324'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', 200); %'DayOfExperience', 100
-masterTable = filterMasterTable('MouseID', {'M25132', 'M25133', 'M26003'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', 5);
+masterTable = filterMasterTable('MouseID', {'M25057', 'M25058'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', [4 5]);
 
 % It will use 
 allData = getTuningData(masterTable, 'applySmoothing', true); 
 
-% allData = getTuningDataByCondition(masterTable);
+%allData = getTuningDataByCondition(masterTable);
 % Plot distributions per mouse for all critera (excluding matched bouton
 % correlation
 
@@ -16,9 +16,9 @@ allData = getTuningData(masterTable, 'applySmoothing', true);
 % plotDistributionsROISelectionCriteria(allData)
 
 %Plot the main grid
-plotConditionTuning(allData, 'RSP', 200, '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\BoutonsAcrossCondition.png')
+% plotConditionTuning(allData, 'RSP', 200, '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Figures\NewRSPBoutonMice\BoutonsAcrossCondition.png')
 
-plotTuningHeatmaps(allData, 'DaysToPlot', [1 2 3 4 5], 'TypeToPlot', 'bouton');
+plotTuningHeatmaps(allData, 'DaysToPlot', [4 5], 'TypeToPlot', 'bouton');
 plotEvenTuningHeatmaps(allData)
 plotOddEvenTuning(allData, 'RSP', 5)
 

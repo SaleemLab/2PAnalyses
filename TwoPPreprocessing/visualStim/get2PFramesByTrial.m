@@ -17,6 +17,14 @@ end
 if contains(stimName, 'DotMotion_RFMapping')
     postStimTime = 6; preStimTime = 2;
 end 
+
+if contains(stimName, 'DotMotion_SpeedTuning')
+    postStimTime = 4; preStimTime = 2;
+end 
+
+if contains(stimName, 'DirTuning')
+    postStimTime = 4; preStimTime = 2;
+end 
 %% Load Data
 isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
 iStim = find(isStim, 1);

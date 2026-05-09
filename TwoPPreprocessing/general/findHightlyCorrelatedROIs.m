@@ -7,7 +7,7 @@ function [roisToKeep, roisToDiscard, groups, corrMatrixCombined] = findHightlyCo
 % specified in sessionFileInfo.otherSessFilePaths.sessionROIData.
 
 %% Set defaults and initialize
-if nargin < 2; signalToUse = 'dFF'; end
+if nargin < 2; signalToUse = 'dFFNeuropilCorrected'; end
 if nargin < 3; VRThreshold_ForBoutonMatch = 0.4; end
 if nargin < 4; NonVRThreshold_ForBoutonMatch = 0.7; end
 if nargin < 5; plotFlag = false; end
@@ -19,7 +19,7 @@ dataScope = 'CombinedVR_NonVR';
 
 
 %% Load VR Data
-VRStimIndices = find(contains({sessionFileInfo.stimFiles.name}, 'VRCorr') & ...
+VRStimIndices = find(contains({sessionFileInfo.stimFiles.name}, 'BaselineCorridor') & ...
     ~contains({sessionFileInfo.stimFiles.name}, 'CombinedRuns') );
 numVRFiles = length(VRStimIndices);
 
@@ -30,8 +30,8 @@ if numVRFiles >= 1
         thisStimIdx = VRStimIndices(thisVRFile);
         processedTwoPDataPath = sessionFileInfo.stimFiles(thisStimIdx).processedMergedBonsaiSuite2pData;
         if exist(processedTwoPDataPath, "file")
-            processedTwoPData = load(processedTwoPDataPath);
-            allDFFData_VR{thisVRFile} = processedTwoPData.zScoredProcessedSignals.(signalToUse);
+            processedTwoPData = load(processedTwoPDataPath, "zScoredProcessedSignals");
+            allDFFData_VR{thisVRFile} = processedTwoPData.processedSignals.(signalToUse);
         else
             warning('Missing processedTwoPData file for VR: %s \n', sessionFileInfo.stimFiles(thisStimIdx).name);
         end
@@ -42,21 +42,26 @@ else
 end
 
 %% Load NonVR Data
-isNotVRStim = find(~contains({sessionFileInfo.stimFiles.name}, 'VRCorr'));
+isNotVRStim = find(~contains({sessionFileInfo.stimFiles.name}, 'Corridor'));
 numNonVRFiles = length(isNotVRStim);
 
 if numNonVRFiles >= 1
     fprintf('Loading and concatenating %d NonVR files...\n', numNonVRFiles);
     allDFFData_NonVR = cell(1, numNonVRFiles);
     for thisNonVRFile = 1:numNonVRFiles
-        thisOtherStimIdx = isNotVRStim(thisNonVRFile);
-        processedTwoPDataPath = sessionFileInfo.stimFiles(thisOtherStimIdx).processedMergedBonsaiSuite2pData;
-        if exist(processedTwoPDataPath, "file")
-            processedTwoPData = load(processedTwoPDataPath);
-            allDFFData_NonVR{thisNonVRFile} = processedTwoPData.processedTwoPData.zScoredProcessedSignals.(signalToUse);
-        else
-            warning('Missing processedTwoPData file for NonVR: %s \n', sessionFileInfo.stimFiles(thisOtherStimIdx).name);
+        try
+            thisOtherStimIdx = isNotVRStim(thisNonVRFile);
+            processedTwoPDataPath = sessionFileInfo.stimFiles(thisOtherStimIdx).processedMergedBonsaiSuite2pData;
+            if exist(processedTwoPDataPath, "file")
+                processedTwoPData = load(processedTwoPDataPath);
+                allDFFData_NonVR{thisNonVRFile} = processedTwoPData.zScoredProcessedSignals.(signalToUse);
+
+            else
+                sprintf('Missing processedTwoPData file for NonVR: %s \n', sessionFileInfo.stimFiles(thisOtherStimIdx).name);
+            end
+        catch
         end
+
     end
     traces_NonVR = [allDFFData_NonVR{:}];
 else
@@ -172,7 +177,7 @@ if exist(outputFilePath, 'file') == 2
     fprintf('Appending new correlation variables to existing file: %s\n', outputFilePath);
     
     % Save variables using the '-append' flag
-    save(outputFilePath, "highlyCorrBoutons",'-append','-v7.3');
+    save(outputFilePath, "highlyCorrBoutons",'-append');
     
     fprintf('Successfully appended correlation data.\n');
 else
@@ -199,7 +204,7 @@ if plotFlag
     title(sprintf('Final Adjacency Matrix (VR > %.2f OR NonVR > %.2f)', VRThreshold_ForBoutonMatch, NonVRThreshold_ForBoutonMatch));
     xlabel('ROI Index');
     ylabel('ROI Index'); 
-    saveas(fig1, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'CorrAndAdjacencyMatrix_' dataScope '.png']))
+    % saveas(fig1, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'CorrAndAdjacencyMatrix_' dataScope '.png']))
     
     % Plotting traces for two unique discarded groups
     
@@ -210,14 +215,14 @@ if plotFlag
         gM1 = find(groups == uniqueDiscardedGroups(1)); 
         plot(traces_combined(gM1, :)');
         title(['Discarded Group ID: ' num2str(uniqueDiscardedGroups(1))]);
-        ylabel('dF/F');
+        ylabel('\Delta F/F');
     
         subplot(212)
         gM2 = find(groups == uniqueDiscardedGroups(2)); 
         plot(traces_combined(gM2, :)');
         title(['Discarded Group ID: ' num2str(uniqueDiscardedGroups(2))]);
-        ylabel('dF/F');
-        saveas(fig2, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'HighlyCorreltedROIGroups_' dataScope '.png',]))
+        ylabel('\Delta F/F');
+        % saveas(fig2, fullfile(['Z:\ibn-vision\USERS\Sonali\Figures\BoutonCorr\' sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_' 'HighlyCorreltedROIGroups_' dataScope '.png',]))
     
     else
         warning('Could not find 2 unique groups in roisToDiscard to plot.');

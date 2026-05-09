@@ -29,7 +29,7 @@ allDirs  = arrayfun(@(x) x.stimValue, psthData);
 [sortedDirs, sortIdx] = sort(uDirs); 
 
 % Analysis Window
-respWin = [0.5 3]; 
+respWin = [0.5 2.5]; 
 respIdx = timeVec >= respWin(1) & timeVec <= respWin(2);
 tWin = 5; % Smoothing window
 

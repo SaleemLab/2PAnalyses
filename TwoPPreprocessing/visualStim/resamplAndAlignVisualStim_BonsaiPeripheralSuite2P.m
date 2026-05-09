@@ -181,7 +181,7 @@ if isfield(peripheralData, 'Pupil')
     % time rather than using it from a single plane 
     
     uSyncTwoP = unique(vertcat(twoPData.LastSyncPulseTime));
-    %uSyncTwoP = unique(twoPData(1).LastSyncPulseTime);
+   %uSyncTwoP = unique(twoPData(1).LastSyncPulseTime);
     
     % Align the pupil timestamps to the 2P timestamps
     newPupilArduinoTime = align2PSyncPulses(uSyncEye, uSyncTwoP, peripheralData.Pupil.raw.ArduinoTime);

@@ -37,7 +37,7 @@ uSpeedsSorted = cleanSpeeds(sortedIndices);
 psthDataSorted = psthData(sortedIndices);
 
 % Analysis Window
-respWin = [0.5 2]; 
+respWin = [0.5 2.5]; 
 respIdx = timeVec >= respWin(1) & timeVec <= respWin(2);
 tWin = 5; 
 

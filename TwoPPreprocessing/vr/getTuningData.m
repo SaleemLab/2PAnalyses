@@ -1,48 +1,47 @@
 function sessionMetrics = getTuningData(sessionTable, varargin)
-  
     % getTuningData: Loads VR data, computes MEAN tuning curves 
-    % and Modulation Index for each session in the input table.
-    % Sonali Dec 2025
+    % and Modulation Index.
     
     p = inputParser;
     addRequired(p, 'sessionTable', @istable); 
-    addParameter(p, 'signalToUse', 'dFF', @ischar); 
-    addParameter(p, 'applySmoothing', true, @islogical);
+    addParameter(p, 'signalToUse', 'dFFNeuropilCorrected', @ischar); 
+    addParameter(p, 'applySmoothing', false, @islogical);
     parse(p, sessionTable, varargin{:});
     params = p.Results;
     
     numSessions = height(sessionTable);
+    
+    % Initialize empty array for sessions using placeholders
     sessionMetrics = struct('MouseID', {}, 'Day', {}, 'Session', {}, 'Type', {}, ...
                          'InjectionSite', {}, 'TargetArea', {}, 'OddMean', {}, 'EvenMean', {}, ...
                          'MeanTuning', {}, 'Modulation', {}, 'NumCells', {}, 'NumLaps', {}, ...
-                         ... % Fields from sessionROIData
                          'TypeImaged_ROI', {}, 'TargetArea_ROI', {}, ...
                          'highlyCorrBoutons', {}, ...
-                         ... % Fields from lapCorr_Halves
                          'lapCorr_HalvesRho', {}, 'lapCorr_HalvesP', {}, 'lapCorr_HalvesStableThreshold', {}, ...
                          'lapCorr_HalvesStableIdx', {}, 'lapCorr_HalvesFirstHalfLapsCount', {}, 'lapCorr_HalvesSecondHalfLapsCount', {}, ...
-                         ... % Fields from lapCorr_OddEven
                          'lapCorr_OddEvenRho', {}, 'lapCorr_OddEvenP', {}, 'lapCorr_OddEvenStableThreshold', {}, ...
                          'lapCorr_OddEvenStableIdx', {}, ...
-                         ... % Fields from nullDist_PeakTuningMetric
-                         'isSignificantByPeakShuffling', {} ,'realPeakPercentileRank', {}, 'targetPercentile_Peak', {}, ...
-                         ... % Fields from nullDist_RangeTuningMetric
+                         'isSignificantByPeakShuffling', {}, 'realPeakPercentileRank', {}, 'targetPercentile_Peak', {}, ...
                          'isSignificantByRange', {}, 'realRangePercentileRank', {}, 'targetPercentile_Range', {}, ...
-                         ... % Fields from tuningCurveVariance
-                         'ratioVarToTuningVar', {}, 'ratioVarToTuningRange', {} ...
-                         );
-    
-    % wb = waitbar(0, 'Loading and processing sessions...');
+                         'ratioVarToTuningVar', {}, 'ratioVarToTuningRange', {});
     
     for thisSessions = 1:numSessions
-        % waitbar(thisSessions/numSessions, wb, sprintf('Processing session %d/%d...', thisSessions, numSessions));
-        
         row = sessionTable(thisSessions,:);
-        currentSessionData = struct(); 
+        currentSessionData = struct('MouseID', [], 'Day', [], 'Session', [], 'Type', [], ...
+             'InjectionSite', [], 'TargetArea', [], 'OddMean', [], 'EvenMean', [], ...
+             'MeanTuning', [], 'Modulation', [], 'NumCells', [], 'NumLaps', [], ...
+             'TypeImaged_ROI', [], 'TargetArea_ROI', [], 'highlyCorrBoutons', [], ...
+             'lapCorr_HalvesRho', [], 'lapCorr_HalvesP', [], 'lapCorr_HalvesStableThreshold', [], ...
+             'lapCorr_HalvesStableIdx', [], 'lapCorr_HalvesFirstHalfLapsCount', [], 'lapCorr_HalvesSecondHalfLapsCount', [], ...
+             'lapCorr_OddEvenRho', [], 'lapCorr_OddEvenP', [], 'lapCorr_OddEvenStableThreshold', [], ...
+             'lapCorr_OddEvenStableIdx', [], 'isSignificantByPeakShuffling', [], 'realPeakPercentileRank', [], ...
+             'targetPercentile_Peak', [], 'isSignificantByRange', [], 'realRangePercentileRank', [], ...
+             'targetPercentile_Range', [], 'ratioVarToTuningVar', [], 'ratioVarToTuningRange', []);
         
         currentSessionData.MouseID = row.MouseID{1};
         currentSessionData.Day = row.DayOfExperience;
         currentSessionData.Session = char(row.Session);
+        fprintf('Processing Mouse %s | Day: %d | Session: %s \n ', currentSessionData.MouseID, currentSessionData.Day, currentSessionData.Session)
         
         % Type identification
         if ismember('TypeImaged', row.Properties.VariableNames)
@@ -53,26 +52,17 @@ function sessionMetrics = getTuningData(sessionTable, varargin)
              currentSessionData.Type = 'Unknown';
         end
         
-        % if ismember('GCaMPInjectionSite', row.Properties.VariableNames)
-        %     currentSessionData.InjectionSite = row.GCaMPInjectionSite{1};
-        %     currentSessionData.TargetArea = row.TargetArea{1};
-        % else
-        %      currentSessionData.InjectionSite = '';
-        %      currentSessionData.TargetArea = '';
-        % end
-        
-        % Load Activity Data
-        [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse);
+        % Load Activity Data using your helper
+        [lapActivity, numLaps, sfi, ~] = loadVRLapSignal(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse);
         [sessionROIData] = loadSessionROIData(sfi); 
         
         if isempty(lapActivity)
-            warning('Skipping %s Session %s Day %d: %s', currentSessionData.MouseID, currentSessionData.Session, currentSessionData.Day, errorMessage);
             continue;
         end
         
         % Smooth data 
         if params.applySmoothing
-            smoothingKernel = gausswin(9); 
+            smoothingKernel = gausswin(15);  %swapped to 15
             smoothingKernel = smoothingKernel / sum(smoothingKernel);
             lapActivity = smoothActivityTraces(lapActivity, smoothingKernel);
         end
@@ -86,8 +76,7 @@ function sessionMetrics = getTuningData(sessionTable, varargin)
         tuningCurveMax = max(meanAllLaps, [], 2, 'omitnan'); 
         tuningCurveMin = min(meanAllLaps, [], 2, 'omitnan');
         tuningCurveMean = mean(meanAllLaps, 2, 'omitnan');
-        % modulationIndex = (tuningCurveMax - tuningCurveMin) ./ tuningCurveMean;
-        modulationIndex = (tuningCurveMax - tuningCurveMin); % zscored signals
+        modulationIndex = (tuningCurveMax - tuningCurveMin);
         modulationIndex(tuningCurveMean == 0) = NaN; 
         
         currentSessionData.OddMean = meanOddLaps;
@@ -97,213 +86,130 @@ function sessionMetrics = getTuningData(sessionTable, varargin)
         currentSessionData.NumCells = size(lapActivity, 1);
         currentSessionData.NumLaps = numLaps;
         
-        % Safe extraction from sessionROIData
-        % Metadata
+        % Data extraction using helpers
         currentSessionData.TypeImaged_ROI = safeGet(sessionROIData, 'typeImaged');
         currentSessionData.TargetArea_ROI = safeGet(sessionROIData, 'targetArea');
-        
-        % Highly Correlated Boutons
-        if isfield(sessionROIData, 'highlyCorrBoutons')
-            currentSessionData.highlyCorrBoutons = sessionROIData.highlyCorrBoutons.roisToKeep;
-        else
-            currentSessionData.highlyCorrBoutons = [];
-        end
+        currentSessionData.highlyCorrBoutons = safeGetField(sessionROIData, 'highlyCorrBoutons', 'roisToKeep', []);
   
-        % lapCorr_Halves
-        if isfield(sessionROIData, 'lapCorr_Halves')
-            currentSessionData.lapCorr_HalvesRho = sessionROIData.lapCorr_Halves.rho;
-            currentSessionData.lapCorr_HalvesP = sessionROIData.lapCorr_Halves.p;
-            currentSessionData.lapCorr_HalvesStableThreshold = sessionROIData.lapCorr_Halves.stableThreshold;
-            currentSessionData.lapCorr_HalvesStableIdx = sessionROIData.lapCorr_Halves.stableIdx;
-            currentSessionData.lapCorr_HalvesFirstHalfLapsCount = sessionROIData.lapCorr_Halves.firstHalfLapsCount;
-            currentSessionData.lapCorr_HalvesSecondHalfLapsCount = sessionROIData.lapCorr_Halves.secondHalfLapsCount;
-        else
-            currentSessionData.lapCorr_HalvesRho = []; currentSessionData.lapCorr_HalvesP = [];
-            currentSessionData.lapCorr_HalvesStableThreshold = []; currentSessionData.lapCorr_HalvesStableIdx = [];
-            currentSessionData.lapCorr_HalvesFirstHalfLapsCount = []; currentSessionData.lapCorr_HalvesSecondHalfLapsCount = [];
-        end
+        % Metrics
+        currentSessionData.lapCorr_HalvesRho = safeGetField(sessionROIData, 'lapCorr_Halves', 'rho', []);
+        currentSessionData.lapCorr_HalvesP = safeGetField(sessionROIData, 'lapCorr_Halves', 'p', []);
+        currentSessionData.lapCorr_HalvesStableThreshold = safeGetField(sessionROIData, 'lapCorr_Halves', 'stableThreshold', []);
+        currentSessionData.lapCorr_HalvesStableIdx = safeGetField(sessionROIData, 'lapCorr_Halves', 'stableIdx', []);
+        currentSessionData.lapCorr_HalvesFirstHalfLapsCount = safeGetField(sessionROIData, 'lapCorr_Halves', 'firstHalfLapsCount', []);
+        currentSessionData.lapCorr_HalvesSecondHalfLapsCount = safeGetField(sessionROIData, 'lapCorr_Halves', 'secondHalfLapsCount', []);
         
-        % lapCorr_OddEven
-        if isfield(sessionROIData, 'lapCorr_OddEven')
-            currentSessionData.lapCorr_OddEvenRho = sessionROIData.lapCorr_OddEven.rho;
-            currentSessionData.lapCorr_OddEvenP = sessionROIData.lapCorr_OddEven.p;
-            currentSessionData.lapCorr_OddEvenStableThreshold = sessionROIData.lapCorr_OddEven.stableThreshold;
-            currentSessionData.lapCorr_OddEvenStableIdx = sessionROIData.lapCorr_OddEven.stableIdx;
-        else
-            currentSessionData.lapCorr_OddEvenRho = []; currentSessionData.lapCorr_OddEvenP = [];
-            currentSessionData.lapCorr_OddEvenStableThreshold = []; currentSessionData.lapCorr_OddEvenStableIdx = [];
-        end
+        currentSessionData.lapCorr_OddEvenRho = safeGetField(sessionROIData, 'lapCorr_OddEven', 'rho', []);
+        currentSessionData.lapCorr_OddEvenP = safeGetField(sessionROIData, 'lapCorr_OddEven', 'p', []);
+        currentSessionData.lapCorr_OddEvenStableThreshold = safeGetField(sessionROIData, 'lapCorr_OddEven', 'stableThreshold', []);
+        currentSessionData.lapCorr_OddEvenStableIdx = safeGetField(sessionROIData, 'lapCorr_OddEven', 'stableIdx', []);
         
-        % nullDist_PeakTuningMetric
         if isfield(sessionROIData, 'nullDist_PeakTuningMetric')
             currentSessionData.isSignificantByPeakShuffling = safeGet(sessionROIData.nullDist_PeakTuningMetric.isSignificantByPeakShuffling, params.signalToUse);
             currentSessionData.realPeakPercentileRank = safeGet(sessionROIData.nullDist_PeakTuningMetric.realPeakPercentileRank, params.signalToUse);
             currentSessionData.targetPercentile_Peak = sessionROIData.nullDist_PeakTuningMetric.targetPercentile;
-        else
-            currentSessionData.isSignificantByPeakShuffling = []; currentSessionData.realPeakPercentileRank = []; currentSessionData.targetPercentile_Peak = [];
         end
         
-        % nullDist_RangeTuningMetric
         if isfield(sessionROIData, 'nullDist_RangeTuningMetric')
             currentSessionData.isSignificantByRange = safeGet(sessionROIData.nullDist_RangeTuningMetric.isSignificantByRange, params.signalToUse);
             currentSessionData.realRangePercentileRank = safeGet(sessionROIData.nullDist_RangeTuningMetric.realRangePercentileRank, params.signalToUse);
             currentSessionData.targetPercentile_Range = sessionROIData.nullDist_RangeTuningMetric.targetPercentile; 
-        else
-            currentSessionData.isSignificantByRange = []; currentSessionData.realRangePercentileRank = []; currentSessionData.targetPercentile_Range = [];
         end
         
-        % tuningCurveVariance
-        if isfield(sessionROIData, 'tuningCurveVariance')
-            currentSessionData.ratioVarToTuningVar = sessionROIData.tuningCurveVariance.ratioVarToTuningVar;
-            currentSessionData.ratioVarToTuningRange = sessionROIData.tuningCurveVariance.ratioVarToTuningRange;
-        else
-            currentSessionData.ratioVarToTuningVar = []; currentSessionData.ratioVarToTuningRange = [];
-        end
+        currentSessionData.ratioVarToTuningVar = safeGetField(sessionROIData, 'tuningCurveVariance', 'ratioVarToTuningVar', []);
+        currentSessionData.ratioVarToTuningRange = safeGetField(sessionROIData, 'tuningCurveVariance', 'ratioVarToTuningRange', []);
         
-        sessionMetrics(end+1) = orderfields(currentSessionData, sessionMetrics); 
+        % Assign to master array
+        sessionMetrics(thisSessions) = currentSessionData; 
     end
     
-    % close(wb);
-    fprintf('Data loaded for %d sessions.\n', length(sessionMetrics));
+    sessionMetrics = orderfields(sessionMetrics); 
 end
 
+%% --- Helper Functions ---
 function val = safeGet(s, field)
-    if isstruct(s) && isfield(s, field)
-        val = s.(field);
-    else
-        val = [];
-    end
+    if isstruct(s) && isfield(s, field), val = s.(field); else, val = []; end
 end
 
+function val = safeGetField(s, sub, field, default)
+    if isfield(s, sub) && isfield(s.(sub), field), val = s.(sub).(field); else, val = default; end
+end
 
-
-%% Load sessionROIData (fixed but double check dec 2025 SSS)
 function [sessionROIData] = loadSessionROIData(sessionFileInfo)
-% FIX: Initialize output to an empty structure. This ensures the output 
-% is assigned even if an error occurs, preventing the main function crash.
-sessionROIData = struct(); 
-
-try
-    sessionROIDataFilePath = sessionFileInfo.otherSessFilePaths.sessionROIData;
-    
-    if exist(sessionROIDataFilePath, 'file')
-        sessionROIData = load(sessionROIDataFilePath);
-    else
-        warning('loadSessionROIData:MissingFile', ...
-            'SessionROIData.mat is missing at path: %s', ...
-            sessionROIDataFilePath);
-    end
-    
-catch ME
-
     sessionROIData = struct(); 
-    warning('loadSessionROIData:Error', ...
-        'An error occurred while trying to load SessionROIData. Check if "otherSessFilePaths" exists in sessionFileInfo. Error: %s', ...
-        ME.message);
-end
-end
-
-
-%% local helper function (loadVRLapSignal)
-function [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(subjectID, sessionID, signalName)
-    lapActivity = [];
-    numLaps = 0;
-    errorMessage = '';
-    sfi = struct(); %sfi just in case of a crash before assignment
-    
     try
-        % Find the path to the session's info file
-        sessionInfoPath = findSessionFileInfoFilePath(subjectID, sessionID);
-        if ~isfile(sessionInfoPath)
-            errorMessage = 'InfoMissing';
-            return;
-        end
+        path = sessionFileInfo.otherSessFilePaths.sessionROIData;
+        if exist(path, 'file'), sessionROIData = load(path); end
+    catch, sessionROIData = struct(); end
+end
+
+function [lapActivity, numLaps, sfi, errorMessage] = loadVRLapSignal(subjectID, sessionID, signalName)
+    lapActivity = []; numLaps = 0; errorMessage = ''; sfi = struct();
+    try
+        path = findSessionFileInfoFilePath(subjectID, sessionID);
+        D = load(path, 'sessionFileInfo'); 
+        sfi = D.sessionFileInfo;
+        stimNames = string({sfi.stimFiles.name});
         
-        % Load the session file info
-        D = load(sessionInfoPath, 'sessionFileInfo');
-        sfi = D.sessionFileInfo; % 
+        % 1. Identify all potential Baseline stimuli (Case-insensitive check is safer)
+        % This looks for "BaselineCorridor" OR "VRCorr"
+        baseIndices = find(contains(stimNames, "BaselineCorridor", 'IgnoreCase', true) | ...
+                           contains(stimNames, "VRCorr", 'IgnoreCase', true));
         
-        % Find the correct VR stimulus file
-        stimFileNames = string({sfi.stimFiles.name});
-        vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & contains(stimFileNames, "CombinedRuns"), 1);
-        
-        if isempty(vrFileIndex) % Fallback: Find last run if no 'CombinedRuns' Need to find a better fix here 
-            if strcmp(sfi.animal_name, 'M25132') || strcmp(sfi.animal_name, 'M25133') 
-                vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & ~contains(stimFileNames, "CombinedRuns"), 1, 'first'); 
-            elseif strcmp(sfi.animal_name, 'M26003')
-                vrFileIndex = find(contains(stimFileNames, "BaselineCorridor") & ~contains(stimFileNames, "CombinedRuns"), 1, 'last'); 
-            end 
-        end
-        
-        if isempty(vrFileIndex)
-            errorMessage = 'NoVRCorr';
+        if isempty(baseIndices)
+            errorMessage = 'NoBaselineOrVRCorr'; 
             return; 
         end
         
-        % Get the response file path
-        responseFilePath = sfi.stimFiles(vrFileIndex).Response;
-        if isempty(responseFilePath) || ~isfile(responseFilePath)
-            errorMessage = 'RespMissing'; 
+        % 2. Selection logic remains the same to find the "best" baseline file
+        selectedIdx = [];
+        
+        % Rule: If any candidate contains "CombinedRuns", prioritize it
+        combinedIdx = baseIndices(contains(stimNames(baseIndices), "CombinedRuns"));
+        if ~isempty(combinedIdx)
+            selectedIdx = combinedIdx(1);
+            
+        % Rule: If only one candidate exists (regardless of name), use it
+        elseif isscalar(baseIndices)
+            selectedIdx = baseIndices;    
+            
+        % Rule: Multiple files found, look for a specific run (e.g., "00002")
+        else
+            idx00002 = baseIndices(contains(stimNames(baseIndices), "00002"));
+            if ~isempty(idx00002)
+                selectedIdx = idx00002(1);
+            else
+                %  just take the first one found if 00002 doesn't exist
+                selectedIdx = baseIndices(1);
+            end
+        end
+        
+        if isempty(selectedIdx)
+            errorMessage = 'SelectionFailed'; 
             return; 
         end
         
-        % Load the response data
-        R = load(responseFilePath);
-        
-        % Check if the signal exists in the lap data structure
-        if ~isfield(R, 'lapPositionActivity') || ~isfield(R.lapPositionActivity, signalName)
-            errorMessage = 'SignalMissing'; 
-            return;
-        end
-        
-        % Extract the signal data
+        % Load Data
+        R = load(sfi.stimFiles(selectedIdx).Response);
         lapActivity = R.lapPositionActivity.(signalName);
         numLaps = size(lapActivity, 2);
         
-        % Ensure there is more than one lap to be useful
-        if numLaps < 2
-            lapActivity = [];
-            errorMessage = '<2Laps';
-            return; 
-        end
-        
-    catch ME
-        % Added ME to the catch block to debug if needed
-        errorMessage = 'LoadError';
-        warning('loadVRLapSignal:LoadError', 'Error: %s', ME.message);
+    catch
+        errorMessage = 'LoadError'; 
     end
 end
 
-
-%% Smooth activity traces
-function smoothedData = smoothActivityTraces(activityData, filterKernel)
+function smoothedData = smoothActivityTraces(activityData, kernel)
     smoothedData = activityData;
-    
-    % Loop over cells/channels (1st dimension)
-    for cellIdx = 1:size(activityData, 1)
-        % Loop over laps (2nd dimension)
-        for lapIdx = 1:size(activityData, 2)
-            
-            % Get the trace for this specific cell and lap
-            trace = squeeze(activityData(cellIdx, lapIdx, :));
-            
-            % Find NaN values to restore them after filtering
-            nanMask = isnan(trace);
-            if all(nanMask)
-                continue; % Skip if the entire trace is NaN
-            end
-            
-  
-            trace(nanMask) = 0;
-            
-
-            filteredTrace = filtfilt(filterKernel, 1, trace);
-            
-            % Restore NaN values
-            filteredTrace(nanMask) = NaN;
-            
-            % Assign the smoothed trace back to the output array
-            smoothedData(cellIdx, lapIdx, :) = filteredTrace;
+    for c = 1:size(activityData, 1)
+        for l = 1:size(activityData, 2)
+            trace = squeeze(activityData(c, l, :));
+            mask = isnan(trace);
+            if all(mask), continue; end
+            trace(mask) = 0;
+            s = filtfilt(kernel, 1, trace);
+            s(mask) = NaN;
+            smoothedData(c, l, :) = s;
         end
     end
 end
