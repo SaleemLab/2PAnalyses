@@ -9,7 +9,7 @@ function [response, sessionFileInfo] = getRunningSpeedAcrossLaps(sessionFileInfo
 %   response.lapRunningSpeed: Cell array of speed vectors for each lap (time-based, unfiltered).
 %   response.lapPositionRunningSpeed: Matrix of mean speed per lap and position bin (calculated on the fly).
 
-if nargin < 4, doPlot = true; end 
+if nargin < 4, doPlot = false; end 
 % Load data 
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}), 1);
 if isempty(stimIdx), error('Specified VRStimName not found in sessionFileInfo.'); end

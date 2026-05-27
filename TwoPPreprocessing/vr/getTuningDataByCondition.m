@@ -1,11 +1,13 @@
 function sessionMetrics = getTuningDataByCondition(sessionTable, varargin)
-    % getTuningDataByCondition: Processes a table of sessions, finds the best
-    % stimulus file (Landmark > Baseline), and splits full lap activity by condition.
-    
+% load data based on trial conditions; 
+% saves various parameters to filter rois 
+% temporarity computes fraction of variance explained [will add this to
+% each sessions soon] 
+
     p = inputParser;
     addRequired(p, 'sessionTable', @istable); 
     addParameter(p, 'signalToUse', 'dFFNeuropilCorrected', @ischar); 
-    addParameter(p, 'applySmoothing', true, @islogical);
+    % addParameter(p, 'applySmoothing', true, @islogical);
     parse(p, sessionTable, varargin{:});
     params = p.Results;
     
@@ -13,41 +15,68 @@ function sessionMetrics = getTuningDataByCondition(sessionTable, varargin)
     sessionMetrics = struct(); 
     
     for thisSess = 1:numSessions
+        
         row = sessionTable(thisSess,:);
         currentSessionData = struct(); 
-        
         currentSessionData.MouseID = row.MouseID{1};
         currentSessionData.Day = row.DayOfExperience;
         currentSessionData.Session = char(row.Session);
-        
-        % Load & Split
-        [condActivity, sfi, errorMessage] = loadVRLapSignalByCondition(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse); 
-        
-        if isempty(fieldnames(condActivity))
-            warning('Skipping %s: %s', currentSessionData.Session, errorMessage);
-            continue;
+        currentSessionData.TypeImaged = char(row.TypeImaged);
+        if contains(currentSessionData.TypeImaged, 'Somas')
+            currentSessionData.TargetArea = 'V1';
         end
+        fprintf('Processing Mouse %s Session %s \n', currentSessionData.MouseID, currentSessionData.Session)
         
+        [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, ~] = loadVRLapSignalByCondition(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse); 
+        if isempty(fieldnames(condActivity)), continue; end
+        % new: saves the gain 
+        
+        
+        currentSessionData.movementVisualGain=movementVisualGain; 
+
+        currentSessionData.SMI = SMI;
+
+        currentSessionData.flaggedLaps = flaggedLaps; 
+        
+        if length(currentSessionData.movementVisualGain)>1
+            if isscalar(unique(currentSessionData.movementVisualGain))
+                currentSessionData.movementVisualGain = movementVisualGain(1);
+            end
+        end 
+        [sessionROIData] = loadSessionROIData(sfi); 
+        
+        currentSessionData.Rho_OddEven = safeGetField(sessionROIData, 'lapCorr_OddEven', 'rho', []);
+        currentSessionData.Rho_Halves  = safeGetField(sessionROIData, 'lapCorr_Halves', 'rho', []);
+        currentSessionData.TuningVarMetrics = safeGet(sessionROIData, 'tuningCurveVariance');
+        currentSessionData.NullDist_Range = safeGet(sessionROIData, 'nullDist_RangeTuningMetric');
+        currentSessionData.NullDist_Peak = safeGet(sessionROIData, 'nullDist_PeakTuningMetric');
+        currentSessionData.cvExpVar = safeGetField(sessionROIData, 'crossValExpVar', 'cvExpVar'); 
+        currentSessionData.cvExpvar_nullDist_pVales = safeGetField(sessionROIData, 'crossValExpVar', 'pValues');
+        
+
+        if  strcmpi(currentSessionData.TypeImaged, 'Somas')
+            currentSessionData.sparseNoiseMatrix = safeGet(sessionROIData, 'sparseNoiseRF');
+        end
+      
+     
+        if  strcmpi(currentSessionData.TypeImaged, 'Boutons')
+            currentSessionData.uniqueBoutonIdx = safeGetField(sessionROIData, 'highlyCorrBoutons','roisToKeep');
+            currentSessionData.highCorrBoutonIdx = safeGetField(sessionROIData, 'highlyCorrBoutons','roisToDiscard');
+            % this seems to be missing for somas; have imported above from
+            % data table 
+            currentSessionData.TargetArea = safeGet(sessionROIData, 'targetArea');
+        end
+
         condNames = fieldnames(condActivity);
         for c = 1:length(condNames)
             name = condNames{c};
             data = condActivity.(name); 
-            
-            if params.applySmoothing
-                smoothingKernel = gausswin(15); 
-                smoothingKernel = smoothingKernel / sum(smoothingKernel);
-                % --- THIS IS THE FUNCTION THAT WAS MISSING ---
-                data = smoothActivityTraces(data, smoothingKernel);
-            end
-            
+            % if params.applySmoothing
+            %     data = smoothActivityTraces(data, gausswin(15)/sum(gausswin(15)));
+            % end
             currentSessionData.ConditionData.(name).LapActivity = data;
             currentSessionData.ConditionData.(name).NumLaps = size(data, 2);
-            currentSessionData.ConditionData.(name).MeanTuning = squeeze(mean(data, 2, 'omitnan'));
         end
-        
-        [sessionROIData] = loadSessionROIData(sfi); 
-        currentSessionData.NumCells = size(condActivity.(condNames{1}), 1);
-        currentSessionData.TargetArea_ROI = safeGet(sessionROIData, 'targetArea');
         
         if isempty(fieldnames(sessionMetrics))
             sessionMetrics = currentSessionData;
@@ -57,70 +86,97 @@ function sessionMetrics = getTuningDataByCondition(sessionTable, varargin)
     end
 end
 
-%% --- HELPER: SMOOTHING ---
-function smoothedData = smoothActivityTraces(activityData, filterKernel)
-    smoothedData = activityData;
-    % activityData is [Cells x Laps x Position]
-    for cellIdx = 1:size(activityData, 1)
-        for lapIdx = 1:size(activityData, 2)
-            trace = squeeze(activityData(cellIdx, lapIdx, :));
-            nanMask = isnan(trace);
-            if all(nanMask), continue; end
-            
-            trace(nanMask) = 0;
-            filteredTrace = filtfilt(filterKernel, 1, trace);
-            filteredTrace(nanMask) = NaN;
-            smoothedData(cellIdx, lapIdx, :) = filteredTrace;
-        end
-    end
-end
+% smooth before plotting; skipping this here.. 
+% function smoothedData = smoothActivityTraces(activityData, filterKernel)
+%     smoothedData = activityData;
+%     for cellIdx = 1:size(activityData, 1)
+%         for lapIdx = 1:size(activityData, 2)
+%             trace = squeeze(activityData(cellIdx, lapIdx, :));
+%             nanMask = isnan(trace);
+%             if all(nanMask), continue; end
+%             trace(nanMask) = 0;
+%             filteredTrace = filtfilt(filterKernel, 1, double(trace));
+%             filteredTrace(nanMask) = NaN;
+%             smoothedData(cellIdx, lapIdx, :) = filteredTrace;
+%         end
+%     end
+% end
 
-%% --- HELPER: LOADING ---
-function [condActivity, sfi, errorMessage] = loadVRLapSignalByCondition(subjectID, sessionID, signalName)
+function [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, errorMessage] = loadVRLapSignalByCondition(subjectID, sessionID, signalName)
     condActivity = struct(); errorMessage = ''; sfi = struct();
     try
         sessionInfoPath = findSessionFileInfoFilePath(subjectID, sessionID);
-        if ~isfile(sessionInfoPath), errorMessage = 'InfoMissing'; return; end
         D = load(sessionInfoPath, 'sessionFileInfo');
         sfi = D.sessionFileInfo; 
-        
         stimNames = string({sfi.stimFiles.name});
-        isLandmark = contains(stimNames, "LandManipCorridor");
-        isBaseline = contains(stimNames, "BaselineCorridor");
-        isCombined = contains(stimNames, "CombinedRuns");
         
-        targetIdx = find(isLandmark & isCombined, 1);
-        if isempty(targetIdx), targetIdx = find(isBaseline & isCombined, 1); end
-        if isempty(targetIdx), targetIdx = find(isLandmark | isBaseline, 1, 'last'); end
+        targetIdx = find(contains(stimNames, "LandManipCorridor") & contains(stimNames, "CombinedRuns"), 1);
+        
+        if isempty(targetIdx)
+            targetIdx = find(contains(stimNames, "LandManipCorridor"), 1);
+        end
+        
+        if isempty(targetIdx)
+            targetIdx = find(contains(stimNames, "BaselineCorridor") & contains(stimNames, "CombinedRuns"), 1);
+        end
+        
+        if isempty(targetIdx)
+            targetIdx = find(contains(stimNames, "BaselineCorridor"), 1);
+        end
 
-        if isempty(targetIdx), errorMessage = 'NoValidStimFound'; return; end
+        if isempty(targetIdx)
+            error('No valid LandManip or Baseline corridor found.');
+        end
         
-        R = load(sfi.stimFiles(targetIdx).Response);
-        fullActivity = R.lapPositionActivity.(signalName); 
+        responseFilePath = sfi.stimFiles(targetIdx).Response;
+    
+        response = load(responseFilePath, 'lapPositionActivity', 'movementVisualGain', 'trialIndicesByCondition', 'SMI_Metrics', 'flaggedLaps', 'stimName');
         
-        if isfield(R, 'trialIndicesByCondition')
-            fn = fieldnames(R.trialIndicesByCondition);
+        
+        % response = load(sfi.stimFiles(targetIdx).Response);        
+        if ~isfield(response.lapPositionActivity, signalName)
+            error('Signal %s missing from data.', signalName);
+         end
+        movementVisualGain = [];
+        if isfield(response, 'movementVisualGain')
+            movementVisualGain = response.movementVisualGain; 
+        end 
+        fullActivity = response.lapPositionActivity.(signalName); 
+
+        if isfield(response, 'trialIndicesByCondition')
+            fn = fieldnames(response.trialIndicesByCondition);
             for i = 1:length(fn)
-                trialIdx = R.trialIndicesByCondition.(fn{i});
+                trialIdx = response.trialIndicesByCondition.(fn{i});
                 validLaps = trialIdx(trialIdx > 0 & trialIdx <= size(fullActivity, 2));
                 if ~isempty(validLaps)
-                    condActivity.(fn{i}) = fullActivity(:, validLaps, :);
+                    condActivity.(fn{i}) = fullActivity(:, validLaps, :); 
                 end
             end
         else
             condActivity.Default = fullActivity;
         end
+
+        if isfield(response, 'SMI_Metrics') && ~isempty(response.SMI_Metrics)
+           SMI = response.SMI_Metrics.(signalName);       
+        end
+
+        if isfield(response, 'flaggedLaps') %&& ~isempty(response.flaggedLaps)
+           flaggedLaps = response.flaggedLaps;       
+        end
+        
     catch ME
         errorMessage = ME.message;
     end
 end
 
-%% --- UTILITIES ---
 function [sessionROIData] = loadSessionROIData(sessionFileInfo)
     sessionROIData = struct(); 
     try
         path = sessionFileInfo.otherSessFilePaths.sessionROIData;
-        if exist(path, 'file'), sessionROIData = load(path); end
+        if exist(path, 'file')
+            D = load(path); 
+            if isfield(D, 'sessionROIData'), sessionROIData = D.sessionROIData; else, sessionROIData = D; end
+        end
     catch
         sessionROIData = struct(); 
     end
@@ -130,27 +186,6 @@ function val = safeGet(s, field)
     if isstruct(s) && isfield(s, field), val = s.(field); else, val = []; end
 end
 
-
-
-% % % Create a blank template based on the last entry
-% 
-% [sessionFileInfo.stimFiles.Response] = deal([]);
-% 
-% 
-% newEntry = sessionFileInfo.stimFiles(end);
-% 
-% 
-% newEntry.name = 'M26003_LandManipCorridor_20260325_CombinedRuns';
-% newEntry.bonsai_filepaths = {}; 
-% newEntry.eyetracking_filepaths = {}; 
-% newEntry.tif_filepaths = {};
-% newEntry.TwoPMetaData = '';
-% newEntry.processedPeripheralData = '';
-% newEntry.mergedBonsai2PSuite2pData = '';
-% newEntry.Response = 'Z:\ibn-vision\DATA\SUBJECTS\M26003\Analysis\20260325\M26003_20260325_Response_M26003_LandManipCorridor_20260325_CombinedRuns.mat';
-% 
-% 
-% sessionFileInfo.stimFiles(end+1) = newEntry;
-% 
-% 
-% save('\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\DATA\SUBJECTS\M26003\Analysis\20260325\M26003_20260325_sessionFileInfo.mat', 'sessionFileInfo');
+function val = safeGetField(s, sub, field, default)
+    if isstruct(s) && isfield(s, sub) && isfield(s.(sub), field), val = s.(sub).(field); else, val = default; end
+end

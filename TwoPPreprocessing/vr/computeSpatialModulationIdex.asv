@@ -1,0 +1,451 @@
+function [sessionFileInfo, response] = computeSpatialModulationIdex(sessionFileInfo, VRStimName, applySmoothing, excludeFlaggedLaps)
+% Compute on base trials only
+% 
+if nargin < 2
+   error('Must provide the response struct.');
+end
+if nargin < 3
+    applySmoothing = true; 
+end
+
+if nargin < 4
+    excludeFlaggedLaps = false;
+end 
+
+stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
+if isempty(stimIdx)
+    error('Specified VRStimName ''%s'' not found in sessionFileInfo.', VRStimName);
+end
+
+response = load(sessionFileInfo.stimFiles(stimIdx).Response, 'lapPositionActivity', 'trialIndicesByCondition', 'stimName', 'flaggedLaps');
+
+partnerLandmarkPosition = 80;   
+excludeStart = 30; 
+excludeEnd = 30;
+
+signalNames = fieldnames(response.lapPositionActivity);
+
+disp('Computing SMI for this session...\n');
+SMI = struct(); 
+SMI_Metrics = struct();
+
+for iSignal = 1:length(signalNames)
+    currentSignalName = signalNames{iSignal};
+    disp(['Processing signal: ', currentSignalName]);
+    
+    lapActivity = response.lapPositionActivity.(currentSignalName); 
+    baseTrials = response.trialIndicesByCondition.Baseline;
+
+    % Remove flagged laps [over 50% of frames in a lab were labelled 'bad']
+    if excludeFlaggedLaps && isfield(response, 'flaggedLaps') && ~isempty(response.flaggedLaps)
+        overlappingLaps = intersect(baseTrials, response.flaggedLaps);
+        if ~isempty(overlappingLaps)
+            fprintf('Excluding %d flagged baseline laps before computing metric...\n', length(overlappingLaps));
+            % Remove any baseline trial index that appears in flaggedLaps
+            baseTrials = setdiff(baseTrials, response.flaggedLaps);
+        end
+    end
+    
+    
+    baseLapActivity = lapActivity(:, baseTrials, :);
+    [numROIs, numLaps, numBins] = size(baseLapActivity);
+    validLapPositionRange = (excludeStart + 1) : (numBins - excludeEnd);
+    
+    if applySmoothing
+        w = gausswin(15); w = w / sum(w);
+        for iCell = 1:numROIs
+            for iLap = 1:numLaps
+                trace = squeeze(baseLapActivity(iCell, iLap, :));
+                if all(isnan(trace)), continue; end
+                nanMask = isnan(trace);
+                trace(nanMask) = 0;
+                smoothed = filtfilt(w, 1, trace);
+                smoothed(nanMask) = NaN;
+                baseLapActivity(iCell, iLap, :) = smoothed;
+            end
+        end
+    end
+    
+    meanOdd = squeeze(mean(baseLapActivity(:, 1:2:end, :), 2, 'omitnan'));
+    meanEven = squeeze(mean(baseLapActivity(:, 2:2:end, :), 2, 'omitnan'));
+    
+    smiValues = NaN(numROIs, 1);
+    rpValues  = NaN(numROIs, 1);
+    rnValues  = NaN(numROIs, 1);
+    peakBins  = NaN(numROIs, 1);
+    
+    trackBins = struct();
+    trackBins.prefBin = zeros(numROIs, 1);
+    trackBins.partnerBins = cell(numROIs, 1);
+    
+    for thsROI = 1:numROIs
+        roiTrace = meanOdd(thsROI, :);
+        [pks, locs] = findpeaks(roiTrace);
+        
+        validPeakMask = ismember(locs, validLapPositionRange);
+        validPks = pks(validPeakMask);
+        validLocs = locs(validPeakMask);
+        
+        if ~isempty(validLocs)
+            [~, maxPeakIdx] = max(validPks);
+            prefBin = validLocs(maxPeakIdx);
+        else
+            [~, maxRelIdx] = max(roiTrace(validLapPositionRange));
+            prefBin = validLapPositionRange(maxRelIdx);
+        end
+        
+        trackBins.prefBin(thsROI) = prefBin;
+        peakBins(thsROI) = prefBin;
+        
+        Rp = max(0, meanEven(thsROI, prefBin));
+        rpValues(thsROI) = Rp;
+        
+        if prefBin <= 100
+            targetPartner = prefBin + partnerLandmarkPosition; 
+        else
+            targetPartner = prefBin - partnerLandmarkPosition; 
+        end
+        
+        if targetPartner >= 1 && targetPartner <= numBins
+            matchingBin = targetPartner;
+            trackBins.partnerBins{thsROI} = matchingBin;
+            Rn = max(0, meanEven(thsROI, matchingBin));
+            rnValues(thsROI) = Rn;
+        else
+            continue; 
+        end
+        
+        % if (Rp + Rn) > 1e-9 
+        smiValues(thsROI) = (Rp - Rn) / (Rp + Rn);
+        % else
+        %     smiValues(thsROI) = NaN; 
+        % end
+    end
+    SMI.(currentSignalName) = smiValues;
+    
+    SMI_Metrics.(currentSignalName).SMI = smiValues;
+    SMI_Metrics.(currentSignalName).Rp = rpValues;
+    SMI_Metrics.(currentSignalName).Rn = rnValues;
+    SMI_Metrics.(currentSignalName).PeakBinPosition = peakBins;
+    
+    validSMIIdx = find(~isnan(smiValues));
+    if ~isempty(validSMIIdx)
+        qVals = quantile(smiValues(validSMIIdx), [0.25, 0.50, 0.75]);
+        quantROIs = zeros(1, 3);
+        for q = 1:3
+            [~, minIdx] = min(abs(smiValues(validSMIIdx) - qVals(q)));
+            quantROIs(q) = validSMIIdx(minIdx);
+        end
+        qLabels = {'low smi (25th pct)', 'median smi (50th pct)', 'high smi (75th pct)'};
+        figure('Name', ['example rois for ' currentSignalName], 'Color', [1 1 1], 'Position', [100 100 1200 400]);
+        for iPlot = 1:3
+            targetROI = quantROIs(iPlot);
+            subplot(1, 3, iPlot); hold on;
+            yLims = selectYLim(meanOdd(targetROI,:), meanEven(targetROI,:));
+            
+            plot(1:numBins, meanOdd(targetROI, :), 'Color', [0.824, 0.016, 0.176], 'LineWidth', 2, 'DisplayName', 'mean odd laps');
+            plot(1:numBins, meanEven(targetROI, :), 'Color', [0.000, 0.400, 1.000], 'LineWidth', 2, 'DisplayName', 'mean even laps');
+            
+            pBin = trackBins.prefBin(targetROI);
+            partBins = trackBins.partnerBins{targetROI};
+            plot(pBin, meanEven(targetROI, pBin), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 8, 'DisplayName', 'Rp (pref bin)');
+            if ~isempty(partBins)
+                plot(partBins, meanEven(targetROI, partBins), 'bo', 'MarkerFaceColor', 'b', 'MarkerSize', 8, 'DisplayName', 'Rn (partner bins)');
+            end
+            title(sprintf('%s\nroi %d (smi: %.2f)', qLabels{iPlot}, targetROI, smiValues(targetROI)), 'Interpreter', 'none');
+            xlabel('spatial position bins');
+            ylabel('activity');
+            ylim(yLims);
+            grid on;
+            if iPlot == 3, legend('Location', 'best'); end
+        end
+    end
+end
+
+disp('smi calculation complete.');
+disp(['appending variable SMI_Metrics to file: ', sessionFileInfo.stimFiles(stimIdx).Response]);
+save(sessionFileInfo.stimFiles(stimIdx).Response, 'SMI_Metrics', '-append');
+save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+disp('Done.');
+
+figure('Name', 'spatial modulation index summary', 'Color', [1 1 1]);
+numSignals = length(signalNames);
+subplot(1, 2, 1); hold on;
+plotGroupData = []; plotGroupLabels = {};
+for iSignal = 1:numSignals
+    sigName = signalNames{iSignal};
+    vals = SMI.(sigName)(~isnan(SMI.(sigName)));
+    if ~isempty(vals)
+        jitter = (rand(size(vals)) - 0.5) * 0.15 + iSignal;
+        scatter(jitter, vals, 25, [0.5, 0.5, 0.5], 'filled', 'MarkerFaceAlpha', 0.4);
+        plotGroupData = [plotGroupData; vals]; 
+        labels = repmat({sigName}, length(vals), 1);
+        plotGroupLabels = [plotGroupLabels; labels];
+    end
+end
+if ~isempty(plotGroupData), boxplot(plotGroupData, plotGroupLabels, 'Widths', 0.4, 'Colors', 'k'); end
+ylabel('spatial modulation index (smi)'); title('smi distribution per signal type'); ylim([-1.1, 1.1]); grid on;
+
+subplot(1, 2, 2); hold on;
+for iSignal = 1:numSignals
+    sigName = signalNames{iSignal};
+    vals = SMI.(sigName)(~isnan(SMI.(sigName)));
+    if ~isempty(vals)
+        [f, x] = ecdf(vals);
+        plot(x, f, 'LineWidth', 2.5, 'DisplayName', sigName);
+    end
+end
+xlabel('smi value'); ylabel('cumulative proportion'); title('cumulative distribution function');
+legend('Location', 'best', 'Interpreter', 'none'); xlim([-1.1, 1.1]); ylim([0, 1]); grid on;
+drawnow;
+end
+
+function yLimits = selectYLim(traceA, traceB)
+    mx = max([traceA, traceB]);
+    mn = min([traceA, traceB]);
+    rangeVal = mx - mn;
+    if rangeVal <= 1e-9, rangeVal = 1; end
+    yLimits = [mn - 0.1*rangeVal, mx + 0.1*rangeVal];
+end
+
+% this version specifies landmark boundaries and finds peaks within this
+% boundary 
+% function [sessionFileInfo, response] = computeSpatialModulationIdex(sessionFileInfo, VRStimName, excludeFlaggedLaps, applySmoothing)
+%  % TODO: Includes a position range to detect peaks and then looks for the
+%     % -+80cm partner. 
+%     % landmark centres are 40, 80, 120 and 160 look for 7cm on either side
+%     % of the landmark centre and from that peak look for the partner  plus
+%     % or minus 80cms away... 
+% if nargin < 2
+%    error('Must provide the response struct.');
+% end
+% if nargin < 3; excludeFlaggedLaps = false; end
+% if nargin < 4
+%     applySmoothing = true; 
+% end
+% 
+% % load data 
+% stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
+% if isempty(stimIdx)
+%     error('Specified VRStimName ''%s'' not found in sessionFileInfo.', VRStimName);
+% end
+% 
+% response = load(sessionFileInfo.stimFiles(stimIdx).Response, 'lapPositionActivity', 'trialIndicesByCondition', 'stimName', 'flaggedLaps');
+% 
+% partnerLandmarkPosition = 80;   
+% landmarkCentres = [40, 80, 120, 160];
+% peakWindow = 15;
+% % exclude 30% of each lap 
+% excludeStart = 30; 
+% excludeEnd = 30;
+% 
+% % find signalNames
+% signalNames = fieldnames(response.lapPositionActivity);
+% 
+% disp('Computing SMI for this session...\n');
+% % Initialize sub-structures to hold the custom extraction values
+% SMI = struct(); 
+% SMI_Metrics = struct();
+% 
+% for iSignal = 1:length(signalNames)
+%     currentSignalName = signalNames{iSignal};
+%     disp(['Processing signal: ', currentSignalName]);
+% 
+%     % activity (Neurons x Laps x Bins)
+%     lapActivity = response.lapPositionActivity.(currentSignalName); 
+% 
+%     % Select the baseline conditions
+%     baseTrials = response.trialIndicesByCondition.Baseline;
+% 
+%     % Remove flagged laps 
+%     if excludeFlaggedLaps && isfield(response, 'flaggedLaps') && ~isempty(response.flaggedLaps)
+%         overlappingLaps = intersect(baseTrials, response.flaggedLaps);
+%         if ~isempty(overlappingLaps)
+%             fprintf('Excluding %d flagged baseline laps before computing metric...\n', length(overlappingLaps));
+%             % Remove any baseline trial index that appears in flaggedLaps
+%             baseTrials = setdiff(baseTrials, response.flaggedLaps);
+%         end
+%     end
+%     % -----------------------------------------------
+% 
+%     % Extract base activity using the unflagged baseline indices
+%     baseLapActivity = lapActivity(:, baseTrials, :);
+%     [numROIs, numLaps, numBins] = size(baseLapActivity);
+%     validLapRange = (excludeStart + 1) : (numBins - excludeEnd);
+% 
+%     % Optional smoothning before computing smi 
+%     if applySmoothing
+%         w = gausswin(10); w = w / sum(w);
+%         for iCell = 1:numROIs
+%             for iLap = 1:numLaps
+%                 trace = squeeze(baseLapActivity(iCell, iLap, :));
+%                 if all(isnan(trace)), continue; end
+%                 nanMask = isnan(trace);
+%                 trace(nanMask) = 0;
+%                 smoothed = filtfilt(w, 1, trace);
+%                 smoothed(nanMask) = NaN;
+%                 baseLapActivity(iCell, iLap, :) = smoothed;
+%             end
+%         end
+%     end
+%     % -----------------------------------------------------------------
+% 
+%     % compute mean odd and even 
+%     meanOdd = squeeze(mean(baseLapActivity(:, 1:2:end, :), 2, 'omitnan'));
+%     meanEven = squeeze(mean(baseLapActivity(:, 2:2:end, :), 2, 'omitnan'));
+% 
+%     smiValues = NaN(numROIs, 1);
+%     rpValues  = NaN(numROIs, 1);
+%     rnValues  = NaN(numROIs, 1);
+%     peakBins  = NaN(numROIs, 1);
+% 
+%     % track parametres 
+%     trackBins = struct();
+%     trackBins.prefBin = zeros(numROIs, 1);
+%     trackBins.partnerBins = cell(numROIs, 1);
+% 
+%     for thsROI = 1:numROIs
+%         landmarkBins = [];
+%         for iLand = 1:length(landmarkCentres)
+%             lowBound = max(1, landmarkCentres(iLand) - peakWindow);
+%             highBound = min(numBins, landmarkCentres(iLand) + peakWindow);
+%             landmarkBins = [landmarkBins, lowBound:highBound];
+%         end
+%         % Intersect landmark windows with the central 30% exclusion window
+%         validPeakBins = intersect(unique(landmarkBins), validLapRange);
+%         if isempty(validPeakBins)
+%             continue;
+%         end
+%         % Determine peak position from Odd
+%         [~, maxRelIdx] = max(meanOdd(thsROI, validPeakBins));
+%         prefBin = validPeakBins(maxRelIdx);
+%         trackBins.prefBin(thsROI) = prefBin;
+%         peakBins(thsROI) = prefBin;
+% 
+%         % Measure in even; Response preferred (Rp)
+%         Rp = max(0, meanEven(thsROI, prefBin));
+%         rpValues(thsROI) = Rp;
+% 
+%         % Split Point Rule: Midpoint of active track (100cm) dictates direction
+%         if prefBin <= 100
+%             targetPartner = prefBin + partnerLandmarkPosition; % Look forward (+80cm)
+%         else
+%             targetPartner = prefBin - partnerLandmarkPosition; % Look backward (-80cm)
+%         end
+%         % Ensure the target partner falls cleanly within the total track boundaries
+%         if targetPartner >= 1 && targetPartner <= numBins
+%             matchingBin = targetPartner;
+%             trackBins.partnerBins{thsROI} = matchingBin;
+%             Rn = max(0, meanEven(thsROI, matchingBin));
+%             rnValues(thsROI) = Rn;
+%         else
+%             continue; 
+%         end
+%         % Compute SMI
+%         if (Rp + Rn) > 1e-9
+%             smiValues(thsROI) = (Rp - Rn) / (Rp + Rn);
+%         else
+%             smiValues(thsROI) = NaN; % Assign NaN if SMI cannot be computed
+%         end
+%     end
+% 
+% 
+%     SMI_Metrics.(currentSignalName).SMI = smiValues;
+%     SMI_Metrics.(currentSignalName).Rp = rpValues;
+%     SMI_Metrics.(currentSignalName).Rn = rnValues;
+%     SMI_Metrics.(currentSignalName).PeakBinPosition = peakBins;
+% 
+%     %% plotting 
+%     validSMIIdx = find(~isnan(smiValues));
+%     if ~isempty(validSMIIdx)
+%         qVals = quantile(smiValues(validSMIIdx), [0.25, 0.50, 0.75]);
+%         quantROIs = zeros(1, 3);
+%         for q = 1:3
+%             [~, minIdx] = min(abs(smiValues(validSMIIdx) - qVals(q)));
+%             quantROIs(q) = validSMIIdx(minIdx);
+%         end
+%         qLabels = {'low smi (25th pct)', 'median smi (50th pct)', 'high smi (75th pct)'};
+%         figure('Name', ['example rois for ' currentSignalName], 'Color', [1 1 1], 'Position', [100 100 1200 400]);
+%         for iPlot = 1:3
+%             targetROI = quantROIs(iPlot);
+%             subplot(1, 3, iPlot); hold on;
+%             yLims = selectYLim(meanOdd(targetROI,:), meanEven(targetROI,:));
+%             for iLand = 1:length(landmarkCentres)
+%                 lowB = max(1, landmarkCentres(iLand) - peakWindow);
+%                 highB = min(numBins, landmarkCentres(iLand) + peakWindow);
+%                 shadeLow = max(lowB, validLapRange(1));
+%                 shadeHigh = min(highB, validLapRange(end));
+%                 if shadeLow <= shadeHigh
+%                     fill([shadeLow shadeHigh shadeHigh shadeLow], [yLims(1) yLims(1) yLims(2) yLims(2)], ...
+%                         [1 0.9 0.9], 'EdgeColor', 'none', 'FaceAlpha', 0.5, 'HandleVisibility', 'off');
+%                 end
+%             end
+%             plot(1:numBins, meanOdd(targetROI, :), 'Color', [0.824, 0.016, 0.176], 'LineWidth', 2, 'DisplayName', 'mean odd laps');
+%             plot(1:numBins, meanEven(targetROI, :), 'Color', [0.000, 0.400, 1.000], 'LineWidth', 2, 'DisplayName', 'mean even laps');
+%             pBin = trackBins.prefBin(targetROI);
+%             partBins = trackBins.partnerBins{targetROI};
+%             plot(pBin, meanEven(targetROI, pBin), 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 8, 'DisplayName', 'Rp (pref bin)');
+%             if ~isempty(partBins)
+%                 plot(partBins, meanEven(targetROI, partBins), 'bo', 'MarkerFaceColor', 'b', 'MarkerSize', 8, 'DisplayName', 'Rn (partner bins)');
+%             end
+%             title(sprintf('%s\nroi %d (smi: %.2f)', qLabels{iPlot}, targetROI, smiValues(targetROI)), 'Interpreter', 'none');
+%             xlabel('spatial position bins');
+%             ylabel('activity');
+%             ylim(yLims);
+%             grid on;
+%             if iPlot == 3, legend('Location', 'best'); end
+%         end
+%     end
+% end
+% 
+% %% Saving only the new variances 
+% disp('smi calculation complete.');
+% disp(['appending variable SMI_Metrics to file: ', sessionFileInfo.stimFiles(stimIdx).Response]);
+% % Appends ONLY the new independent variable layout directly into the targets
+% save(sessionFileInfo.stimFiles(stimIdx).Response, 'SMI_Metrics', '-append');
+% save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+% disp('Done.');
+% 
+% %% summary 
+% % figure('Name', 'spatial modulation index summary', 'Color', [1 1 1]);
+% % numSignals = length(signalNames);
+% % subplot(1, 2, 1); hold on;
+% % plotGroupData = []; plotGroupLabels = {};
+% % % scatter and box plot 
+% % for iSignal = 1:numSignals
+% %     sigName = signalNames{iSignal};
+% %     vals = SMI.(sigName)(~isnan(SMI.(sigName)));
+% %     if ~isempty(vals)
+% %         % Scatter distribution points with a slight jitter for clarity
+% %         jitter = (rand(size(vals)) - 0.5) * 0.15 + iSignal;
+% %         scatter(jitter, vals, 25, [0.5, 0.5, 0.5], 'filled', 'MarkerFaceAlpha', 0.4);
+% %         plotGroupData = [plotGroupData; vals]; 
+% %         labels = repmat({sigName}, length(vals), 1);
+% %         plotGroupLabels = [plotGroupLabels; labels];
+% %     end
+% % end
+% % if ~isempty(plotGroupData), boxplot(plotGroupData, plotGroupLabels, 'Widths', 0.4, 'Colors', 'k'); end
+% % ylabel('spatial modulation index (smi)'); title('smi distribution per signal type'); ylim([-1.1, 1.1]); grid on;
+% % % distributions
+% % subplot(1, 2, 2); hold on;
+% % for iSignal = 1:numSignals
+% %     sigName = signalNames{iSignal};
+% %     vals = SMI.(sigName)(~isnan(SMI.(sigName)));
+% %     if ~isempty(vals)
+% %         [f, x] = ecdf(vals);
+% %         plot(x, f, 'LineWidth', 2.5, 'DisplayName', sigName);
+% %     end
+% % end
+% % xlabel('smi value'); ylabel('cumulative proportion'); title('cumulative distribution function');
+% % legend('Location', 'best', 'Interpreter', 'none'); xlim([-1.1, 1.1]); ylim([0, 1]); grid on;
+% % drawnow;
+% % end
+% end
+% function yLimits = selectYLim(traceA, traceB)
+%     mx = max([traceA, traceB]);
+%     mn = min([traceA, traceB]);
+%     rangeVal = mx - mn;
+%     if rangeVal <= 1e-9, rangeVal = 1; end
+%     yLimits = [mn - 0.1*rangeVal, mx + 0.1*rangeVal];
+% end
+% 

@@ -8,18 +8,33 @@ vrKeywords = {'VRCorr', 'BaselineCorridor', 'LandManipCorridor'};
 rfKeywords = {'RFMapping'};
 doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002', 'M25126_VRCorr_20260123_00001', 'M25126_VRCorrBaseline_20260123_00002', 'M25126_VRCorrWithManipulations_20260123_00003', 'M25132_BaselineCorridor_20260219_00001', 'M25132_BaselineCorridor_20260219_00002', ...
     'M26003_BaselineCorridor_20260322_00001',  'M26003_BaselineCorridor_20260322_00002','M26003_BaselineCorridor_20260324_00001', 'M25131_BaselineCorridor_20260421_00001', 'M26005_BaselineCorridor_20260421_00001'};
-%changed to dff 2026 jan
+
 % filteredTable now holds the key metadata (TypeImaged) needed for parameter setting.
 
-filteredTable = filterMasterTable('Exclude', 0, ...
-    'Suite2PPreprocessing', 1, ...
-    'MouseID', {'M25058', 'M25057'}, ...
-    'Session', {'20250529', '20250530'});
-    % ); %rerun '20260318' m25131 (checking eye tracking bits here); m26003 20260321 (too)
+% filteredTable = filterMasterTable('Exclude', 0, ...
+%     'Suite2PPreprocessing', 1, ...
+%     'MouseID', {'M26004', 'M26005', 'M25131', 'M25126'}, ...
+%     'Session', );
+
+pairs=struct;
+pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
+pairs.M26004 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+pairs.M26003 = '20260322';
+pairs.M25132 = '20260226';
+pairs.M25133 = '20260224';
+
+
+
+% pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+% pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+% pairs.M25126 = ['20260311', '20260312', '20260313'];
+% pairs.M25132 = ['20260228', '20260313'];
+% pairs.M26003 = ['20260324', '20260325'];
+
+
+
+filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
 mouseInfo = sessionsToProcess(filteredTable);
-
-% responseName = {'BaselineCorridor','BaselineCorridor','BaselineCorridor','BaselineCorridor'};
-
 
 totalSessionsToProcess = 0;
 sessionsProcessedCount = 0;
@@ -59,7 +74,7 @@ rfpostStimTime = 3;     % seconds
 method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
 
 %% INITIALISE ERROR LOG
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'runRSP_20260506.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'run200Coded_VRSessionMissingAfterCrash_ToRemoveOccNorm_FixFlaggedLaps_recomputeIncMatrices.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 % If the log file doesn't exist, create it with headers
 if ~exist(logFilePath, 'file')
@@ -219,14 +234,14 @@ for thisMouse = 1:size(mouseInfo, 1)
                        
                      
                         % % specififc analysis
-                        % if contains(thisName, 'RFMapping')
-                        %     fprintf('  Running RFMapping Analysis...\n');
-                        %     [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
-                        %     [~, sessionFileInfo] = getRFMappingTrialGroups(sessionFileInfo, thisName);
-                        %     [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
-                        %     % plotRFGrid_byPosition_ROIs(sessionFileInfo, thisName);
-                        %     [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, thisName);
-                        %     % plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,false)
+                        if contains(thisName, 'RFMapping')
+                            fprintf('  Running RFMapping Analysis...\n');
+                            [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
+                            [~, sessionFileInfo] = getRFMappingTrialGroups(sessionFileInfo, thisName);
+                            [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
+                            % plotRFGrid_byPosition_ROIs(sessionFileInfo, thisName);
+                            [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, thisName);
+                            % plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,false)
 
                         % elseif contains(thisName, 'DotMotion_RFMapping')
                         %     fprintf('  Running DotMotion RFMapping Analysis...\n');
@@ -235,12 +250,12 @@ for thisMouse = 1:size(mouseInfo, 1)
                         %     [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
                         %     % plotDotFieldRFs(sessionFileInfo, doSmooth)
 
-                        if contains(thisName, 'DotMotion_SpeedTuning')
+                        elseif contains(thisName, 'DotMotion_SpeedTuning')
                             fprintf('  Running DotMotion Analysis...\n');
                             [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
                             [bonsaiData, sessionFileInfo] = getTrialGroups(sessionFileInfo, thisName);
                             [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
-                            plotSpeedTuning(sessionFileInfo, response)
+                            % plotSpeedTuning(sessionFileInfo, response)
                             %plotSpeedTuning_TemporNasalSpeedInc(sessionFileInfo, response, doSmooth)
                   
 
@@ -250,7 +265,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                             [~, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, thisName, true);
                             [~, sessionFileInfo] = getTrialGroups(sessionFileInfo, thisName);
                             [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
-                            plotDirectionTuning(sessionFileInfo, response, true, false)
+                            % plotDirectionTuning(sessionFileInfo, response, true, false)
                             disp('  Direction tuning processed.');
                         end
 
@@ -271,19 +286,16 @@ for thisMouse = 1:size(mouseInfo, 1)
                     fprintf('Processing VR Stim: %s\n', vrStimName);
                     try
                         % Preprocessing steps
-                        
                         [~, sessionFileInfo] = getVRBonsaiFiles(sessionFileInfo, vrStimName); % Reads and saves all tables; no additional computation done here
                         [~, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo, vrStimName, 1, interpRate);
                         [~, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFileInfo,vrStimName);
                         [~, ~, ~, sessionFileInfo] = resamplAndAlignVR_BonsaiPeripheralSuite2P(sessionFileInfo,interpRate,'TwoPFrameTime', vrStimName);
-                        [response, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo, vrStimName);
+                        [~, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInfo, vrStimName);
                         [~, sessionFileInfo] = getVRTrialIndices(sessionFileInfo, vrStimName); %new
-                        [~, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, vrStimName);
-                        [~, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName, zScoreProcessedSignals, applyTemporalSmoothing); %, prctlF, windowSize
-
+                        [~, sessionFileInfo] = get2PFrameLapPositionBins(sessionFileInfo, vrStimName,true); %turnBadFramesToNans=true; 
+                        [~, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, vrStimName, zScoreProcessedSignals, applyTemporalSmoothing); 
                         % Calculates and saves LapPositionActivity (un-shuffled)
-                        [~, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, useZScoredProcessedSignals);
-
+                        [~, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, vrStimName, useZScoredProcessedSignals,false); %this still contains the flaggedLaps 
                         [~, sessionFileInfo] = getRunningSpeedAcrossLaps(sessionFileInfo, vrStimName);
                         clear response;
 
@@ -311,14 +323,18 @@ for thisMouse = 1:size(mouseInfo, 1)
                         response = load(sessionFileInfo.stimFiles(stimIdx).Response);
                         % Compute Shuffle Matrix (Stitch to itself)
                         fprintf(' -> Computing shuffle matrix for run: %s\n', vrStimName);
-                        % Change shuffle to include spikes 
                         [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo,response,{vrStimName}, useZScoredProcessedSignals);
                         [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
                         [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
                         [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response); % Run on final response
-                        [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response); % Run on final response
-                        [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response);
+                        [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response,signalName, applyTemporalSmoothing,true, false); % Run on final response
+                        [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response, signalName, applyTemporalSmoothing, true, false);
+                        [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response); 
    
+
+                        plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, signalName, applyTemporalSmoothing)
+
+                        %% Additional plotting functions 
                         %plotPopulationActivityAcrossConditions(sessionFileInfo, response, signalName, applyTemporalSmoothing)
                         %plotPopulationActivityAcrossConditions(sessionFileInfo, response, 'dFFNeuropilCorrected', applyTemporalSmoothing)
                         %plotSortedPopulationResponse_OddEven(sessionFileInfo, response, signalName, true);
@@ -326,7 +342,6 @@ for thisMouse = 1:size(mouseInfo, 1)
                         % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName)                       % Run checks
                         % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, 'dFFNeuropilCorrected')
                         %plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, 'dFF')
-                        plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, signalName, applyTemporalSmoothing)
 
                         % For boutons specifically
                         if strcmpi(typeImaged, 'Boutons')
@@ -342,8 +357,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                     % Combine Response sturctures
                     fprintf('Checking for and combining Response across multiple VR runs...\n')
 
-                    responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'VRCorr', 'Response');
-                    % the ucl open vr into this
+                    responseVRRuns = loadDataStructuresByKeyword(sessionFileInfo, 'Corridor', 'Response');
                     [response, sessionFileInfo] = combineResponseForVRRuns(responseVRRuns, sessionFileInfo);
 
                     % Compute Shuffle Matrix (Stitch ALL raw signals together)
@@ -354,8 +368,12 @@ for thisMouse = 1:size(mouseInfo, 1)
                     [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response); % Run on final response
                     [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response); % Run on final response
                     [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response);
+                    [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response);
                    
                     
+                    %% Additional plotting functions
+                    plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, signalName, applyTemporalSmoothing)
+
                     %plotSortedPopulationResponse_OddEven(sessionFileInfo, response, signalName, true)
                     %plotPopulationActivityAcrossConditions(sessionFileInfo, response, signalName, applyTemporalSmoothing);
                     %plotPopulationActivityAcrossConditions(sessionFileInfo, response, 'dFFNeuropilCorrected', applyTemporalSmoothing);
@@ -370,7 +388,8 @@ for thisMouse = 1:size(mouseInfo, 1)
                     % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName);
                     % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing,'dFFNeuropilCorrected');
 
-                    % For boutons specifically
+                       
+                    %% For boutons specifically
                     if strcmpi(typeImaged, 'Boutons')
                         disp('Finding highly correlated boutons for this session')
                         [~,~,~,~] = findHightlyCorrelatedROIs(sessionFileInfo); %TODO: flatten!!!

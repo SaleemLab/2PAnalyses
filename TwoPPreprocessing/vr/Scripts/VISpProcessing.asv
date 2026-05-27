@@ -1,0 +1,35 @@
+%poolRSPLearningDays
+%% Grab sessions to load  
+% some of the earlier sessions can can h
+pairs=struct; 
+pairs.M26005 = ['20260305', '20260306', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs
+pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M25126 = ['20260311', '20260312', '20260313']; % unique fovs 
+ 
+
+VISpSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+
+% edit this function to include SNTmatrix 
+VISpData = getTuningDataByCondition(VISpSessions); 
+
+%% Heatmaps for individual mice; only include rois that are stable across; Self normalised 
+% first/second halves of laps 
+% Corrected call:
+plotEvenTuningHeatmaps(VISpData, ...
+    'DaysToPlot', 200, ...
+    'UseStabilityFilter', true, ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewVISpMice\EvenLaps_SortedByOdd.png')
+%% Population pooled across days 
+plotPooledPopulation(VISpData, 'V1',...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewVISpMice\VISp_PooledNewCorridor2026_withoutRangeNorm.png', ...
+    'DaysToPlot', 200, ...
+    'TypeToPlot', 'Boutons');
+%%
+VISpData = getTuningDataByCondition(VISpSessions,'signalToUse', 'spks');
+plotConditionTuning(VISpData, 'V1', 200, '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Figures\NewVISpMice\VISpAcrossCondition.png')
+% VISpData = computeSMIAcrossSessions(VISpData);
+
+[VISpData.TargetArea_ROI] = deal('V1');
+
+%%

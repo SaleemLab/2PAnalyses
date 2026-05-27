@@ -127,6 +127,25 @@ if isfield(peripheralData, 'Wheel')
     peripheralData.Wheel.sampleTimes = sampleTimes';
 end
 
+% disp('Processing Peripheral Data: Wheel')
+% if isfield(peripheralData, 'Wheel')
+%     rawTime     = peripheralData.Wheel.rawArduinoTime;
+%     rawValue    = peripheralData.Wheel.rawValue;
+%     validIndices = ~isnan(rawTime);
+%     if ~all(validIndices)
+%         rawTime  = rawTime(validIndices);
+%         rawValue = rawValue(validIndices);
+%     end
+%     if ~isempty(rawTime)
+%         [rawTime, uniqueIdx] = unique(rawTime);
+%         rawValue = rawValue(uniqueIdx);
+%         peripheralData.Wheel.Value      = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, NaN)';
+%         peripheralData.Wheel.sampleTimes = sampleTimes';
+%     else
+%         peripheralData.Wheel.Value      = NaN(size(sampleTimes))';
+%         peripheralData.Wheel.sampleTimes = sampleTimes';
+%     end
+% end
 %% GrayScreen Check: Remove fields if necessary 
 if contains(StimName, 'GrayScreen', 'IgnoreCase',true)
     if exist('peripheralData', 'var')
@@ -202,6 +221,39 @@ if isfield(peripheralData, 'Pupil')
     peripheralData.Pupil.sampleTimes = sampleTimes';
 
 end
+
+
+
+% disp('Processing Peripheral Data: Pupil')
+% if isfield(peripheralData, 'Pupil')
+%     uSyncEye = unique(peripheralData.Pupil.raw.LastSyncPulseTime);
+%     uSyncTwoP = unique(vertcat(twoPData.LastSyncPulseTime));
+%     newPupilArduinoTime = align2PSyncPulses(uSyncEye, uSyncTwoP, peripheralData.Pupil.raw.ArduinoTime);
+%     pupilFields = {'CentroidX', 'CentroidY', 'Area', 'MajorAxisLength', 'MinorAxisLength'};
+% 
+%     for thisfld = 1:numel(pupilFields)
+%         fName = pupilFields{thisfld};
+%         rawValue = peripheralData.Pupil.int.(fName);
+% 
+%         rawTime = newPupilArduinoTime;
+%         validIndices = ~isnan(rawTime);
+%         if ~all(validIndices)
+%             rawTime  = rawTime(validIndices);
+%             rawValue = rawValue(validIndices);
+%         end
+% 
+%         if ~isempty(rawTime)
+%             [rawTime, uniqueIdx] = unique(rawTime);
+%             rawValue = rawValue(uniqueIdx);
+% 
+%             peripheralData.Pupil.Value.(fName) = interp1(rawTime, rawValue, sampleTimes, generalInterpMethod, 'extrap')'; 
+%         else
+%             peripheralData.Pupil.Value.(fName) = NaN(size(sampleTimes))';
+%         end
+%     end
+% 
+%     peripheralData.Pupil.sampleTimes = sampleTimes';
+% end
 %% Interpolate: Bonsai - TrialInfo
 disp('Processing Bonsai Data: StimOnset Info')
 fieldsToProcess = { 'ArduinoTimeRaw', 'ArduinoTime' };

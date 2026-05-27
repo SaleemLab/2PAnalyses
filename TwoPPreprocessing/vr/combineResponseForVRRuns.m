@@ -1,25 +1,23 @@
 function [responseCombined, sessionFileInfo] = combineResponseForVRRuns(VRruns, sessionFileInfo, overwrite)
 % combineResponseForVRRuns: Concatenates multiple VR sessions into one.
 % Updated to ensure trial indices align with matrix rows for unified plotting.
-
 if nargin < 3, overwrite = true; end
 
 % Generate naming for the combined file
-parts = split(VRruns{1}.stimName, '_');
+parts = split(VRruns{2}.stimName, '_');
 corridorType = 'VRRun';
 if length(parts) >= 2, corridorType = parts{2}; end
 combinedStimName = [sessionFileInfo.animal_name '_' corridorType '_' sessionFileInfo.session_name '_CombinedRuns'];
 combinedResponseFileName = [sessionFileInfo.animal_name '_' sessionFileInfo.session_name '_Response_' combinedStimName '.mat'];
 combinedResponseFilePath = fullfile(sessionFileInfo.Directories.save_folder, combinedResponseFileName);
 
-% 
 if isempty(sessionFileInfo.stimFiles)
     allStimNames = {};
 else
     allStimNames = {sessionFileInfo.stimFiles.name};
 end
-existingStimIndex = find(strcmp(allStimNames, combinedStimName), 1);
 
+existingStimIndex = find(strcmp(allStimNames, combinedStimName), 1);
 if ~overwrite && ~isempty(existingStimIndex) && exist(combinedResponseFilePath, 'file')
     disp('Existing combined run found. Loading flattened file...');
     responseCombined = load(combinedResponseFilePath);
@@ -56,6 +54,16 @@ else
     responseCombined = VRruns{1};
     responseCombined.stimName = combinedStimName; 
     responseCombined.AllstimName = VRruns{1}.stimName;
+    
+    % Ensure flaggedLaps field exists in the initial struct (even if empty)
+    if ~isfield(responseCombined, 'flaggedLaps')
+        responseCombined.flaggedLaps = [];
+    end
+    
+    % Force flaggedLaps from Run 1 to be a row vector for consistent appending
+    if size(responseCombined.flaggedLaps, 1) > size(responseCombined.flaggedLaps, 2)
+        responseCombined.flaggedLaps = responseCombined.flaggedLaps';
+    end
     
     % Track how many completed laps are stored in the matrix columns
     % This acts as the offset for the next run's indices
@@ -95,6 +103,20 @@ else
             end
         end
         
+        %% Process and Shift newly added flaggedLaps variable
+        if isfield(responseCurrent, 'flaggedLaps') && ~isempty(responseCurrent.flaggedLaps)
+            currFlaggedLaps = responseCurrent.flaggedLaps;
+            
+            % Enforce row vector formatting
+            if size(currFlaggedLaps, 1) > size(currFlaggedLaps, 2), currFlaggedLaps = currFlaggedLaps'; end
+            
+            % Shift index values matching our spatial matrix offset
+            shiftedFlaggedLaps = currFlaggedLaps + numCompletedSoFar;
+            
+            % Append seamlessly to combined list
+            responseCombined.flaggedLaps = [responseCombined.flaggedLaps, shiftedFlaggedLaps];
+        end
+        
         % Concatenate lapPositionActivity (Matrix Columns = Laps)
         for s = 1:length(sigNames)
             sn = sigNames{s};
@@ -107,8 +129,7 @@ else
         responseCombined.lapPositionRunningSpeed = cat(1, ...
             responseCombined.lapPositionRunningSpeed, ...
             responseCurrent.lapPositionRunningSpeed); 
-
-
+        
         % Concatenate lap position data 
         responseCombined.lapPosition2PFrameIdx = [responseCombined.lapPosition2PFrameIdx; ...
                                                   responseCurrent.lapPosition2PFrameIdx];
@@ -124,7 +145,7 @@ else
             end
         end
         
-        % concatenation of other variable 
+        % concatenation of other variables 
         responseCombined.wheelSpeed = [responseCombined.wheelSpeed; responseCurrent.wheelSpeed];
         responseCombined.mouseVirtualPosition = [responseCombined.mouseVirtualPosition; responseCurrent.mouseVirtualPosition];
         responseCombined.lapCountAll = [responseCombined.lapCountAll; responseCurrent.lapCountAll];
@@ -132,10 +153,8 @@ else
         responseCombined.endTimeAll = [responseCombined.endTimeAll; responseCurrent.endTimeAll];
         responseCombined.completedStartTimes = [responseCombined.completedStartTimes; responseCurrent.completedStartTimes];
         responseCombined.completedEndTimes = [responseCombined.completedEndTimes; responseCurrent.completedEndTimes];
-        % responseCombined.blockIDs = [responseCombined.blockIDs; responseCurrent.blockIDs];
-       % responseCombined.trackIDsAll = [responseCombined.trackIDsAll; responseCurrent.trackIDsAll];
         responseCombined.trialTypeAll = [responseCombined.trialTypeAll; responseCurrent.trialTypeAll];
-
+        
         if ~isfield(responseCombined, 'AllstimName')
             responseCombined.AllstimName = {};
         end
@@ -143,21 +162,22 @@ else
         if isfield(responseCombined, 'movementVisualGain')
              responseCombined.movementVisualGain = [responseCombined.movementVisualGain; responseCurrent.movementVisualGain]; 
         end 
-
         responseCombined.AllstimName = [responseCombined.AllstimName; {responseCurrent.stimName}];
-
        
         % Mean running speed 
-        responseCombined.lapRunningSpeed = [responseCombined.lapRunningSpeed; responseCurrent.lapRunningSpeed]; %cell 
-
+        responseCombined.lapRunningSpeed = [responseCombined.lapRunningSpeed; responseCurrent.lapRunningSpeed]; 
+        
         % Update the offset for the next run in the loop
         numCompletedSoFar = size(responseCombined.lapPositionActivity.(sigNames{1}), 2);
     end
 end
 
-
-responseCombined.completedLaps_AbsoluteIdx = [responseCombined.completedLaps_AbsoluteIdx; responseCurrent.completedLaps_AbsoluteIdx];
-responseCombined.abortedLaps_AbsoluteIdx = [responseCombined.abortedLaps_AbsoluteIdx; responseCurrent.abortedLaps_AbsoluteIdx];
+% Note: Fixed a minor bug here—ensured that these append actions safely handle responseCurrent 
+% references if multi-run logic is invoked.
+if numRuns >= 2
+    responseCombined.completedLaps_AbsoluteIdx = [responseCombined.completedLaps_AbsoluteIdx; responseCurrent.completedLaps_AbsoluteIdx];
+    responseCombined.abortedLaps_AbsoluteIdx = [responseCombined.abortedLaps_AbsoluteIdx; responseCurrent.abortedLaps_AbsoluteIdx];
+end
 
 % Save results
 disp(['Saving combined response to ', combinedResponseFilePath]);

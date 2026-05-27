@@ -81,16 +81,35 @@ nLaps = size(lapPosition2PFrameIdx, 1);
 frameToBinMap_Global = nan(1, totalCombinedFrames);
 % frameToLapMap has been removed as I am not computing the lap-to-lap
 % activity 
+% disp('Creating global frame-to-bin map...');
+% for thisLap = 1:nLaps
+%     for thisBin = 1:numBins
+%         frameIdx = lapPosition2PFrameIdx{thisLap, thisBin};
+%         if ~isempty(frameIdx)
+%             % Use indices directly; they should already point into the stitched signal length
+%             frameToBinMap_Global(frameIdx) = thisBin;
+%         end
+%     end
+% end
+% This accounts for Nans introduced [bad_frames]
 disp('Creating global frame-to-bin map...');
 for thisLap = 1:nLaps
     for thisBin = 1:numBins
         frameIdx = lapPosition2PFrameIdx{thisLap, thisBin};
-        if ~isempty(frameIdx)
-            % Use indices directly; they should already point into the stitched signal length
-            frameToBinMap_Global(frameIdx) = thisBin;
+        
+        % Strip out the NaN placeholders so we only index with actual frames
+        cleanFrameIdx = frameIdx(~isnan(frameIdx));
+        
+        if ~isempty(cleanFrameIdx)
+            % Convert to uint64/int64 or standard integers to guarantee clean indexing
+            cleanFrameIdx = round(cleanFrameIdx); 
+            
+            % Use clean indices safely; they point into the stitched signal length
+            frameToBinMap_Global(cleanFrameIdx) = thisBin;
         end
     end
 end
+
 % Frame map is now complete and reflects the stitching order 
 
 %% Calculate Shuffle Matrix 

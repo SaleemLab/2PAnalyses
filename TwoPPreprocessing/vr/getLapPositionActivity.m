@@ -2,25 +2,26 @@ function [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, V
 % Calculates binned lap activity (Neurons x Laps x Bins) for a single stimulus.
 % Returns the unshifted signal and its time indices for stitching/shuffling later.
 % Handles cases where 'spks' may be missing, empty, or all zeros.
+%
+% Applies temporal smoothing (gausswin 15) to ALL signals prior to spatial
+% binning. Default is 250ms smoothning 
 
-%% Handle optional inputs
+% Optional input 'doOccupancyNorm' handles occupancy rate normalization (activity per second) for spikes.
+% occupancyNorm = total signal accumulated in position bin/total time spent
+% in position bin (seconds); This has been commented out 
+
 if nargin < 3, useZScoredProcessedSignals = true; end
 if nargin < 4, onlyIncludeROIs = false; end
+% if nargin < 5, doOccupancyNorm = false; end 
 
-%% Find VR stimulus and load data
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx), error('Specified VRStimName not found in sessionFileInfo.'); end
-
 disp(['Loading data for stimulus: ', VRStimName]);
-
-
 hasSpks = false; 
 filePath = sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData;
 
-% Check what variables exist in the .mat file before loading
 varsInFile = who('-file', filePath);
 
-% 
 if useZScoredProcessedSignals 
     load(filePath, 'zScoredProcessedSignals', 'iscell');
     signals = zScoredProcessedSignals;
@@ -29,9 +30,6 @@ else
     signals = processedSignals;
 end
 
-
-% Check if 'spks' exists, is not empty, and contains actual data (not all
-% zeros); this needs to be fixed in the 2p data 
 if ismember('spks', varsInFile)
     load(filePath, 'spks');
     if ~isempty(spks) && any(spks(:))
@@ -43,60 +41,66 @@ else
     warning('Variable "spks" not found in file: %s. Skipping.', filePath);
 end
 
-% Load response indexing
-response = load(sessionFileInfo.stimFiles(stimIdx).Response, 'lapPosition2PFrameIdx');
+% Ensure flaggedLaps field exists to prevent crashes down stream
+response = load(sessionFileInfo.stimFiles(stimIdx).Response);
+if ~isfield(response, 'flaggedLaps')
+    response.flaggedLaps = [];
+end
 
+% deltaT = [];
+% if doOccupancyNorm
+%     load(filePath, 'resample2PTimeUsed');
+%     timeData = load(filePath, resample2PTimeUsed);
+%     timeVec = timeData.(resample2PTimeUsed);
+%     deltaT = median(diff(timeVec));
+% end
 
-%% Apply temporal smoothing to spikes
+w = gausswin(15); 
+w = w / sum(w);
+
+sigFields = fieldnames(signals);
+for f = 1:length(sigFields)
+    fieldName = sigFields{f};
+    if isnumeric(signals.(fieldName)) && ~isempty(signals.(fieldName))
+        signals.(fieldName) = filtfilt(w, 1, signals.(fieldName)')';
+    end
+end
+
 spks_smoothed = []; 
 if hasSpks
-    disp('Applying temporal smoothing to spikes (gausswin 15)...');
-    w = gausswin(15); 
-    w = w / sum(w);
-    % Vectorised smoothing along time dimension
     spks_smoothed = filtfilt(w, 1, spks')'; 
 end
 
-%% Get cell ROIs
 if onlyIncludeROIs
     ROIs = find(iscell(:, 1));
 else
     ROIs = (1:size(iscell, 1))';
 end
-
 response.lapPositionActivityZScored = useZScoredProcessedSignals;
+% response.lapPositionActivityOccupancyNormalized = true;
 
-%% Calculate Real Activity (Neurons x Laps x Bins)
 signalNames = {'dFF', 'dFFNeuropilCorrected', 'spks'}; 
 numSignals = length(signalNames);
 
-% Define binning based on Stimulus Name
 if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
     numBins = 200;
 elseif contains(VRStimName, 'VRCorr')
     numBins = 140;
-else
-    numBins = 100; % Default fallback
 end
 
 nLaps = size(response.lapPosition2PFrameIdx, 1);
 lapPositionActivity = struct(); 
 
-disp('Calculating Real Activity (Neurons x Laps x Bins)...');
-
 for iSignal = 1:numSignals
     currentSignalName = signalNames{iSignal};
     
-    % SKIP logic: If this is spks but we don't have valid data, skip to next signal
     if strcmp(currentSignalName, 'spks') && ~hasSpks
         continue; 
     end
-
-    % Select the correct matrix to process
+    
     if strcmp(currentSignalName, 'spks')
         currentSignalMatrix = spks_smoothed(ROIs, :);
     else 
-        % Check if the field exists in the signals struct (e.g. dFF)
         if isfield(signals, currentSignalName)
             currentSignalMatrix = signals.(currentSignalName)(ROIs, :); 
         else
@@ -106,27 +110,33 @@ for iSignal = 1:numSignals
     end 
     
     numROIs = size(currentSignalMatrix, 1);
-    
-
     lapPositionActivity.(currentSignalName) = nan(numROIs, nLaps, numBins);
     
     for thisLap = 1:nLaps
         for thisBin = 1:numBins
             frameIdx = response.lapPosition2PFrameIdx{thisLap, thisBin};
-            if ~isempty(frameIdx)
-                % Compute mean activity for this bin
-                lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = ...
-                    mean(currentSignalMatrix(:, frameIdx), 2, 'omitnan');
-            end
+            
+            validFrameMask = ~isnan(frameIdx);
+            cleanFrameIdx = frameIdx(validFrameMask);
+            
+            % Taking the mean natively handles the varying number of frames per bin
+            meanActivity = mean(currentSignalMatrix(:, cleanFrameIdx), 2, 'omitnan');
+
+            % if doOccupancyNorm && strcmp(currentSignalName, 'spks')
+            %     % Converts 'spikes per frame' to 'spikes per second' (Hz)
+            %     % while maintaining the occupancy normalization achieved by the mean
+            %     lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = meanActivity ./ deltaT;
+            % else
+                % Standard mean for dF/F or unscaled spikes
+            lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = meanActivity;
+            % end
+          
         end
     end
-end
 
-%% save
 response.lapPositionActivity = lapPositionActivity;
-
 disp(['Saving updated Response struct (Lap Activity) to ', sessionFileInfo.stimFiles(stimIdx).Response]);
 save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
-
+disp('Done.');
 end

@@ -39,7 +39,7 @@ for iStim = 1:length(sessionFileInfo.stimFiles)
         planeTimes_table = get_bonsai_twopframetimes_by_planes(twop_filepath, numPlanes);
         twoPData = struct(); 
         
-        
+
         for iPlane = 1:sessionFileInfo.numPlanes
             planeName = sessionFileInfo.suite2pFiles(iPlane).planeName;
             fAll_filepath = findFile(sessionFileInfo.suite2pFiles(iPlane).planes, 'fall');

@@ -16,7 +16,7 @@ if nargin < 3
 end
 
 if nargin < 4
-    signalToUse = 'dFF';
+    signalToUse = 'dFFNeuropilCorrected';
 end
 %% Load Threshold Metrics from sessionROIData
 outputFilePath = sessionFileInfo.otherSessFilePaths.sessionROIData;
@@ -78,8 +78,8 @@ fprintf('Generating ROI summary plots for %d ROIs...\n', nROIs);
 % Define criteria thresholds 
 THRESHOLD_VAR_TO_VAR = 20; 
 THRESHOLD_VAR_TO_RANGE = 1; 
-THRESHOLD_HALVES_CORR = 0.4;
-THRESHOLD_ODDEVEN_CORR = 0.4;
+THRESHOLD_HALVES_CORR = 0.6;
+THRESHOLD_ODDEVEN_CORR = 0.6;
 
 
 % Initialize counter for ROIs that pass all criteria
@@ -171,7 +171,7 @@ for neuronIdx = 1:nROIs
     plot(x, meanActivity, 'k', 'LineWidth', 2);
     xline(40, 'k--'); xline(80, 'k--'); xline(120, 'k--'); xline(160, 'k--');
     xticks([1 40 80 120 160 200]);
-    xlabel('Position (cm)'); ylabel('Mean dFF');
+    xlabel('Position (cm)'); ylabel('Mean \DeltaF/F');
     title(mainTitle, 'Color', titleColor);
     
     if metricsLoaded

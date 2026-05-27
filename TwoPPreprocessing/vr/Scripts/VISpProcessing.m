@@ -1,0 +1,35 @@
+%poolRSPLearningDays
+%% Grab sessions to load  
+% some of the earlier sessions can can h
+pairs=struct; 
+pairs.M26005 = ['20260305', '20260306', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs
+pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M25126 = ['20260311', '20260312', '20260313']; % unique fovs 
+ 
+
+VISpSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+
+% edit this function to include SNTmatrix 
+VISpData = getTuningDataByCondition(VISpSessions); 
+VISpDataSpks = getTuningDataByCondition(VISpSessions, 'signalToUse', 'spks');
+
+VISpData = appendFilteredROIs(VISpData, 'RhoHalvesThreshold', 0.8, 'CvExpVarThreshold', 0.5, 'FilterSomasByRF', true);
+VISpDataSpks = appendFilteredROIs(VISpDataSpks, 'RhoHalvesThreshold', 0.8, 'CvExpVarThreshold', 0.1, 'FilterSomasByRF', true);
+
+
+%% plotting functions 
+% this will include 4 mice (kimchi including) 
+plotPooledPopulation_OddEven(VISpData, 'V1', ...
+     'TypeToPlot', 'Somas', ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter0\VISP\VISppooled_OddEven');
+
+
+% plot even and conditions in pdf png and svg; this will include 3 mice
+% with all 5 conditions 
+plotPooledPopulation_AcrossConditions(VISpData, 'V1', ...
+     'TypeToPlot', 'Somas', ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter0\VISP\VISppooled_conditions');
+
+
+plotFilteredSMIDistributions(VISpData)

@@ -37,7 +37,7 @@ function [response, sessionFileInfo] = extractVRAndPeripheralData(sessionFileInf
 
 
 %% Defualt parameters 
-if nargin < 3, plotFlag = true; end
+if nargin < 3, plotFlag = false; end
 
 %% Load data files
 %% Load data files
@@ -306,7 +306,10 @@ if contains(VRStimName, 'BaselineCorridor') || contains(VRStimName, 'LandManipCo
     response.movementVisualGain = bonsaiData.movementVisualGain;
 end
 
-
+%%
+save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
+save(sessionFileInfo.stimFiles(iStim).Response,'-struct', 'response', '-v7.3'); %using -v7.3 as this is first save
+disp('Saved Response');
 %% Sanity check plot: Lap start and end times across session
 if nargin < 2 || plotFlag
     figure('Name', 'Lap Start and End Times'); clf;
@@ -359,8 +362,4 @@ if nargin < 2 || plotFlag
 
 end
 
-save(sessionFileInfo.stimFiles(iStim).Response,'-struct', 'response', '-v7.3'); %using -v7.3 as this is first save
-disp('Saved Response');
-
-save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end

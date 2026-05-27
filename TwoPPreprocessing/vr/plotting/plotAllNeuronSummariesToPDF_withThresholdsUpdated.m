@@ -1,0 +1,173 @@
+function plotAllNeuronSummariesToPDF_withThresholdsUpdated(sessionFileInfo, response, applySmoothing, signalToUse)
+%   Plots Odd/Even split summary for all ROIs and exports to multipage PDF.
+%   Uses the specific loop/filtfilt smoothing logic for the spatial dimension only.
+
+if nargin < 3 || isempty(applySmoothing); applySmoothing = true; end
+if nargin < 4 || isempty(signalToUse); signalToUse = 'dFFNeuropilCorrected'; end
+
+%% 1. Load Metrics from sessionROIData
+outputFilePath = sessionFileInfo.otherSessFilePaths.sessionROIData;
+metricsLoaded = false;
+EVthreshold = 0.1;
+
+
+if exist(outputFilePath, 'file') == 2
+    loadedMetrics = load(outputFilePath);
+    
+    % Determine correct label for Circular Shift (Standard)
+    % if isfield(loadedMetrics.nullDist_PeakTuningMetric, 'CircShift')
+    %     shufLabel = 'CircShift';
+    % else
+    %     shufLabel = 'StandardShuffle';
+    % end
+    
+    % Load Standard (CircShift) Metrics
+    peakSig_Std  = loadedMetrics.nullDist_PeakTuningMetric.isSignificantByPeakShuffling.(signalToUse);
+    rangeSig_Std = loadedMetrics.nullDist_RangeTuningMetric.isSignificantByRange.(signalToUse);
+    pRank_Std    = loadedMetrics.nullDist_PeakTuningMetric.realPeakPercentileRank.(signalToUse);
+    rRank_Std    = loadedMetrics.nullDist_RangeTuningMetric.realRangePercentileRank.(signalToUse);
+    
+    % % Load RandPerm Metrics
+    % hasRP = isfield(loadedMetrics.nullDist_PeakTuningMetric, 'RandPerm');
+    % if hasRP
+    %     peakSig_RP  = loadedMetrics.nullDist_PeakTuningMetric.RandPerm.isSignificantByPeakShuffling.(signalToUse);
+    %     rangeSig_RP = loadedMetrics.nullDist_RangeTuningMetric.RandPerm.isSignificantByRange.(signalToUse);
+    %     pRank_RP    = loadedMetrics.nullDist_PeakTuningMetric.RandPerm.realPeakPercentileRank.(signalToUse);
+    %     rRank_RP    = loadedMetrics.nullDist_RangeTuningMetric.RandPerm.realRangePercentileRank.(signalToUse);
+    % end
+    % 
+
+    % Explained variance 
+    meanEV = loadedMetrics.crossValExpVar.medianExpVar; 
+    
+   
+
+    % Variance and Stability Metrics
+    varToTuningVar   = loadedMetrics.tuningCurveVariance.ratioVarToTuningVar;
+    varToTuningRange = loadedMetrics.tuningCurveVariance.ratioVarToTuningRange; 
+    oddEvenRho       = loadedMetrics.lapCorr_OddEven.rho;
+    halvesRho        = loadedMetrics.lapCorr_Halves.rho;
+    
+    % Unique Bouton Mask
+    roisToKeepMask = false(size(varToTuningVar));
+    if isfield(loadedMetrics.highlyCorrBoutons, 'roisToKeep')
+        roisToKeepMask(loadedMetrics.highlyCorrBoutons.roisToKeep) = true;
+    end
+    metricsLoaded = true;
+end
+
+%% 2. PDF Setup
+figSaveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
+if ~exist(figSaveDir, 'dir'); mkdir(figSaveDir); end
+pdfPath = fullfile(figSaveDir, sprintf('%s_%s_OddEvenSplit_IncCirtera_%s.pdf', ...
+    sessionFileInfo.animal_name, sessionFileInfo.session_name, signalToUse));
+
+if exist(pdfPath, 'file'); delete(pdfPath); end
+
+%% 3. Extract Activity and Loop
+lapActivityFull = response.lapPositionActivity.(signalToUse);
+[nROIs, nLaps, nBins] = size(lapActivityFull);
+evenIdx = 2:2:nLaps;
+oddIdx  = 1:2:nLaps;
+
+for roiIdx = 1:nROIs
+    roiActivity = squeeze(lapActivityFull(roiIdx, :, :));
+    if all(isnan(roiActivity), 'all'); continue; end
+    
+    %% 4. Custom Smoothing (Spatial Only)
+    if applySmoothing
+        % Smoothing kernel (10 bins)
+        w_space = gausswin(10); w_space = w_space / sum(w_space);
+        for iL = 1:nLaps
+            trace = roiActivity(iL, :);
+            if all(isnan(trace)), continue; end
+            nanMask = isnan(trace); trace(nanMask) = 0;
+            smoothed = filtfilt(w_space, 1, trace);
+            smoothed(nanMask) = NaN;
+            roiActivity(iL, :) = smoothed;
+        end
+    end
+    
+    % Split Data
+    evenLaps = roiActivity(evenIdx, :);
+    oddLaps  = roiActivity(oddIdx, :);
+    mEven = mean(evenLaps, 1, 'omitnan');
+    sEven = std(evenLaps, 0, 1, 'omitnan') ./ sqrt(sum(~isnan(evenLaps), 1));
+    mOdd  = mean(oddLaps, 1, 'omitnan');
+    sOdd  = std(oddLaps, 0, 1, 'omitnan') ./ sqrt(sum(~isnan(oddLaps), 1));
+
+    %% 5. Visualization
+    fig = figure('Visible', 'off', 'Position', [50 50 1300 800]);
+    
+    % Heatmap: Even
+    subplot(2, 2, 1);
+    imagesc(normalize(evenLaps, 2, 'range')); 
+    colormap(flipud(gray)); title('Even Trials');
+    ylabel('Trial #'); xline([40 80 120 160], 'k--');
+    
+    % Heatmap: Odd
+    subplot(2, 2, 3);
+    imagesc(normalize(oddLaps, 2, 'range'));
+    colormap(flipud(gray)); title('Odd Trials');
+    xlabel('Position (cm)'); ylabel('Trial #'); xline([40 80 120 160], 'k--');
+
+    % Stability Overlay
+    subplot(2, 2, 2); hold on;
+    x = 1:nBins;
+    fill([x fliplr(x)], [mEven+sEven, fliplr(mEven-sEven)], [0 0.45 0.74], 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+    fill([x fliplr(x)], [mOdd+sOdd, fliplr(mOdd-sOdd)], [0.85 0.33 0.1], 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+    plot(x, mEven, 'Color', [0 0.45 0.74], 'LineWidth', 2);
+    plot(x, mOdd, 'Color', [0.85 0.33 0.1], 'LineWidth', 2);
+    title(sprintf('ROI %d ', roiIdx));
+    ylabel('\DeltaF/F'); xline([40 80 120 160], 'k--'); 
+
+    % Dashboard (gemini)
+    subplot(2, 2, 4); axis off;
+    if metricsLoaded
+        spatialSig = (peakSig_Std(roiIdx) || rangeSig_Std(roiIdx));
+        % if hasRP; spatialSig = spatialSig || peakSig_RP(neuronIdx) || rangeSig_RP(neuronIdx); end
+        
+        % passed if significant using shuffle, halves stable and cross-val
+        % explained variance. 
+        passed = spatialSig && (halvesRho(roiIdx) >= 0.6) && (meanEV(roiIdx) >= EVthreshold);
+        
+        detailText = { ...
+            sprintf('--- SIGNIFICANCE (shuffle) ---'); ...
+            sprintf('Peak:  %d (%.1f%%)', peakSig_Std(roiIdx), pRank_Std(roiIdx)); ...
+            sprintf('Range: %d (%.1f%%)', rangeSig_Std(roiIdx), rRank_Std(roiIdx)) ...
+        };
+        
+        % if hasRP
+        %     detailText = [detailText; { ...
+        %         ''; ...
+        %         '--- SIGNIFICANCE (RandPerm) ---'; ...
+        %         sprintf('Peak:  %d (%.1f%%)', peakSig_RP(neuronIdx), pRank_RP(neuronIdx)); ...
+        %         sprintf('Range: %d (%.1f%%)', rangeSig_RP(neuronIdx), rRank_RP(neuronIdx)) ...
+        %     }];
+        % end
+        
+        detailText = [detailText; { ...
+            ''; ...
+            '--- STABILITY & VARIANCE ---'; ...
+            sprintf('Explained Variance: %.3f (Target > 0.1) ', meanEV(roiIdx))
+            sprintf('Var/TunVar:   %.2f', varToTuningVar(roiIdx)); ...
+            sprintf('Var/TunRange: %.2f', varToTuningRange(roiIdx)); ...
+            '---- ------'
+            sprintf('Odd/Even Rho: %.3f (Target > 0.6)', oddEvenRho(roiIdx)); ...
+            sprintf('Halves Rho:   %.3f (Target > 0.6)', halvesRho(roiIdx)); ...
+            '---- ------'
+            sprintf('Unique Bouton: %d', roisToKeepMask(roiIdx)); ...
+            ''; ...
+            sprintf('STATUS: %s', iif(passed, 'PASS', 'FAIL')) ...
+        }];
+        
+        text(0.1, 0.5, detailText, 'FontSize', 10, 'FontName', 'FixedWidth', 'Interpreter', 'none');
+    end
+    
+    exportgraphics(fig, pdfPath, 'Append', true);
+    close(fig);
+end
+fprintf('PDF Generated Successfully: %s\n', pdfPath);
+end
+
+function out = iif(cond, t, f); if cond; out = t; else; out = f; end; end

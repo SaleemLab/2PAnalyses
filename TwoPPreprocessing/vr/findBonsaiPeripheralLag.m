@@ -33,7 +33,7 @@ function [bonsaiData, sessionFileInfo] = findBonsaiPeripheralLag(sessionFileInfo
 
 if nargin < 3; method = 1; end % Set default
 if nargin < 4; samplingRate = 60; end % Set default
-if nargin < 5; plotFlag = true; end % false  
+if nargin < 5; plotFlag = false; end % false  
 
 %%
 for iStim = 1:length(sessionFileInfo.stimFiles)

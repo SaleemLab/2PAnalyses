@@ -22,7 +22,7 @@ function [bonsaiData, sessionFileInfo] = alignVRBonsaiToPeripheralData(sessionFi
 %
 % Aman and Sonali - March 2025
 
-if nargin < 3, plotFlag = true; end
+if nargin < 3, plotFlag = false; end
 
 for iStim = 1:length(sessionFileInfo.stimFiles)
     bonsaiData.isVRstim(iStim) = strcmp(VRStimName, sessionFileInfo.stimFiles(iStim).name);
