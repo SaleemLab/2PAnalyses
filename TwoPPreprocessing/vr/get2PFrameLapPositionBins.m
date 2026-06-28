@@ -315,9 +315,12 @@ timeVec = timeData.(resample2PTimeUsed);
 if size(timeVec, 1) > size(timeVec, 2), timeVec = timeVec'; end
 % Load required response fields
 response = load(sessionFileInfo.stimFiles(stimIdx).Response, 'completedStartTimes', 'completedEndTimes', ...
-                         'wheelSpeed', 'mouseVirtualPosition');
+                         'wheelSpeed', 'mouseVirtualPosition', 'movementVisualGain', 'startTimeAll', 'endTimeAll');
 load(sessionFileInfo.stimFiles(stimIdx).BonsaiData, 'bonsaiData');
-load(sessionFileInfo.stimFiles(stimIdx).processedPeripheralData, 'peripheralData');
+% load(sessionFileInfo.stimFiles(stimIdx).processedPeripheralData, 'peripheralData');
+
+% create a copy of the interpolated mouse position value 
+bonsaiData.MousePos.Value_nanCorrected = bonsaiData.MousePos.Value;
 %% Define filters and setup
 minSpeedBin = 1;
 maxSpeedBin = 100;
@@ -353,17 +356,19 @@ elseif contains(VRStimName, 'VRCorr')
     posBinEdges = 0:140;
 end 
 numPosBins = length(posBinEdges) - 1;
-nLaps = length(response.completedStartTimes);
+nLaps = length(response.startTimeAll);
 lapPosition2PFrameIdx = cell(nLaps, numPosBins);
 lapPositionRelativeTime = cell(nLaps, numPosBins);
+
+lapPosition_speedDerived = cell(nLaps,1);
 %% Loop over laps to find frame indices for each spatial bin
 flaggedLaps = []; % Initialize empty array to track bad laps
 for thisLap = 1:nLaps
     disp(['Processing Lap: ' num2str(thisLap)]);
-    lapStart = response.completedStartTimes(thisLap);
-    lapEnd = response.completedEndTimes(thisLap);
+    lapStart = response.startTimeAll(thisLap);
+    lapEnd = response.endTimeAll(thisLap);
     
-    % Find global indices for frames in this lap
+    % Find indices for frames in this lap
     lapFrameIdx = find(timeVec >= lapStart & timeVec <= lapEnd);
     if isempty(lapFrameIdx)
         disp(['No 2P frames found for lap ' num2str(thisLap) '. Continuing...']);
@@ -373,29 +378,63 @@ for thisLap = 1:nLaps
     % Enforce lapFrameIdx to be a row vector to prevent dimension mismatch errors
     if size(lapFrameIdx, 1) > size(lapFrameIdx, 2), lapFrameIdx = lapFrameIdx'; end
     
-    % Data Loss Check (Evaluates strictly based on bad frames)
+    % Data loss check (Evaluates strictly based on bad frames)
     totalFramesInLap = length(lapFrameIdx);
     badFramesInLap = sum(isBadFrame(lapFrameIdx));
     if (badFramesInLap / totalFramesInLap) > 0.5
         flaggedLaps = [flaggedLaps, thisLap]; % Append the bad lap index to the array
         warning('Lap %d: More than 50%% of frames excluded due to BadFrames \n.', thisLap);
     end
-    
+
     % Get position and force to row vector alignment
     lapPosition = response.mouseVirtualPosition(lapFrameIdx);
     if size(lapPosition, 1) > size(lapPosition, 2), lapPosition = lapPosition'; end
-    
+
+    % check position of the first frame; this can happen due to the
+    % interpolation. For example if the first position is 159cm (due to
+    % linear interpolation) and the second position is 1.x then change the
+    % first position to match the second one.
+    %     if length(lapPosition) > 1 && lapPosition(1) > lapPosition(2)
+    %
+    %         fprintf('  [PATCH] Lap %-2d: Shifting F1 Position from %6.2f cm -> %6.2f cm\n', ...
+    %             thisLap, lapPosition(1), lapPosition(2));
+    %         lapPosition(1) = lapPosition(2);
+    %     end
+
+   if length(lapPosition) > 1
+       if thisLap <nLaps
+           nextStart = response.startTimeAll(thisLap+1);
+       else
+           nextStart = response.endTimeAll(thisLap);
+       end
+       % Find indices for frames from start of this lap to the start of
+       % next lap
+       FrameIdx = find(timeVec >= lapStart & timeVec <= nextStart);
+       lapPosition_speedDerived{thisLap} = [FrameIdx' cumsum(response.movementVisualGain/0.0612*response.wheelSpeed(FrameIdx)/60)];% Wheel speed also scaled to match VR speed
+      
+       rawFirstFive = nan(1,5);
+       rawFirstFive(1:min(5, length(lapPosition))) = lapPosition(1:min(5, length(lapPosition)));
+        lapPosition_original = lapPosition;
+        lapPosition(find(abs(diff(rawFirstFive))>3)) =nan;
+
+         bonsaiData.MousePos.Value_nanCorrected(lapFrameIdx) = lapPosition;
+
+        fprintf(' Lap %-2d | Raw First 5: [%.2f, %.2f, %.2f, %.2f, %.2f] -> [%.2f, %.2f, %.2f, %.2f, %.2f]', ...
+            thisLap, rawFirstFive(1), rawFirstFive(2), rawFirstFive(3), rawFirstFive(4), rawFirstFive(5),...
+            lapPosition(1), lapPosition(2), lapPosition(3), lapPosition(4), lapPosition(5));
+    end
+
     % Assign each frame in the lap to a position bin
     positionIdx = discretize(lapPosition, posBinEdges);
     if size(positionIdx, 1) > size(positionIdx, 2), positionIdx = positionIdx'; end
-    
+
     for thisBin = 1:numPosBins
-        % binMask captures all frames that physically occurred in this spatial bin
+        % binMask captures all frames that  occurred in this position bin
         binMask = (positionIdx == thisBin);
-        
+
         % Extract raw global frame indices as integers first
         rawFrameIdxInBin = lapFrameIdx(binMask);
-        
+
         if ~isempty(rawFrameIdxInBin)
             % Identify frames that fail our filter criteria
             badFrameMask = ~combinedFilter(rawFrameIdxInBin);
@@ -426,7 +465,11 @@ fprintf('%d out of %d laps flagged due to over 50%% loss of frames [bad-frames o
 response.lapPosition2PFrameIdx = lapPosition2PFrameIdx;
 response.lapPositionRelativeTime = lapPositionRelativeTime;
 response.flaggedLaps= flaggedLaps; 
+response.lapPosition_speedDerived = lapPosition_speedDerived; 
+
+% bonsaiData.MousePos.Value_nanCorrected = Value_nanCorrected; 
 save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append'); 
+save(sessionFileInfo.stimFiles(stimIdx).BonsaiData, 'bonsaiData', '-append'); % added a new corrected mousepos.value variable that turns uncertains positions to nans (due to interp)
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 disp('Done.');
 end

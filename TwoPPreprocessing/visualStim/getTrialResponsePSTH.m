@@ -80,22 +80,39 @@
 function [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, stimName, signalToUse)
 if nargin < 3, signalToUse = 'dFFNeuropilCorrected'; end 
 
-% Load data
-iStim = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}), 1);
-load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedSignals');
-load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
-load(sessionFileInfo.stimFiles(iStim).Response, 'response');
 
-signalMatrix = processedSignals.(signalToUse); 
+% Load data
+
+iStim = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}), 1);
+if ~isempty(iStim)
+    filePath = sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData;
+    fileInfo = whos('-file', filePath);
+    if any(strcmp({fileInfo.name}, 'spks'))
+        processedTwoPData = load(filePath, 'processedSignals', 'spks');
+    else
+        processedTwoPData = load(filePath, 'processedSignals');
+    end 
+    load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
+    load(sessionFileInfo.stimFiles(iStim).Response, 'response'); 
+else
+    warning('Stimulus name "%s" not found in sessionFileInfo.', stimName);
+end
+
+if contains(signalToUse, 'spks')
+    signalMatrix = processedTwoPData.spks;
+else
+    signalMatrix = processedTwoPData.processedSignals.(signalToUse); 
+end 
+
 [nNeurons, ~] = size(signalMatrix);
 nGroups = numel(bonsaiData.trialGroups);
 
 % define grid
-% Use the window defined in your slicing function
+% Use the window defined in the slicing function
 pre = response(1).preStimTime;
 post = response(1).postStimTime;
-perfectTime = -pre : (1/60) : post; 
-nFramesPerfect = length(perfectTime);
+Time = -pre : (1/60) : post; 
+nFrames = length(Time);
 
 pd = struct('stimValue', [], 'alignedResponses', [], 'meanResponse', [], ...
             'stdResponse', [], 'semResponse', [], 'timeVector', [], 'responseType', []);
@@ -107,7 +124,7 @@ for g = 1:nGroups
     nTrialsInGrp = numel(trIdxs);
 
     % Initialize 3D matrix with the Perfect Grid size
-    aligned = nan(nNeurons, nFramesPerfect, nTrialsInGrp);
+    aligned = nan(nNeurons, nFrames, nTrialsInGrp);
 
     for ti = 1:nTrialsInGrp
         trialID = trIdxs(ti);
@@ -124,11 +141,11 @@ for g = 1:nGroups
             % Ignore NaNs (bad frames) and interpolate to exactly 0.0
             valid = ~isnan(rawRelTimes);
             if sum(valid) > 10
-                % Re-align to the perfect timebase
-                trace = interp1(rawRelTimes(valid), rawSignal(n, valid), perfectTime, 'linear', 'extrap');
+                % Re-align to the timebase
+                trace = interp1(rawRelTimes(valid), rawSignal(n, valid), Time, 'linear', 'extrap');
 
                 % Subtract this trial's own baseline (-2s to 0s)
-                baselineVal = nanmean(trace(perfectTime < 0));
+                baselineVal = nanmean(trace(Time < 0));
                 aligned(n, :, ti) = trace - baselineVal;
             end
         end
@@ -145,7 +162,7 @@ for g = 1:nGroups
     response(1).psthData(g).meanResponse     = mResp;
     response(1).psthData(g).stdResponse      = sResp;
     response(1).psthData(g).semResponse      = semR;
-    response(1).psthData(g).timeVector       = perfectTime;
+    response(1).psthData(g).timeVector       = Time;
     response(1).psthData(g).responseType     = 'Interpolated & Baseline-Subtracted';
 end
 

@@ -5,9 +5,9 @@ function offsetAxes(ax)
 %
 % by Anne Urai, 2016
 
-set(ax, 'TickDir','out', 'TickLength', [0.01 0.001]...
+set(ax, 'TickDir','out', 'TickLength', [0.02 0.001]...
     ,  'color', 'none', 'box','off', 'XColor', 'k', 'YColor', 'k',...
-    'FontName', 'Calibri', 'LineWidth', 0.5)
+    'FontName', 'Arial', 'LineWidth', 1)
 
 if ~exist('ax', 'var'), ax = gca; end
 % modify the x and y limits to below the data (by a small amount)
@@ -19,9 +19,9 @@ end
 
 function resetVertex(ax)
 
-set(ax, 'TickDir','out', 'TickLength', [0.01 0.001]...
+set(ax, 'TickDir','out', 'TickLength', [0.02 0.001]...
     ,  'color', 'none', 'box','off', 'XColor', 'k', 'YColor', 'k',...
-    'FontName', 'Calibri', 'LineWidth', 0.5)
+    'FontName', 'Arial', 'LineWidth', 1)
 
 % extract the x axis vertext data
 % X, Y and Z row of the start and end of the individual axle.

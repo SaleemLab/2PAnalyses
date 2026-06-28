@@ -89,6 +89,7 @@ function [bonsaiData, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFi
             bonsaiData.ArduinoTimeRaw = stimEventsTable.ArduinoTime./1000;
             bonsaiData.stimType = stimEventsTable.VelX1;
             bonsaiData.stimID = stimEventsTable.Id;
+            
 
         case 'DotMotion_RFMapping'
             stimEventsTable = readtable(tuningFilePath);

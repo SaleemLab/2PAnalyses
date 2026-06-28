@@ -14,8 +14,8 @@ VISpSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exc
 VISpData = getTuningDataByCondition(VISpSessions); 
 VISpDataSpks = getTuningDataByCondition(VISpSessions, 'signalToUse', 'spks');
 
-VISpData = appendFilteredROIs(VISpData, 'RhoHalvesThreshold', 0.8, 'CvExpVarThreshold', 0.5, 'FilterSomasByRF', true);
-VISpDataSpks = appendFilteredROIs(VISpDataSpks, 'RhoHalvesThreshold', 0.8, 'CvExpVarThreshold', 0.1, 'FilterSomasByRF', true);
+VISpData = appendFilteredROIs(VISpData, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'RestrictSMIToLandmarkBoundaries', true, 'LandmarkBoundaries', 15);
+VISpDataSpks = appendFilteredROIs(VISpDataSpks, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01);
 
 
 %% plotting functions 
@@ -31,5 +31,11 @@ plotPooledPopulation_AcrossConditions(VISpData, 'V1', ...
      'TypeToPlot', 'Somas', ...
     'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter0\VISP\VISppooled_conditions');
 
+plotAndSaveFilteredTuningCurves(VISpData, true)
+
 
 plotFilteredSMIDistributions(VISpData)
+
+
+%% check smi across evs [move to different script; temp]
+

@@ -50,8 +50,8 @@ function sessionMetrics = getTuningDataByCondition(sessionTable, varargin)
         currentSessionData.TuningVarMetrics = safeGet(sessionROIData, 'tuningCurveVariance');
         currentSessionData.NullDist_Range = safeGet(sessionROIData, 'nullDist_RangeTuningMetric');
         currentSessionData.NullDist_Peak = safeGet(sessionROIData, 'nullDist_PeakTuningMetric');
-        currentSessionData.cvExpVar = safeGetField(sessionROIData, 'crossValExpVar', 'cvExpVar'); 
-        currentSessionData.cvExpvar_nullDist_pVales = safeGetField(sessionROIData, 'crossValExpVar', 'pValues');
+        currentSessionData.cvExpVar = safeGetField(sessionROIData, 'crossValExpVar', params.signalToUse); 
+
         
 
         if  strcmpi(currentSessionData.TypeImaged, 'Somas')
@@ -110,22 +110,39 @@ function [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, errorMessage]
         sfi = D.sessionFileInfo; 
         stimNames = string({sfi.stimFiles.name});
         
-        targetIdx = find(contains(stimNames, "LandManipCorridor") & contains(stimNames, "CombinedRuns"), 1);
-        
-        if isempty(targetIdx)
-            targetIdx = find(contains(stimNames, "LandManipCorridor"), 1);
-        end
-        
-        if isempty(targetIdx)
-            targetIdx = find(contains(stimNames, "BaselineCorridor") & contains(stimNames, "CombinedRuns"), 1);
-        end
-        
-        if isempty(targetIdx)
-            targetIdx = find(contains(stimNames, "BaselineCorridor"), 1);
-        end
+%         targetIdx = find(contains(stimNames, "LandManipCorridor") & contains(stimNames, "CombinedRuns"), 1);
+%         
+%         if isempty(targetIdx)
+%             targetIdx = find(contains(stimNames, "LandManipCorridor"), 1);
+%         end
+%         
+%         if isempty(targetIdx)
+%             targetIdx = find(contains(stimNames, "BaselineCorridor") & contains(stimNames, "CombinedRuns"), 1);
+%         end
+%         
+%         if isempty(targetIdx)
+%             targetIdx = find(contains(stimNames, "BaselineCorridor"), 1);
+%         end
+% 
+%         if isempty(targetIdx)
+%             error('No valid LandManip or Baseline corridor found.');
+%         end
+
+        % select combined runs if present 
+        targetIdx = find(contains(stimNames, "Corridor") & contains(stimNames, "CombinedRuns"), 1);
 
         if isempty(targetIdx)
-            error('No valid LandManip or Baseline corridor found.');
+            allCorridorIdx = find(contains(stimNames, "Corridor"));
+
+            if isscalar(allCorridorIdx)
+           
+                targetIdx = allCorridorIdx;
+            elseif length(allCorridorIdx) > 1
+                
+                targetIdx = find(contains(stimNames, "Corridor") & contains(stimNames, "00002"), 1);
+            end
+
+
         end
         
         responseFilePath = sfi.stimFiles(targetIdx).Response;
@@ -182,10 +199,20 @@ function [sessionROIData] = loadSessionROIData(sessionFileInfo)
     end
 end
 
+% gemini functions to load fields 
+% s is the sturct; sub is the sub-struct and and then the field name 
 function val = safeGet(s, field)
-    if isstruct(s) && isfield(s, field), val = s.(field); else, val = []; end
+    if isstruct(s) && isfield(s, field)
+        val = s.(field); 
+    else
+        val = []; 
+    end
 end
 
 function val = safeGetField(s, sub, field, default)
-    if isstruct(s) && isfield(s, sub) && isfield(s.(sub), field), val = s.(sub).(field); else, val = default; end
+    if isstruct(s) && isfield(s, sub) && isfield(s.(sub), field)
+        val = s.(sub).(field); 
+    else
+        val = default; 
+    end
 end

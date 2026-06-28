@@ -1,5 +1,5 @@
 function saveFigureFormats(figHandle, savePath)
-% saveFigureFormats: High-quality exporter that saves a clean raster PNG,
+% exporter that saves a  PNG,
 % a vector-safe PDF, and a classic-traced layered SVG using the print engine.
 % gemini 
 
@@ -16,14 +16,19 @@ function saveFigureFormats(figHandle, savePath)
     set(figHandle, 'Renderer', 'painters');
 
 
-    exportgraphics(figHandle, [basePath, '.png'], 'Resolution', 600);
+    exportgraphics(figHandle, [basePath, '.png']);
     
-    exportgraphics(figHandle, [basePath, '.pdf'], 'ContentType', 'vector');
+    exportgraphics(figHandle, [basePath, '.pdf'],'ContentType', 'vector');
     
-    % 3. FIXED Layered SVG (Bypasses exportgraphics restrictions entirely)
+    % Gemini suggested fix Layered SVG 
     % Uses the native print driver to map every text, line, and matrix component 
-    % into fully editable vector group hierarchies.
-    print(figHandle, [basePath, '.svg'], '-dsvg', '-vector');
+    % into fully editable vector group hierarchies. 
+    print(figHandle, [basePath, '.svg'], '-dsvg');
     
-    fprintf('Export complete! Formats saved successfully to:\n   %s[.png, .pdf, .svg]\n', basePath);
+    % Save as a MATLAB .fig file
+    savefig(figHandle, [basePath, '.fig']);
+
+
+    
+    fprintf('Export complete! Formats saved successfully to:\n   %s[.png, .pdf, .svg, .fig]\n', basePath);
 end

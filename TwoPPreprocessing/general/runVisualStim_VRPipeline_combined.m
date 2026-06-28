@@ -11,29 +11,29 @@ doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 
 
 % filteredTable now holds the key metadata (TypeImaged) needed for parameter setting.
 
-% filteredTable = filterMasterTable('Exclude', 0, ...
-%     'Suite2PPreprocessing', 1, ...
-%     'MouseID', {'M26004', 'M26005', 'M25131', 'M25126'}, ...
-%     'Session', );
-
-pairs=struct;
-pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
-pairs.M26004 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
-pairs.M26003 = '20260322';
-pairs.M25132 = '20260226';
-pairs.M25133 = '20260224';
+filteredTable = filterMasterTable('Exclude', 0, ...
+    'Suite2PPreprocessing', 1, ...
+    'MouseID', {'M26003', 'M25132', 'M25133'}, ...
+    'DayOfExperience', [1 2 3 4]);
 
 
 
+% pairs.M26005 = '20260318';
+%pairs.M26003 = '20260324';
+% pairs.M25132 = '20260226';
+% pairs.M25133 = '20260224';
+
+
+% pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
 % pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
 % pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
 % pairs.M25126 = ['20260311', '20260312', '20260313'];
-% pairs.M25132 = ['20260228', '20260313'];
-% pairs.M26003 = ['20260324', '20260325'];
+% pairs.M25132 = ['20260226', '20260228', '20260313'];
+% pairs.M26003 = ['20260322', '20260324', '20260325'];
+% pairs.M25133 = '20260224';
 
-
-
-filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+% pairs.M25132 = {'20260226'};
+% filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
 mouseInfo = sessionsToProcess(filteredTable);
 
 totalSessionsToProcess = 0;
@@ -53,7 +53,7 @@ paramsSomas.useZScoredProcessedSignals = false;
 paramsSomas.applyTemporalSmoothing = true;
 paramsSomas.prctlF = 8; % The percentile from which to take F0 (baseline F).
 paramsSomas.windowSize = 60; % The rolling window over which to calculate F0.
-paramsSomas.signalName = 'dFFNeuropilCorrected';
+paramsSomas.signalName = 'spks';
 
 
 % Parameters for Bouton Imaging
@@ -74,7 +74,7 @@ rfpostStimTime = 3;     % seconds
 method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
 
 %% INITIALISE ERROR LOG
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'run200Coded_VRSessionMissingAfterCrash_ToRemoveOccNorm_FixFlaggedLaps_recomputeIncMatrices.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'FINALRun_20260628_RSPLearning.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 % If the log file doesn't exist, create it with headers
 if ~exist(logFilePath, 'file')
@@ -329,7 +329,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response); % Run on final response
                         [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response,signalName, applyTemporalSmoothing,true, false); % Run on final response
                         [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response, signalName, applyTemporalSmoothing, true, false);
-                        [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response); 
+%                         [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response); 
    
 
                         plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, signalName, applyTemporalSmoothing)
@@ -365,10 +365,10 @@ for thisMouse = 1:size(mouseInfo, 1)
                     [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo, response, vrStimNames, useZScoredProcessedSignals);
                     [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
                     [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
-                    [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response); % Run on final response
-                    [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response); % Run on final response
-                    [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response);
-                    [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response);
+                    [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response, signalName); % Run on final response
+                    [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response, signalName); % Run on final response
+                    [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response, signalName);
+%                     [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response);
                    
                     
                     %% Additional plotting functions

@@ -1,5 +1,4 @@
 function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
-
     
     pooledSMI_RSP = [];
     for s = 1:length(RSPData)
@@ -11,7 +10,6 @@ function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
             pooledSMI_RSP = [pooledSMI_RSP; cleanSMI(:)];
         end
     end
-    
     
     pooledSMI_VISp = [];
     for s = 1:length(VISpData)
@@ -28,10 +26,13 @@ function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
         error('one or both brain regions do not contain any valid filtered data.');
     end
     
-    % 
+    % Calculate Medians
+    median_RSP  = median(pooledSMI_RSP);
+    median_VISp = median(pooledSMI_VISp);
+    
     [pVal, hStat] = ranksum(pooledSMI_RSP, pooledSMI_VISp);
-    fprintf('RSP Boutons pooled ROIs:  %d (median SMI: %.3f)\n', length(pooledSMI_RSP), median(pooledSMI_RSP));
-    fprintf('VISp Somas pooled ROIs:   %d (median SMI: %.3f)\n', length(pooledSMI_VISp), median(pooledSMI_VISp));
+    fprintf('RSP Boutons pooled ROIs:  %d (median SMI: %.3f)\n', length(pooledSMI_RSP), median_RSP);
+    fprintf('VISp Somas pooled ROIs:   %d (median SMI: %.3f)\n', length(pooledSMI_VISp), median_VISp);
     fprintf('p-value (rank-sum test):  %.4e\n', pVal);
     if hStat
         disp('result: significantly different distributions.');
@@ -46,6 +47,7 @@ function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
     rspColor  = 'k'; 
     vispColor = [0.6 0.6 0.6]; 
     
+    %% --- Subplot 1: ECDF ---
     subplot(1, 2, 1); hold on;
     
     [fRSP, xRSP] = ecdf(pooledSMI_RSP);
@@ -66,57 +68,71 @@ function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
     xlim([-1.1, 1.1]);
     ylim([0, 1.02]);
     legend('Location', 'best', 'Interpreter', 'none', 'Box','off');
-
+    
+    yticks([0, 1]); 
+    
     set(gca, 'Box', 'off'); 
     defaultAxesProperties(gca)
-    offsetAxes()
+    offsetAxes(gca)
     axis square; 
-
-    % 
+    
+    %% --- Subplot 2: Histogram ---
     subplot(1, 2, 2); hold on;
     
     binEdges = linspace(-1.1, 1.1, 55);
     
-
-          
-    histogram(pooledSMI_VISp, 'BinEdges', binEdges, 'Normalization', 'pdf', ...
-        'FaceColor', vispColor, 'EdgeColor', 'w', 'FaceAlpha', 0.3, ...
-        'DisplayName', 'VISp somas');
-    histogram(pooledSMI_RSP, 'BinEdges', binEdges, 'Normalization', 'pdf', ...
-        'FaceColor', rspColor, 'EdgeColor', 'w', 'FaceAlpha', 0.4, ...
-        'DisplayName', 'RSP boutons');
-%     histogram(pooledSMI_RSP, 'BinEdges', binEdges, 'Normalization', 'pdf', ...
-%               'DisplayStyle', 'stairs', 'EdgeColor', [0 0 0], 'LineWidth', 1, ...
-%               'DisplayName', 'rsp boutons');
-%           
-%     % VISp Somas - Dashed Dark Gray Line
-%     histogram(pooledSMI_VISp, 'BinEdges', binEdges, 'Normalization', 'pdf', ...
-%               'DisplayStyle', 'stairs', 'EdgeColor', [0.5 0.5 0.5], 'LineWidth', 1, ...
-%               'LineStyle', '--', 'DisplayName', 'visp somas');
+    [counts_RSP, ~]  = histcounts(pooledSMI_RSP, binEdges, 'Normalization', 'pdf');
+    [counts_VISp, ~] = histcounts(pooledSMI_VISp, binEdges, 'Normalization', 'pdf');
+    
+    combined_counts = counts_RSP + counts_VISp;
+    first_idx = find(combined_counts > 0, 1, 'first');
+    last_idx  = find(combined_counts > 0, 1, 'last');
+    
+    cropped_edges  = binEdges(first_idx : last_idx+1);
+    cropped_RSP    = [counts_RSP(first_idx : last_idx), 0];   
+    cropped_VISp   = [counts_VISp(first_idx : last_idx), 0];  
+    
+    h1 = stairs(cropped_edges, cropped_RSP, 'Color', [0 0 0], 'LineWidth', 1.2, ...
+                'DisplayName', 'rsp boutons');
+    h2 = stairs(cropped_edges, cropped_VISp, 'Color', [0.5 0.5 0.5], 'LineWidth', 1.2, ...
+                'DisplayName', 'visp somas');
           
     xline(0, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.8, 'HandleVisibility', 'off');
     xlabel('Spatial modulation index');
     ylabel('Probability');
-
     
+    xlim([-1, 1]);
     
-    xlim([-1.1, 1.1]);
-   
+    max_density = max([max(counts_RSP), max(counts_VISp)]);
+    y_max = ceil(max_density * 5) / 5; 
+    ylim([0, y_max]); 
+    yticks([0, y_max/2, y_max]); 
+    
+    % --- PRINT MEDIANS ON THE FIGURE ---
+    % Places text in the upper-right sector of the plot coordinates
+    text_x = cropped_edges(end) * 0.45; 
+    text(text_x, y_max * 0.85, sprintf('RSP Med: %.3f', median_RSP), ...
+         'Color', 'k', 'FontWeight', 'bold', 'FontSize', 9);
+    text(text_x, y_max * 0.75, sprintf('VISp Med: %.3f', median_VISp), ...
+         'Color', [0.4 0.4 0.4], 'FontWeight', 'bold', 'FontSize', 9);
+    % 
+    
     legend('Location', 'best', 'Box','off');
     
-    % 
     set(gca, 'Box', 'off');
     defaultAxesProperties(gca)
     offsetAxes(gca)
     axis square;
-    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1\RSPVsVISp\';
+    
+    
+    %% --- Save Block ---
+    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4\smi_RSP_VISP_spks';
     if ~exist(outputDir, 'dir')
         mkdir(outputDir);
     end
     
-    baseFileName = 'rsp_vs_visp_smi_comparison';
+    baseFileName = 'rsp_vs_vispdFFNeu_smi_comparison';
     fullSavePath = fullfile(outputDir, baseFileName);
     
     saveFigureFormats(figHandle, fullSavePath);
-
 end

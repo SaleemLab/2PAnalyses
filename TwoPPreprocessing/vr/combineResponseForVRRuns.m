@@ -16,8 +16,8 @@ if isempty(sessionFileInfo.stimFiles)
 else
     allStimNames = {sessionFileInfo.stimFiles.name};
 end
-
 existingStimIndex = find(strcmp(allStimNames, combinedStimName), 1);
+
 if ~overwrite && ~isempty(existingStimIndex) && exist(combinedResponseFilePath, 'file')
     disp('Existing combined run found. Loading flattened file...');
     responseCombined = load(combinedResponseFilePath);
@@ -66,7 +66,6 @@ else
     end
     
     % Track how many completed laps are stored in the matrix columns
-    % This acts as the offset for the next run's indices
     sigNames = fieldnames(responseCombined.lapPositionActivity);
     numCompletedSoFar = size(responseCombined.lapPositionActivity.(sigNames{1}), 2);
     
@@ -81,7 +80,7 @@ else
             responseCurrent.(fieldName) = responseCurrent.(fieldName) + lastEndTime;
         end
         
-        % This ensures Trial 1 of Run B points to Row (N+1) of the combined matrix
+        % Shift trial indices
         if isfield(responseCurrent, 'trialIndicesByCondition')
             condNames = fieldnames(responseCurrent.trialIndicesByCondition);
             for c = 1:length(condNames)
@@ -89,10 +88,7 @@ else
                 currIdx = responseCurrent.trialIndicesByCondition.(cn);
                 
                 if ~isempty(currIdx)
-                    % Shift the trial indices to match the new column position 
-                    % in the concatenated lapPositionActivity matrix.
                     shiftedIdx = currIdx + numCompletedSoFar;
-                    
                     if isfield(responseCombined.trialIndicesByCondition, cn)
                         responseCombined.trialIndicesByCondition.(cn) = ...
                             [responseCombined.trialIndicesByCondition.(cn); shiftedIdx];
@@ -106,14 +102,8 @@ else
         %% Process and Shift newly added flaggedLaps variable
         if isfield(responseCurrent, 'flaggedLaps') && ~isempty(responseCurrent.flaggedLaps)
             currFlaggedLaps = responseCurrent.flaggedLaps;
-            
-            % Enforce row vector formatting
             if size(currFlaggedLaps, 1) > size(currFlaggedLaps, 2), currFlaggedLaps = currFlaggedLaps'; end
-            
-            % Shift index values matching our spatial matrix offset
             shiftedFlaggedLaps = currFlaggedLaps + numCompletedSoFar;
-            
-            % Append seamlessly to combined list
             responseCombined.flaggedLaps = [responseCombined.flaggedLaps, shiftedFlaggedLaps];
         end
         
@@ -129,6 +119,13 @@ else
         responseCombined.lapPositionRunningSpeed = cat(1, ...
             responseCombined.lapPositionRunningSpeed, ...
             responseCurrent.lapPositionRunningSpeed); 
+        
+        %% --- INTEGRATION OF lapPosition_speedDerived (CELL ARRAY) ---
+        if isfield(responseCurrent, 'lapPosition_speedDerived')
+            responseCombined.lapPosition_speedDerived = [responseCombined.lapPosition_speedDerived; ...
+                                                         responseCurrent.lapPosition_speedDerived];
+        end
+        %% -------------------------------------------------------------
         
         % Concatenate lap position data 
         responseCombined.lapPosition2PFrameIdx = [responseCombined.lapPosition2PFrameIdx; ...
@@ -172,8 +169,6 @@ else
     end
 end
 
-% Note: Fixed a minor bug here—ensured that these append actions safely handle responseCurrent 
-% references if multi-run logic is invoked.
 if numRuns >= 2
     responseCombined.completedLaps_AbsoluteIdx = [responseCombined.completedLaps_AbsoluteIdx; responseCurrent.completedLaps_AbsoluteIdx];
     responseCombined.abortedLaps_AbsoluteIdx = [responseCombined.abortedLaps_AbsoluteIdx; responseCurrent.abortedLaps_AbsoluteIdx];

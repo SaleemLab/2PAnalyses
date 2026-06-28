@@ -12,24 +12,24 @@ VISpSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exc
 
 % edit this function to include SNTmatrix 
 VISpData = getTuningDataByCondition(VISpSessions); 
+VISpDataSpks = getTuningDataByCondition(VISpSessions, 'signalToUse', 'spks');
 
-%% Heatmaps for individual mice; only include rois that are stable across; Self normalised 
-% first/second halves of laps 
-% Corrected call:
-plotEvenTuningHeatmaps(VISpData, ...
-    'DaysToPlot', 200, ...
-    'UseStabilityFilter', true, ...
-    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewVISpMice\EvenLaps_SortedByOdd.png')
-%% Population pooled across days 
-plotPooledPopulation(VISpData, 'V1',...
-    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\NewVISpMice\VISp_PooledNewCorridor2026_withoutRangeNorm.png', ...
-    'DaysToPlot', 200, ...
-    'TypeToPlot', 'Boutons');
-%%
-VISpData = getTuningDataByCondition(VISpSessions,'signalToUse', 'spks');
-plotConditionTuning(VISpData, 'V1', 200, '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\Figures\NewVISpMice\VISpAcrossCondition.png')
-% VISpData = computeSMIAcrossSessions(VISpData);
+VISpData = appendFilteredROIs(VISpData, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'RestrictSMIToLandmarkBoundaries', true, 'LandmarkBoundaries', 15);
+VISpDataSpks = appendFilteredROIs(VISpDataSpks, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01);
 
-[VISpData.TargetArea_ROI] = deal('V1');
 
-%%
+%% plotting functions 
+% this will include 4 mice (kimchi including) 
+plotPooledPopulation_OddEven(VISpData, 'V1', ...
+     'TypeToPlot', 'Somas', ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter0\VISP\VISppooled_OddEven');
+
+
+% plot even and conditions in pdf png and svg; this will include 3 mice
+% with all 5 conditions 
+plotPooledPopulation_AcrossConditions(VISpData, 'V1', ...
+     'TypeToPlot', 'Somas', ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter0\VISP\VISppooled_conditions');
+
+
+plotFilteredSMIDistributions(VISpData)

@@ -118,22 +118,56 @@ fprintf('Bonsai VR data saved for: %s\n', VRStimName);
 
 end
 
-%% Sub-function for landmark reformatting @Could move this further up the pipeline TODO CHECK 
+%% Sub-function for landmark reformatting @Could move this further up the pipeline TODO 
 function trialTable = reformatLandmarkTableToTrialTable(landmarkTable)
-    % Groups landmark entries by unique timestamp to define discrete trials/laps
-    [uniqueTimestamps, ~, trialIdx] = unique(landmarkTable.Seconds);
-    numTrials = length(uniqueTimestamps);
+    % Groups landmark entries to define discrete trials/laps.
+    % Fixes the VR/Arduino early-timestamp bug by enforcing that a trial 
+    % must contain at least 3 landmarks and adopts the later cluster timestamp.
     
-    % Pre-allocate output
+    % Ensure data is sorted chronologically to begin with
+    landmarkTable = sortrows(landmarkTable, 'Seconds');
+    
+    % Assign trial indices dynamically based on landmark counts
+    numRows = height(landmarkTable);
+    trialIdx = zeros(numRows, 1);
+    
+    currentTrial = 1;
+    landmarksInCurrentTrial = 1;
+    trialIdx(1) = currentTrial;
+    
+    for r = 2:numRows
+        timeGap = landmarkTable.Seconds(r) - landmarkTable.Seconds(r-1);
+        
+        % If there's a time gap AND we already have enough landmarks for a valid trial,
+        % only then do we increment to the next trial index. 
+        % With this current design the minimum number of landmarks in any
+        % given trial is 3 
+        if timeGap > 0.001 && landmarksInCurrentTrial >= 3
+            currentTrial = currentTrial + 1;
+            landmarksInCurrentTrial = 1; % Reset counter for the new trial
+        else
+            landmarksInCurrentTrial = landmarksInCurrentTrial + 1;
+        end
+        trialIdx(r) = currentTrial;
+    end
+    
+    numTrials = currentTrial;
+    
+    % output table 
     trialTable = table('Size', [numTrials, 8], ...
         'VariableTypes', {'double', 'double', 'cell', 'cell', 'cell', 'cell', 'cell', 'double'}, ...
         'VariableNames', {'Seconds', 'Lap', 'LandmarkNames', 'Positions', 'Sizes', 'CenterOffsets', 'RewardValence', 'NumLandmarks'});
-
+    
+    % Populate the table and correct timestamps
     for thisNum = 1:numTrials
         thisTrial = landmarkTable(trialIdx == thisNum, :);
         
-        trialTable.Seconds(thisNum)      = uniqueTimestamps(thisNum);
-        trialTable.Lap(thisNum)          = thisNum; % Lap number based on unique occurrence
+        % FIX: Grab the LATER timestamp (the cluster time) instead of the early outlier
+        % If an early landmark was pulled in, max() ensures we use the true stable trial time.
+        % TODO: run this by andrew!! 
+        trialTable.Seconds(thisNum)          = max(thisTrial.Seconds);
+        
+        trialTable.Lap(thisNum)              = thisNum; 
         trialTable.LandmarkNames{thisNum}    = thisTrial.("Value.Value");
         trialTable.Positions{thisNum}        = thisTrial.("Value.Value.Position");
         trialTable.Sizes{thisNum}            = thisTrial.("Value.Value.Size");

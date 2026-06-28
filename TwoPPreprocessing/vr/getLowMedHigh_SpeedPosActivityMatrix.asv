@@ -1,0 +1,99 @@
+function response = getLowMedHigh_SpeedPosActivityMatrix(sessionFileInfo, VRStimName, options)
+% Shapes neural data into a [3 x numPosBins x numROIs] Position-Speed matrix
+% by pooling frames (per [trial x posBin] cell) into Low / Med / High speed.
+%
+% Options:
+%   .signalToUse        : 'dFFNeuropilCorrected' (default)
+%   .useFixedThresholds : false (default) -> percentile split [0, 33.33, 66.67, 100]
+%                         true            -> fixed edges [1, 15, 27, Inf]
+%   .fixedEdges         : [1, 15, 27, Inf] (default, only used if useFixedThresholds = true)
+%
+% Output saved to file:
+%   response.speedPositionActivity.speedRanges.low  [1 x numPosBins x numROIs]
+%   response.speedPositionActivity.speedRanges.med  [1 x numPosBins x numROIs]
+%   response.speedPositionActivity.speedRanges.high [1 x numPosBins x numROIs]
+%   response.speedPositionActivity.speedEdges
+%   response.speedPositionActivity.method
+
+%% Defaults
+if nargin < 3, options = struct(); end
+if ~isfield(options, 'signalToUse'),        options.signalToUse = 'dFFNeuropilCorrected'; end
+if ~isfield(options, 'useFixedThresholds'), options.useFixedThresholds = false; end
+if ~isfield(options, 'fixedEdges'),         options.fixedEdges = [1, 15, 27, Inf]; end
+
+%% Load data
+stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
+if isempty(stimIdx), error('Specified VRStimName not found.'); end
+filePath = sessionFileInfo.stimFiles(stimIdx).Response;
+
+data      = load(filePath, 'lapPositionActivity', 'lapPositionRunningSpeed', 'trialIndicesByCondition');
+rawROIData = data.lapPositionActivity.(options.signalToUse); % [numROIs x numTrials x numPosBins]
+speedData  = data.lapPositionRunningSpeed;                   % [numTrials x numPosBins]
+
+%% Baseline trials only
+baselineTrials = data.trialIndicesByCondition.Baseline;
+rawROIData     = rawROIData(:, baselineTrials, :);           % [numROIs x numBaselineTrials x numPosBins]
+speedData      = speedData(baselineTrials, :);               % [numBaselineTrials x numPosBins]
+
+[numROIs, ~, numPosBins] = size(rawROIData);
+
+%% Global speed edges from all running frames (used for percentile method)
+allSpeeds   = speedData(:);
+runningMask = allSpeeds > 1 & ~isnan(allSpeeds);            % This is just a safety measure; all speeds are only speeds greather than 1cm/s
+
+if options.useFixedThresholds
+    speedEdges = options.fixedEdges;                         % [1, 15, 27, Inf]
+    method     = 'fixed';
+else
+    runningSpeeds = allSpeeds(runningMask);
+    speedEdges    = prctile(runningSpeeds, [0, 33.33, 66.67, 100]);
+
+    for i = 1:3
+        histogram(allSpeeds(allSpeeds>speedEdges(i) & allSpeeds<speedEdges(i+1))); hold on;
+    end
+
+    method        = 'percentile';
+end
+
+fprintf('Method: %s | Edges: %.2f  %.2f  %.2f  %.2f\n', method, speedEdges(1), speedEdges(2), speedEdges(3), speedEdges(4));
+
+%% Per-frame speed labelling [numTrials x numPosBins]
+% Each [trial, posBin] cell gets its own speed label based on that cell's speed.
+% Frames outside the running range (<=1 or NaN) get label 0 and are excluded.
+speedLabel = zeros(size(speedData));                         % 0 = excluded
+
+for s = 1:3
+    inBin = speedData >= speedEdges(s) & speedData < speedEdges(s+1);
+    speedLabel(inBin) = s;
+end
+
+% For the last edge make it inclusive on the right (handles max value)
+speedLabel(speedData >= speedEdges(end-1) & speedData <= speedEdges(end)) = 3;
+
+%% Build matrix [3 x numPosBins x numROIs]
+matrix = nan(3, numPosBins, numROIs);
+
+for s = 1:3
+    for b = 1:numPosBins
+        trialMask = speedLabel(:, b) == s;                   % [numTrials x 1] logical
+        if sum(trialMask) >= 2
+            % rawROIData is [numROIs x numTrials x numPosBins]
+            % squeeze out the posBin dim -> [numROIs x numTrials], then average over trials
+            frameData        = rawROIData(:, trialMask, b);  % [numROIs x nMatchingTrials]
+            matrix(s, b, :)  = mean(frameData, 2, 'omitnan');
+        end
+    end
+end
+
+%% Package output
+response.speedPositionActivity.speedRanges.low  = squeeze(matrix(1, :, :)); % [numPosBins x numROIs]
+response.speedPositionActivity.speedRanges.med  = squeeze(matrix(2, :, :));
+response.speedPositionActivity.speedRanges.high = squeeze(matrix(3, :, :));
+response.speedPositionActivity.speedEdges       = speedEdges;
+response.speedPositionActivity.method           = method;
+
+%% Save
+disp(['Saving Low/Med/High speed-position matrix to ', filePath]);
+save(filePath, '-struct', 'response', '-append');
+
+end

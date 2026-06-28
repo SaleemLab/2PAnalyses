@@ -9,4 +9,4 @@ plotSMI_PeakDistributions_VISP_RSP(RSPData, VISpData)
 
 % finds preferred peak position to either gratings or plaid 
 % plots bar chart with percentage of selective rois 
-plotSMI_LandmarkIdentityPreference_Both(RSPData, VISpData)
+plotLandmarkIdentityPreference(RSPData, VISpData)

@@ -1,5 +1,7 @@
-function plotSingleROI_ConditionStack(sessionFileInfo, response, neuronIdx, signalToUse)
-% plotSingleROI_ConditionStack: Robust vertical stack with dynamic x-labeling.
+function figHandle = plotSingleROI_ConditionStack(sessionFileInfo, response, neuronIdx, signalToUse)
+% plotSingleROI_ConditionStack: Robust vertical stack with sequential lap counts.
+% FIXED: Handles explicitly passed to all graphics functions to ensure 
+% defaultAxesProperties and offsetAxes are accurately targeted and executed.
 
 if nargin < 4, signalToUse = 'dFFNeuropilCorrected'; end
 
@@ -16,7 +18,6 @@ for i = 1:length(conds)
     end
 end
 numValid = length(validConds);
-
 nBins = size(roiActivity, 2);
 xPos = 1:nBins;
 tickLocs = [40, 80, 120, 160]; 
@@ -47,47 +48,65 @@ baseMu = mean(roiActivity(response.trialIndicesByCondition.(validConds{baseIdx})
 for iC = 1:numValid
     currCond = validConds{iC};
     trialIDs = response.trialIndicesByCondition.(currCond);
+    nLapsInBlock = length(trialIDs);
     currColor = colors{mod(iC-1, length(colors))+1};
     
     % --- LEFT COLUMN: RASTER ---
-    axL = nexttile; hold on;
-    imagesc(xPos, 1:length(trialIDs), roiActivity(trialIDs, :));
-    colormap(axL, flipud(gray));
-    set(gca, 'YDir', 'reverse', 'Box', 'off', 'XTick', tickLocs);
+    axL = nexttile(t); hold(axL, 'on'); % Explicit tile destination assignment
     
-    ylabel(sprintf('%s\n(Laps)', strrep(currCond, '_', ' ')), ...
+    imagesc(axL, xPos, 1:nLapsInBlock, roiActivity(trialIDs, :));
+    colormap(axL, flipud(gray));
+    
+    % FIXED: Switched from gca to explicit axL handle targeting
+    set(axL, 'YDir', 'reverse', 'Box', 'off', 'XTick', tickLocs, ...
+             'YTick', [1, nLapsInBlock], 'YTickLabel', {'1', num2str(nLapsInBlock)});
+    
+    ylabel(axL, sprintf('%s\n(Laps)', strrep(currCond, '_', ' ')), ...
         'FontSize', 11, 'FontWeight', 'bold', 'Color', currColor);
     
-    % Only add X-labels and Tick labels to the very last row
     if iC == numValid
-        set(gca, 'XTickLabel', tickLabels);
-        xlabel('Position (cm)', 'FontWeight', 'bold');
+        set(axL, 'XTickLabel', tickLabels);
+        xlabel(axL, 'Position (cm)', 'FontWeight', 'bold');
     else
-        set(gca, 'XTickLabel', []);
+        set(axL, 'XTickLabel', []);
     end
-
+    
+    % Call properties on the handle directly
+    defaultAxesProperties(axL, true);
+    offsetAxes(axL)
+    
     % --- RIGHT COLUMN: TUNING CURVE ---
-    axR = nexttile; hold on;
-    plot(xPos, baseMu, 'Color', [0.7 0.7 0.7], 'LineWidth', 2, 'LineStyle', '--');
+    axR = nexttile(t); hold(axR, 'on'); % Explicit tile destination assignment
+    plot(axR, xPos, baseMu, 'Color', [0.7 0.7 0.7], 'LineWidth', 2, 'LineStyle', '--');
     
     mu = mean(roiActivity(trialIDs, :), 1, 'omitnan');
-    sem = std(roiActivity(trialIDs, :), 0, 1, 'omitnan') ./ sqrt(length(trialIDs));
-    fill([xPos, fliplr(xPos)], [mu+sem, fliplr(mu - sem)], currColor, ...
+    sem = std(roiActivity(trialIDs, :), 0, 1, 'omitnan') ./ sqrt(nLapsInBlock);
+    fill(axR, [xPos, fliplr(xPos)], [mu+sem, fliplr(mu - sem)], currColor, ...
         'FaceAlpha', 0.2, 'EdgeColor', 'none');
-    plot(xPos, mu, 'Color', currColor, 'LineWidth', 3);
+    plot(axR, xPos, mu, 'Color', currColor, 'LineWidth', 3);
     
-    for p = tickLocs, xline(p, 'k:', 'Alpha', 0.2); end
-    set(gca, 'Box', 'off', 'XTick', tickLocs, 'ylim', [-1 yLimit]);
-    
-    % Only add X-labels and Tick labels to the very last row
-    if iC == numValid
-        set(gca, 'XTickLabel', tickLabels);
-        xlabel('Position (cm)', 'FontWeight', 'bold');
-    else
-        set(gca, 'XTickLabel', []);
+    for p = tickLocs
+        xline(axR, p, 'k--', 'Alpha', 0.3); 
     end
     
-    if iC == 1, title('Mean \Delta F/F \pm SEM', 'FontSize', 10); end
+    % FIXED: Switched from gca to explicit axR handle targeting
+    set(axR, 'Box', 'off', 'XTick', tickLocs, 'ylim', [-1 yLimit]);
+    
+    if iC == numValid
+        set(axR, 'XTickLabel', tickLabels);
+        xlabel(axR, 'Position (cm)', 'FontWeight', 'bold');
+    else
+        set(axR, 'XTickLabel', []);
+    end
+    
+    if iC == 1
+        %title(axR, 'Mean \Delta F/F \pm SEM', 'FontSize', 10);
+        title(axR, 'Mean Activity \pm SEM', 'FontSize', 10);
+    end
+    
+    % Call properties on the handle directly
+    defaultAxesProperties(axR, true);
+    offsetAxes(axR)
 end
 
 %% 5. Save
@@ -95,4 +114,5 @@ saveDir = fullfile(sessionFileInfo.Directories.save_folder, 'Figures', 'ROI_Summ
 if ~exist(saveDir, 'dir'), mkdir(saveDir); end
 saveas(fig, fullfile(saveDir, sprintf('ROI_%d_Summary_Stacked.png', neuronIdx)));
 
+if nargout > 0, figHandle = fig; end
 end

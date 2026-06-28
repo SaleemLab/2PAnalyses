@@ -48,8 +48,13 @@ if plotflag && exist(pdfFileName, 'file')
 end
 
 %% Extract Fluorescence and Timing
-dFF = processedtwoPData.processedSignals.(signalToUse);
-numRois = size(dFF, 1);
+if contains(signalToUse, 'spks')
+    signal = processedtwoPData.spks; 
+else   
+    signal = processedtwoPData.processedSignals.(signalToUse);
+
+end 
+numRois = size(signal, 1);
 numTrials = length(response.responseFrameIdx);
 
 % Map 2P frame indices for each stimulus trial
@@ -64,7 +69,7 @@ end
 roiStimResponses = zeros(numRois, numTrials, maxFrames);
 validMask = ~isnan(twopIndices);
 for neuron = 1:numRois
-    tempF = dFF(neuron, :);
+    tempF = signal(neuron, :);
     roiStimResponses(neuron, validMask) = tempF(twopIndices(validMask));
 end
 

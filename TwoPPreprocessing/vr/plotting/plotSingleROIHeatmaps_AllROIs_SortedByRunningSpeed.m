@@ -18,7 +18,7 @@ nROIs = size(lapActivityFull, 1);
 
 %% Optional smoothing
 if applySmoothing
-    w = gausswin(10); w = w / sum(w);
+    w = gausswin(15); w = w / sum(w);
     for iCell = 1:nROIs
         for iLap = 1:size(lapActivityFull, 2)
             trace = squeeze(lapActivityFull(iCell, iLap, :));

@@ -6,20 +6,15 @@ function [response, sessionFileInfo] = getLapPositionActivity(sessionFileInfo, V
 % Applies temporal smoothing (gausswin 15) to ALL signals prior to spatial
 % binning. Default is 250ms smoothning 
 
-% Optional input 'doOccupancyNorm' handles occupancy rate normalization (activity per second) for spikes.
-% occupancyNorm = total signal accumulated in position bin/total time spent
-% in position bin (seconds); This has been commented out 
-
 if nargin < 3, useZScoredProcessedSignals = true; end
 if nargin < 4, onlyIncludeROIs = false; end
-% if nargin < 5, doOccupancyNorm = false; end 
 
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx), error('Specified VRStimName not found in sessionFileInfo.'); end
 disp(['Loading data for stimulus: ', VRStimName]);
+
 hasSpks = false; 
 filePath = sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData;
-
 varsInFile = who('-file', filePath);
 
 if useZScoredProcessedSignals 
@@ -47,17 +42,8 @@ if ~isfield(response, 'flaggedLaps')
     response.flaggedLaps = [];
 end
 
-% deltaT = [];
-% if doOccupancyNorm
-%     load(filePath, 'resample2PTimeUsed');
-%     timeData = load(filePath, resample2PTimeUsed);
-%     timeVec = timeData.(resample2PTimeUsed);
-%     deltaT = median(diff(timeVec));
-% end
-
 w = gausswin(15); 
 w = w / sum(w);
-
 sigFields = fieldnames(signals);
 for f = 1:length(sigFields)
     fieldName = sigFields{f};
@@ -76,8 +62,8 @@ if onlyIncludeROIs
 else
     ROIs = (1:size(iscell, 1))';
 end
+
 response.lapPositionActivityZScored = useZScoredProcessedSignals;
-% response.lapPositionActivityOccupancyNormalized = true;
 
 signalNames = {'dFF', 'dFFNeuropilCorrected', 'spks'}; 
 numSignals = length(signalNames);
@@ -88,7 +74,20 @@ elseif contains(VRStimName, 'VRCorr')
     numBins = 140;
 end
 
-nLaps = size(response.lapPosition2PFrameIdx, 1);
+%% --- RESTRICT TO COMPLETED LAPS ONLY ---
+if isfield(response, 'completedLaps_AbsoluteIdx') && ~isempty(response.completedLaps_AbsoluteIdx)
+    completedLapIndices = response.completedLaps_AbsoluteIdx;
+else
+    warning('completedLaps_AbsoluteIdx field not found or empty. Defaulting to all rows in lapPosition2PFrameIdx.');
+    completedLapIndices = (1:size(response.lapPosition2PFrameIdx, 1))';
+end
+
+% Convert logical masks to index list if necessary
+if islogical(completedLapIndices)
+    completedLapIndices = find(completedLapIndices);
+end
+
+numCompletedLaps = length(completedLapIndices);
 lapPositionActivity = struct(); 
 
 for iSignal = 1:numSignals
@@ -110,31 +109,30 @@ for iSignal = 1:numSignals
     end 
     
     numROIs = size(currentSignalMatrix, 1);
-    lapPositionActivity.(currentSignalName) = nan(numROIs, nLaps, numBins);
     
-    for thisLap = 1:nLaps
+    % Preallocate matrix using completed lap count
+    lapPositionActivity.(currentSignalName) = nan(numROIs, numCompletedLaps, numBins);
+    
+    for iLap = 1:numCompletedLaps
+        % Map the sequential index loop to the target lap row
+        actualLapRow = completedLapIndices(iLap);
+        
         for thisBin = 1:numBins
-            frameIdx = response.lapPosition2PFrameIdx{thisLap, thisBin};
+            frameIdx = response.lapPosition2PFrameIdx{actualLapRow, thisBin};
             
             validFrameMask = ~isnan(frameIdx);
             cleanFrameIdx = frameIdx(validFrameMask);
             
-            % Taking the mean natively handles the varying number of frames per bin
-            meanActivity = mean(currentSignalMatrix(:, cleanFrameIdx), 2, 'omitnan');
-
-            % if doOccupancyNorm && strcmp(currentSignalName, 'spks')
-            %     % Converts 'spikes per frame' to 'spikes per second' (Hz)
-            %     % while maintaining the occupancy normalization achieved by the mean
-            %     lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = meanActivity ./ deltaT;
-            % else
-                % Standard mean for dF/F or unscaled spikes
-            lapPositionActivity.(currentSignalName)(:, thisLap, thisBin) = meanActivity;
-            % end
-          
+            if ~isempty(cleanFrameIdx)
+                meanActivity = mean(currentSignalMatrix(:, cleanFrameIdx), 2, 'omitnan');
+                lapPositionActivity.(currentSignalName)(:, iLap, thisBin) = meanActivity;
+            end
         end
     end
+end
 
 response.lapPositionActivity = lapPositionActivity;
+
 disp(['Saving updated Response struct (Lap Activity) to ', sessionFileInfo.stimFiles(stimIdx).Response]);
 save(sessionFileInfo.stimFiles(stimIdx).Response, '-struct', 'response', '-append');
 save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');

@@ -1,7 +1,7 @@
 function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
 % plotPooledPopulation_OddEven: Baseline function plotting side-by-side Odd
 % and Even lap profiles. Uses 'smoothLapActivity' for trace smoothing and 
-% 'saveFigureFormats' for vector-safe graphics export. Sets uniform font parameters.
+% Includes population means at the bottom for both odd and even 
     p = inputParser;
     addRequired(p, 'allData', @isstruct);
     addRequired(p, 'targetArea', @(x) ischar(x) || isstring(x));
@@ -10,13 +10,12 @@ function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
     addParameter(p, 'TypeToPlot', 'Boutons', @(x) ischar(x) || isstring(x));
     addParameter(p, 'SavePath', '', @(x) ischar(x) || isstring(x)); 
     addParameter(p, 'ApplySmoothing', true, @islogical);
-    addParameter(p, 'FontName', 'Arial', @(x) ischar(x) || isstring(x)); % Custom font configuration
+    addParameter(p, 'FontName', 'Arial', @(x) ischar(x) || isstring(x)); 
     
     parse(p, allData, targetArea, varargin{:});
     
     targetFont = p.Results.FontName;
     
-    % 
     if all(cellfun(@isempty, {allData.TargetArea})), [allData.TargetArea] = deal(char(targetArea)); end
     if isfield(allData, 'Type') && ~isfield(allData, 'TypeImaged')
         [allData.TypeImaged] = allData.Type;
@@ -28,7 +27,7 @@ function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
     daysToPlot(daysToPlot == 200) = []; 
     nDays = length(daysToPlot);
     
-    plotQueue = struct('matrixToPlot', {}, 'numN', {}, 'titleStr', {}, 'thisCol', {});
+    plotQueue = struct('matrixToPlot', {}, 'numN', {}, 'titleStr', {}, 'thisCol', {}, 'rawMatrix', {});
     titleColors = {'r', [0.4 0.7 0.2], 'b', 'm', 'k'};
     
     % --- DATA PROCESSING LOOP ---
@@ -77,8 +76,8 @@ function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
             end
             
             nTotalLaps = size(lapActivity, 2);
-            allOdd  = vertcat(allOdd, squeeze(mean(lapActivity(:, 1:2:nTotalLaps, :), 2, 'omitnan'))); %#ok<AGROW>
-            allEven = vertcat(allEven, squeeze(mean(lapActivity(:, 2:2:nTotalLaps, :), 2, 'omitnan'))); %#ok<AGROW>
+            allOdd  = vertcat(allOdd, squeeze(mean(lapActivity(:, 1:2:nTotalLaps, :), 2, 'omitnan')));
+            allEven = vertcat(allEven, squeeze(mean(lapActivity(:, 2:2:nTotalLaps, :), 2, 'omitnan')));
         end
         
         if isempty(allEven), continue; end
@@ -100,37 +99,99 @@ function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
         
         qIdx = length(plotQueue) + 1;
         plotQueue(qIdx).matrixToPlot = normOdd(sIdx, :);
+        plotQueue(qIdx).rawMatrix = normOdd; 
         plotQueue(qIdx).numN = numN;
-        % plotQueue(qIdx).titleStr = sprintf('Day %s (Odd, n=%d)', titleDayStr, numN);
+        plotQueue(qIdx).titleStr = sprintf('Day %s (Odd)', titleDayStr);
         plotQueue(qIdx).thisCol = thisCol;
         
         qIdx = length(plotQueue) + 1;
         plotQueue(qIdx).matrixToPlot = normEven(sIdx, :);
+        plotQueue(qIdx).rawMatrix = normEven;
         plotQueue(qIdx).numN = numN;
-        % plotQueue(qIdx).titleStr = sprintf('Day %s (Even)', titleDayStr);
+        plotQueue(qIdx).titleStr = sprintf('Day %s (Even)', titleDayStr);
         plotQueue(qIdx).thisCol = thisCol;
     end
     
     if isempty(plotQueue), figHandle = []; disp('No valid baseline plots generated.'); return; end
     
-    % --- GRID DRAWING ---
-    nRows = 1;
     nCols = length(plotQueue);
     
-    % Expanded width dimensions to protect the upgraded 12pt fonts from edge compression
-    figHandle = figure('Position', [100 100 230*nCols + 150 400], 'Color', 'w');
-    t = tiledlayout(figHandle, nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'loose');
+    % layout setup
+    figWidth = 280 * nCols + 180;
+    figHandle = figure('Position', [100 100 figWidth 580], 'Color', 'w');
     
-    for iTile = 1:nCols
-        ax = nexttile(t);
-        q = plotQueue(iTile);
+    leftMargin   = 0.12; 
+    rightMargin  = 0.12; 
+    topMargin    = 0.08;
+    bottomMargin = 0.14; 
+    gapCols      = 0.05; 
+    gapRows      = 0.06; 
+    
+    availableH = 1 - topMargin - bottomMargin - gapRows;
+    heatmapH   = availableH * 0.72; 
+    traceH     = availableH * 0.28; 
+    
+    availableW = 1 - leftMargin - rightMargin - (nCols-1)*gapCols;
+    colW       = availableW / nCols;
+    
+    heatmapAxes = gobjects(1, nCols);
+    traceAxes   = gobjects(1, nCols);
+    
+    for iCol = 1:nCols
+        q = plotQueue(iCol);
+        colLeft = leftMargin + (iCol-1) * (colW + gapCols);
         
-        renderHeatmap(ax, q.matrixToPlot, q.numN, p.Results.TypeToPlot, targetFont);
-        title(ax, q.titleStr, 'Color', q.thisCol, 'FontSize', 12, 'FontName', targetFont, 'FontWeight', 'normal');
+        % heatmaps
+        ax_heat = axes('Position', [colLeft, bottomMargin + traceH + gapRows, colW, heatmapH]);
+        heatmapAxes(iCol) = ax_heat;
         
-        if iTile == nCols
-            cb = colorbar(ax);
-            cb.Layout.Tile = 'east'; 
+        renderHeatmap(ax_heat, q.matrixToPlot, q.numN, p.Results.TypeToPlot, targetFont);
+        title(ax_heat, q.titleStr, 'Color', q.thisCol, 'FontSize', 12, 'FontName', targetFont, 'FontWeight', 'normal');
+        
+        % popoulation traces 
+        ax_trace = axes('Position', [colLeft, bottomMargin, colW, traceH]);
+        traceAxes(iCol) = ax_trace;
+        
+        meanProfile = mean(q.rawMatrix, 1, 'omitnan');
+        stdProfile  = std(q.rawMatrix, 0, 1, 'omitnan');
+        semProfile  = stdProfile ./ sqrt(sum(~isnan(q.rawMatrix), 1));
+        x_vector = 1:length(meanProfile);
+        
+        hold(ax_trace, 'on');
+        x_patch = [x_vector, fliplr(x_vector)];
+        y_patch = [(meanProfile + semProfile), fliplr(meanProfile - semProfile)];
+        nan_mask = isnan(x_patch) | isnan(y_patch);
+        x_patch(nan_mask) = []; y_patch(nan_mask) = [];
+        
+        fill(ax_trace, x_patch, y_patch, 'k', 'FaceAlpha', 0.15, 'EdgeColor', 'none');
+        plot(ax_trace, x_vector, meanProfile, 'Color', 'k', 'LineWidth', 1.8);
+        
+        landmarks = [40 80 120 160];
+        for lIdx = 1:4
+            xline(ax_trace, landmarks(lIdx), '--', 'Color', [0.7 0.7 0.7], 'LineWidth', 2);
+        end
+        
+        xlabel(ax_trace, 'Position (cm)', 'FontName', targetFont, 'FontSize', 12);
+        xticks(ax_trace, [40 80 120 160]);
+        
+        if iCol == 1
+%             ylabel(ax_trace, 'Mean \Delta F/F', 'FontName', targetFont, 'FontSize', 12);
+            ylabel(ax_trace, 'Mean \Delta F/F', 'FontName', targetFont, 'FontSize', 12);
+        else
+            set(ax_trace, 'YColor', 'none');
+        end
+        
+        ylim(ax_trace, [0.2, max(meanProfile + semProfile) * 1.15]);
+        
+        % Break state hold before executing styling properties
+        hold(ax_trace, 'off');
+        drawnow; 
+        
+        defaultAxesProperties(ax_trace, true);
+        
+        % Colorbar settings
+        if iCol == nCols
+            cb = colorbar(ax_heat, 'Position', [colLeft + colW + 0.02, bottomMargin + traceH + gapRows, 0.02, heatmapH]);
             cb.Ticks = [0.25 0.50 0.75]; 
             cb.TickLabels = {'0.25', '0.50', '0.75'};
             cb.TickDirection = 'out'; 
@@ -142,36 +203,34 @@ function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
             cb.Label.FontName = targetFont;
             cb.Label.FontSize = 12; 
             cb.Label.Rotation = 90;
-            cb.Label.Units = 'normalized';
-            cb.Label.Position = [4, 0.5, 0]; 
-            cb.Label.HorizontalAlignment = 'center';
             cb.Label.VerticalAlignment = 'bottom';
         end
     end
+    
+    % 
+    linkaxes([heatmapAxes, traceAxes], 'x');
+    xPadding = 10; 
+    xlim(heatmapAxes(1), [1 - xPadding, size(plotQueue(1).matrixToPlot, 2) + xPadding]);
     
     if ~isempty(p.Results.SavePath)
         saveFigureFormats(figHandle, p.Results.SavePath);
     end
 end
 
-% --- HELPER PLOTTING SUBFUNCTION ---
 function renderHeatmap(ax, displayMatrix, numN, cellType, targetFont)
     imagesc(ax, displayMatrix);
     colormap(ax, flipud(gray)); 
     
-    set(ax, 'CLim', [0.25 0.75], 'YDir', 'normal', 'Box', 'off', 'TickDir', 'out');
+    set(ax, 'CLim', [0 1], 'YDir', 'normal', 'Box', 'off', 'TickDir', 'out');
     set(ax, 'YTick', [], 'FontName', targetFont, 'FontSize', 12, 'YColor', 'none');
-    xlabel(ax, 'Position (cm)', 'FontName', targetFont, 'FontSize', 12);
-    xticks(ax, [40 80 120 160]);
+    set(ax, 'XTick', [], 'XTickLabel', [], 'XColor', 'none'); 
     
-    % --- FIXED: ADDED GRAY DOTTED LANDMARK LINES ---
     hold(ax, 'on');
     landmarks = [40 80 120 160];
     for lIdx = 1:4
-        xline(ax, landmarks(lIdx), ':', 'Color', [0.6 0.6 0.6], 'LineWidth', 1);
+        xline(ax, landmarks(lIdx), '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 2);
     end
     
-    % Vertical text alignment labels along the Y-axis left flank
     text(ax, -12, numN, sprintf('%d %s', numN, lower(cellType)), ...
         'Rotation', 90, ...
         'FontName', targetFont, ...
@@ -181,24 +240,5 @@ function renderHeatmap(ax, displayMatrix, numN, cellType, targetFont)
         'HorizontalAlignment', 'right', ... 
         'VerticalAlignment', 'middle', ...
         'Clipping', 'off');
-   
-    % if numN >= 100
-    %     y_start = numN * 0.2; 
-    %     y_end   = y_start + 100; 
-    %     y_mid   = y_start + 100;  
-    % 
-    %     x_line = -12; 
-    %     x_text = -20; 
-    % 
-    %     unitStr = lower(cellType);
-    %     scaleBarText = sprintf('100 %s', unitStr);
-    % 
-    %     line(ax, [x_line x_line], [y_start y_end], 'Color', 'k', 'LineWidth', 2, 'Clipping', 'off');
-    % 
-    %     text(ax, x_text, y_mid+40, scaleBarText, 'Rotation', 90, ...
-    %         'FontName', targetFont, ...
-    %         'HorizontalAlignment', 'right', ... 
-    %         'VerticalAlignment', 'middle', ...   
-    %         'FontSize', 12, 'FontWeight', 'normal', 'Clipping', 'off');
-    % end
+    hold(ax, 'off');
 end

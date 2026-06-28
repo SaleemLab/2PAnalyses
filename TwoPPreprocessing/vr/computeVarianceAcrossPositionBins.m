@@ -73,7 +73,7 @@ if plotFlag
 
         set(ax1, 'YScale', 'log');
 
-        % --- Tile 2: Example Tuning Curves (Low vs. High RatioVarToTuningVar) ---
+        % Example tuning curves 
         ax2 = nexttile;
 
         % Find an example ROI with a LOW ratio (selective/good structure)

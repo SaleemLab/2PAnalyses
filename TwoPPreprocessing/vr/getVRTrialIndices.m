@@ -2,6 +2,8 @@ function [response, sessionFileInfo] = getVRTrialIndices(sessionFileInfo, VRStim
 % getVRTrialIndices
 % Matches landmark sequences to matrix rows using a simple 1-to-1 mapping.
 % Previous version used absolute index 
+% Sonali - Feb 2026
+
 
 stimIdx = find(strcmp(VRStimName, {sessionFileInfo.stimFiles.name}));
 if isempty(stimIdx), error('VRStimName not found.'); end
@@ -44,8 +46,10 @@ if contains(VRStimName, 'LandManipCorridor')
             trialIndices.Swap_2_3 = [trialIndices.Swap_2_3; thisLap];
             
         elseif length(currentSeq) == 4 && ... % Swap 3-4
-               strcmp(currentSeq{1}, 'grating_vertical') && strcmp(currentSeq{2}, 'plaid') && ...
-               strcmp(currentSeq{3}, 'plaid') && strcmp(currentSeq{4}, 'grating_vertical')
+               strcmp(currentSeq{1}, 'grating_vertical') && ...
+               strcmp(currentSeq{2}, 'plaid') && ...
+               strcmp(currentSeq{3}, 'plaid') && ...
+               strcmp(currentSeq{4}, 'grating_vertical')
             trialIndices.Swap_3_4 = [trialIndices.Swap_3_4; thisLap];
             
         elseif length(currentSeq) == 3 && ... % Omit 2
@@ -68,7 +72,7 @@ if contains(VRStimName, 'LandManipCorridor')
         end
     end
 else
-    % Standard corridors (VRCorr/Baseline) are 100% Baseline
+    % 2025 RSP bouton corridor ('VRCorr' and new BaselineCorridor) are 100% Baseline
     trialIndices.Baseline = (1:nLaps)'; %completed laps
 end
 

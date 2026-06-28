@@ -3,7 +3,7 @@ function plotAndSaveFilteredTuningCurves(sessionMetrics, applySmoothing)
         applySmoothing = true;
     end
     
-    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1';
+    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1\@Aman\EVFilter_SMILandBoundary\VISp';
     if ~exist(outputDir, 'dir')
         mkdir(outputDir);
     end
@@ -38,14 +38,21 @@ function plotAndSaveFilteredTuningCurves(sessionMetrics, applySmoothing)
         targetROIs = sess.FilteredROIs;
         
         % Calculate median cross-validated explained variance across folds
-        medianEV = median(sess.cvExpVar, 2, 'omitnan');
+        % medianEV = median(sess.cvExpVar, 2, 'omitnan');
         
         % Safely extract p-values matching the ROIs
-        if isfield(sess, 'cvExpvar_nullDist_pVales')
-            pValues = sess.cvExpvar_nullDist_pVales;
+        if isfield(sess, 'cvExpVar')
+            pValues = sess.cvExpVar.pValues;
         else
-            pValues = NaN(size(medianEV)); % Fallback if missing
+            pValues = NaN(size(targetROIs)); % Fallback if missing
         end
+
+        if isfield(sess, 'SMI')
+            smi = sess.SMI.SMI; 
+
+        else
+            smi = nan(length(targetROIs));
+        end 
         
         % include all filtered rois and also add the median ev to the title
         % and also the pval  
@@ -53,7 +60,7 @@ function plotAndSaveFilteredTuningCurves(sessionMetrics, applySmoothing)
         
         baseLapActivity = lapActivityFull(:, :, :);
         if applySmoothing
-            w = gausswin(10); w = w / sum(w);
+            w = gausswin(15); w = w / sum(w);
             for iCell = 1:size(baseLapActivity, 1)
                 for iLap = 1:nLaps
                     trace = squeeze(baseLapActivity(iCell, iLap, :));
@@ -126,9 +133,9 @@ function plotAndSaveFilteredTuningCurves(sessionMetrics, applySmoothing)
             end
             
             % Title updated to display ROI, Median EV, and Null Dist p-value
-            title(sprintf('ROI %d Tuning Curve (mEV: %.2f | p: %.3e)', ...
-                  targetROI, medianEV(targetROI), pValues(targetROI)), 'Interpreter', 'none');
-            xlabel('spatial position bins');
+            title(sprintf('ROI %d Tuning Curve (median EV: %.2f | p: %.3f and SMI: %.2f )', ...
+                  targetROI, sess.cvExpVar.medianExpVar(targetROI), pValues(targetROI)), smi(targetROI), 'Interpreter', 'none');
+            xlabel('position bins');
             ylabel('activity');
             ylim(yLims);
             grid on;

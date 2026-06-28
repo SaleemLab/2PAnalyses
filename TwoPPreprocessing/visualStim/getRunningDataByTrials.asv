@@ -1,0 +1,29 @@
+function getRunningDataByTrials(sessionFileInfo, stimName)
+
+
+iStim = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}), 1);
+% load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData, 'processedSignals');
+load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
+load(sessionFileInfo.stimFiles(iStim).processedPeripheralData, 'peripheralData');
+load(sessionFileInfo.stimFiles(iStim).Response, 'response');
+
+
+
+pre = response(1).preStimTime;
+post = response(1).postStimTime;
+Time = -pre : (1/60) : post; 
+nFrames = length(Time);
+
+nGroups = numel(bonsaiData.trialGroups);
+
+runningData = struct('stimValue', [],  'timeVector', []);
+
+
+for g = 1:nGroups
+    thisGroup = bonsaiData.trialGroups(g);
+    trIdxs = grp.trials;
+    nTrialsInGrp = numel(trIdxs);
+    
+
+
+end 

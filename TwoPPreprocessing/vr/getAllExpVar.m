@@ -23,11 +23,16 @@ end
         %Calculate explained variance from trainmean and test mean curves -
         %FYI: this is Explained variance by position rather than time -
         %values should be higher
+        % totSS — how much the test curve varies around its own mean (baseline variance)
+        % resSS — how much the test curve deviates from the train mean
+        % curve 
         
         trainMean = mean(trainMeanCurve, 'omitnan'); % included omitnans
         
         % Calculate sum of squares while omitting NaNs frame-by-frame
+        % does the test curve match the train curve shape + magnitude
         resSS = sum((testMeanCurve - trainMeanCurve).^2, 'omitnan');
+        % does the test curve deviate from a flat baseline of overall train activity
         totSS = sum((testMeanCurve - trainMean).^2, 'omitnan');
         
         ExpVar = 1 - resSS/totSS;

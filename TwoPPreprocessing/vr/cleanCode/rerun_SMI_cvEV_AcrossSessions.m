@@ -4,14 +4,16 @@
 % pairs.M26003 = ['20260322', '20260324', '20260325'];
 
 pairs=struct; 
- 
-pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
-pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
-pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
-pairs.M25126 = ['20260311', '20260312', '20260313'];
-pairs.M25132 = ['20260228', '20260313'];
-pairs.M26003 = ['20260324', '20260325'];
-pairs.M25133 = '20260224';
+%  % ran these sessions: on May 28th 
+% pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
+% pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+% pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+% pairs.M25126 = ['20260311', '20260312', '20260313'];
+% pairs.M25132 = ['20260226', '20260228', '20260313'];
+% pairs.M26003 = ['20260322', '20260324', '20260325'];
+% pairs.M25133 = '20260224';
+
+pairs.M25132 = ['20260226'];
 
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
 
@@ -48,18 +50,26 @@ for thisMouse = 1:size(mouseInfo, 1)
         loadedInfo = load(infoPath, 'sessionFileInfo');
         sessionFileInfo = loadedInfo.sessionFileInfo;
 
-        stimNames = string({sessionFileInfo.stimFiles.name});
+        stimNames = {sessionFileInfo.stimFiles.name};
+
+        
         % select combined runs if present 
         targetIdx = find(contains(stimNames, "Corridor") & contains(stimNames, "CombinedRuns"), 1);
-        
+
         if isempty(targetIdx)
-            targetIdx = find(contains(stimNames, "Corridor"), 1);
+            allCorridorIdx = find(contains(stimNames, "Corridor"));
+
+            if isscalar(allCorridorIdx)
+           
+                targetIdx = allCorridorIdx;
+            elseif length(allCorridorIdx) > 1
+                
+                targetIdx = find(contains(stimNames, "Corridor") & contains(stimNames, "00002"), 1);
+            end
+
+
         end
         
-        if length(targetIdx)>1
-            targetIdx = find(contains(stimNames, "Corridor") & contains(stimNames, "00002"), 1);
-        end 
-
         if isempty(targetIdx)
             error('No valid LandManip or Baseline corridor found.');
         end
@@ -69,9 +79,10 @@ for thisMouse = 1:size(mouseInfo, 1)
 
         
 
-        [~, ~] = computeSpatialModulationIdex(sessionFileInfo, VRStimName,true,false);
-        crossValExpVar = getCrossValidatedExplainedVariance(sessionFileInfo, VRStimName);
 
+        crossValExpVar = getCrossValidatedExplainedVariance(sessionFileInfo, VRStimName);
+        [~, ~] = computeSpatialModulationIdex(sessionFileInfo, VRStimName,true,true); % exclude laps; apply smoothning 
+        % [~, ~, ~] = getPositionSpeedMatrix(sessionFileInfo, VRStimName);
     end 
 end
 

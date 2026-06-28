@@ -1,187 +1,195 @@
-function [response] = getRunningSpeedTuningCurves(sessionFileInfo, stimName, useZScoredSignals, shuffle)
-% From Saleem et al, 2014 Significance: Real Variance > 99.9% of Shuffled
-% Variance. Fig 2 Darkness 
-% Can you this for plotting: plotRunningTuningCurves(respGray, respDark, pdfPath)
-if nargin < 3 || isempty(useZScoredSignals), useZScoredSignals = false; end
-if nargin < 4 || isempty(shuffle), shuffle = true; end 
+function [response, sessionFileInfo] = getRunningSpeedTuningCurves(sessionFileInfo, stimName, useZScoredSignals, shuffle)
+% Computes 1D speed tuning curves using BOTH dynamic quantiles (Saleem et al style)
+% and a standardized fixed grid for cross-stim type comparisons (gray-darkness).
+%
+% SHUFFLE SIGNIFICANCE CRITERION:
+%   Matches Saleem et al. (2013): Real tuning curve variance must exceed 99.9% 
+%   of circular-shifted null variances (p <= 0.001) across 1,000 permutations.
 
-stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}), 1);
-if isempty(stimIdx), error('Stimulus %s not found.', stimName); end
-data2P = load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData);
-dataPeriph = load(sessionFileInfo.stimFiles(stimIdx).processedPeripheralData, 'peripheralData');
-sourceStructName = 'processedSignals';
-if useZScoredSignals, sourceStructName = 'zScoredProcessedSignals'; end
-signals = data2P.(sourceStructName);
-if isfield(data2P, 'spks') && ~isempty(data2P.spks)
-    signals.spks = data2P.spks; 
-end 
-
-%% 
-fs = 60; 
-tickToCm = 3.1415 * 20 / 1024; 
-wheelSpeed = [0; diff(dataPeriph.peripheralData.Wheel.Value * tickToCm)] ./ [1; diff(dataPeriph.peripheralData.Wheel.sampleTimes)];
-wheelSpeed(abs(wheelSpeed) > 150) = NaN; 
-mIdx = find(wheelSpeed > 1 & ~isnan(wheelSpeed)); % running
-sIdx = find(wheelSpeed <= 1 & ~isnan(wheelSpeed)); % stationary
-ptsPerBin = floor(0.07 * length(wheelSpeed)); % Set points per bin to 7% of total session length
-nB = floor(length(mIdx) / ptsPerBin); % Calculate number of moving bins based on available moving data 
-edges = quantile(wheelSpeed(mIdx), linspace(0, 1, max(1, nB) + 1)); % create speed bin edges using quantiles (equally distributed data points per bin)
-edges = unique(edges); 
-numBins = length(edges)-1;
-speedAxis = [0, edges(1:end-1) + diff(edges)/2];
-
-response.tuningCurve.speedBins = edges;
-response.tuningCurve.source = sourceStructName;
-response.tuningCurve.occupancy.stationary = length(sIdx) / fs;
-response.tuningCurve.occupancy.moving = zeros(1, numBins);
-
-%% Shuffle 
-numShifts = 1000;  
-minShift = 600; % 10s
-maxShift = length(wheelSpeed) - minShift; 
-rng(1); 
-shiftValues = randi([minShift, maxShift], [1, numShifts]);
-
-allFields = fieldnames(signals);
-for thisField = 1:length(allFields)
-    fname = allFields{thisField};
-    sigData = signals.(fname);
-    if size(sigData, 2) ~= length(wheelSpeed), continue; end
+    if nargin < 3 || isempty(useZScoredSignals), useZScoredSignals = false; end
+    if nargin < 4 || isempty(shuffle), shuffle = true; end 
     
-    numROIs = size(sigData, 1);
-    mMean = zeros(numROIs, numBins);
-    mSEM  = zeros(numROIs, numBins);
-    mCount = zeros(numROIs, numBins);
+    stimIdx = find(strcmp(stimName, {sessionFileInfo.stimFiles.name}), 1);
+    if isempty(stimIdx), error('Stimulus %s not found.', stimName); end
     
-    % Stationary Stats (Back to SEM)
-    statMean = mean(sigData(:, sIdx), 2, 'omitnan');
-    statSEM  = std(sigData(:, sIdx), 0, 2, 'omitnan') / sqrt(length(sIdx));
-    statCount = repmat(length(sIdx), numROIs, 1);
+    data2P = load(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData);
+    dataPeriph = load(sessionFileInfo.stimFiles(stimIdx).processedPeripheralData, 'peripheralData');
     
-    for b = 1:numBins
-        idx = find(wheelSpeed >= edges(b) & wheelSpeed < edges(b+1));
-        mMean(:, b) = mean(sigData(:, idx), 2, 'omitnan');
-        mSEM(:, b)  = std(sigData(:, idx), 0, 2, 'omitnan') / sqrt(length(idx));
-        mCount(:, b) = length(idx);
-        if thisField == 1, response.tuningCurve.occupancy.moving(b) = length(idx) / fs; end
-    end
+    sourceStructName = 'processedSignals';
+    if useZScoredSignals, sourceStructName = 'zScoredProcessedSignals'; end
+    signals = data2P.(sourceStructName);
+    if isfield(data2P, 'spks') && ~isempty(data2P.spks)
+        signals.spks = data2P.spks; 
+    end 
     
-    % Move Only modulation
-    moveMax = max(mMean, [], 2);
-    moveMin = min(mMean, [], 2);
-    modRatio_move = 2 * (moveMax - moveMin) ./ (moveMax + moveMin);
+    fs = 60; 
+    tickToCm = 3.1415 * 20 / 1024; 
+    wheelSpeed = [0; diff(dataPeriph.peripheralData.Wheel.Value * tickToCm)] ./ [1; diff(dataPeriph.peripheralData.Wheel.sampleTimes)];
+    wheelSpeed(abs(wheelSpeed) > 150) = NaN; 
     
-    % Full (Move + Stat) modulation
-    fullCurve = [statMean, mMean];
-    fullMax = max(fullCurve, [], 2);
-    fullMin = min(fullCurve, [], 2);
-    modRatio_full = 2 * (fullMax - fullMin) ./ (fullMax + fullMin);
+    mIdx = find(wheelSpeed > 1 & ~isnan(wheelSpeed)); 
+    sIdx = find(wheelSpeed <= 1 & ~isnan(wheelSpeed)); 
     
-    %% sig + variance
-    realVarFull = var(fullCurve, 0, 2, 'omitnan');
-    realVarMovingOnly = var(mMean, 0, 2, 'omitnan');
-    [~, peakIdx] = max(fullCurve, [], 2);
-    peakSpeed = speedAxis(peakIdx);
+    % 
+    allFields = fieldnames(signals);
+    firstFieldName = allFields{1};
+    numROIs = size(signals.(firstFieldName), 1);
     
-    pValFull = ones(numROIs, 1);
-    pValMoving = ones(numROIs, 1);
+    %  Define quantile boundaries (Saleem et al. 2013: 7% frames/bin) ---
+    ptsPerBin = floor(0.07 * length(wheelSpeed)); 
+    nB = floor(length(mIdx) / ptsPerBin); 
+    edgesQuantile = quantile(wheelSpeed(mIdx), linspace(0, 1, max(1, nB) + 1));
+    edgesQuantile = unique(edgesQuantile);
     
-    if shuffle
-        fprintf('Shuffling %s...\n', fname);
-        shuffVarsFull = zeros(numROIs, numShifts);
-        shuffVarsMoving = zeros(numROIs, numShifts);
-        for iperm = 1:numShifts
-            sigS = circshift(sigData, shiftValues(iperm), 2);
-            sM_shuff = mean(sigS(:, sIdx), 2, 'omitnan');
-            mM_shuff = zeros(numROIs, numBins);
+    % ddefine fixed boundaries for gray darkness comparison (For gray-darkness comparisons) ---
+    edgesFixed = [1.5, 3.5, 7.0, 14.0, 25.0, 45.0];
+    
+    
+    response.tuningCurve.source = sourceStructName;
+    response.tuningCurve.occupancy.stationary = length(sIdx) / fs;
+    response.tuningCurve.speedBins = edgesQuantile;
+    
+    response.tuningCurveFixedBins.source = sourceStructName;
+    response.tuningCurveFixedBins.occupancy.stationary = length(sIdx) / fs;
+    response.tuningCurveFixedBins.speedBins = edgesFixed;
+    
+    % Configure Time-Shift Permutation Offsets 
+    numShifts = 1000;  
+    minShift = 600; % 10-second 
+    maxShift = length(wheelSpeed) - minShift; 
+    rng(1); 
+    shiftValues = randi([minShift, maxShift], [1, numShifts]);
+    
+    for thisField = 1:length(allFields)
+        fname = allFields{thisField};
+        sigData = signals.(fname);
+        if size(sigData, 2) ~= length(wheelSpeed), continue; end
+        
+        statMean = mean(sigData(:, sIdx), 2, 'omitnan');
+        statSEM  = std(sigData(:, sIdx), 0, 2, 'omitnan') / sqrt(length(sIdx));
+        statCount = repmat(length(sIdx), numROIs, 1);
+        runFrameworks = {'tuningCurve', 'tuningCurveFixedBins'};
+        edgeDefinitions = {edgesQuantile, edgesFixed};
+        
+        % Separately compute the complete metric per framework
+        for f = 1:2
+            targetStruct = runFrameworks{f};
+            edges = edgeDefinitions{f};
+            numBins = length(edges) - 1;
+            
+            mMean  = zeros(numROIs, numBins);
+            mSEM   = zeros(numROIs, numBins);
+            mCount = zeros(numROIs, numBins);
+            
             for b = 1:numBins
-                idxB = wheelSpeed >= edges(b) & wheelSpeed < edges(b+1);
-                mM_shuff(:, b) = mean(sigS(:, idxB), 2, 'omitnan');
+                idx = find(wheelSpeed >= edges(b) & wheelSpeed < edges(b+1));
+                
+                mMean(:, b)  = mean(sigData(:, idx), 2, 'omitnan');
+                mSEM(:, b)   = std(sigData(:, idx), 0, 2, 'omitnan') / sqrt(length(idx));
+                mCount(:, b) = length(idx);
+                if thisField == 1
+                    response.(targetStruct).occupancy.moving(b) = length(idx) / fs;
+                end
             end
-            shuffVarsFull(:, iperm) = var([sM_shuff, mM_shuff], 0, 2, 'omitnan');
-            shuffVarsMoving(:, iperm) = var(mM_shuff, 0, 2, 'omitnan');
+            
+            moveMax = max(mMean, [], 2); moveMin = min(mMean, [], 2);
+            modRatio_move = 2 * (moveMax - moveMin) ./ (moveMax + moveMin);
+            
+            fullCurve = [statMean, mMean];
+            fullMax = max(fullCurve, [], 2); fullMin = min(fullCurve, [], 2);
+            modRatio_full = 2 * (fullMax - fullMin) ./ (fullMax + fullMin);
+            
+            % Measure true curve variance 
+            realVarFull = var(fullCurve, 0, 2, 'omitnan');
+            realVarMovingOnly = var(mMean, 0, 2, 'omitnan');
+            
+            pValFull = ones(numROIs, 1);
+            pValMoving = ones(numROIs, 1);
+            
+            %  shuffle
+            if shuffle
+                fprintf('Shuffling %s [%s Framework]...\n', fname, targetStruct);
+                shuffVarsFull = zeros(numROIs, numShifts);
+                shuffVarsMoving = zeros(numROIs, numShifts);
+                
+                % entire session shuffled together for full curves 
+                for iperm = 1:numShifts
+                    sigS_full = circshift(sigData, shiftValues(iperm), 2);
+                    
+                    sM_shuff = mean(sigS_full(:, sIdx), 2, 'omitnan');
+                    mM_shuff_full = zeros(numROIs, numBins);
+                    for b = 1:numBins
+                        idxB = wheelSpeed >= edges(b) & wheelSpeed < edges(b+1);
+                        mM_shuff_full(:, b) = mean(sigS_full(:, idxB), 2, 'omitnan');
+                    end
+                    shuffVarsFull(:, iperm) = var([sM_shuff, mM_shuff_full], 0, 2, 'omitnan');
+                end
+                
+                % moving only shuffled together 
+                sigDataMovingOnly = sigData(:, mIdx);
+                wheelSpeedMovingOnly = wheelSpeed(mIdx);
+                
+                % Set bounds safe for the size of the moving-only matrix
+                maxShiftMove = length(mIdx) - minShift;
+                if maxShiftMove > minShift
+                    rng(1); shiftValuesMove = randi([minShift, maxShiftMove], [1, numShifts]);
+                else
+                    shiftValuesMove = shiftValues; % Fallback if running data is short
+                end
+                
+                for iperm = 1:numShifts
+                    % Shift ONLY within the active running timeseries block
+                    sigS_move = circshift(sigDataMovingOnly, shiftValuesMove(iperm), 2);
+                    
+                    mM_shuff_move = zeros(numROIs, numBins);
+                    for b = 1:numBins
+                        % Align the shifted running traces with the running speed vector
+                        idxB = wheelSpeedMovingOnly >= edges(b) & wheelSpeedMovingOnly < edges(b+1);
+                        mM_shuff_move(:, b) = mean(sigS_move(:, idxB), 2, 'omitnan');
+                    end
+                    shuffVarsMoving(:, iperm) = var(mM_shuff_move, 0, 2, 'omitnan');
+                end
+                
+                % --- COMPUTE SIGNIFICANCE ---
+                pValFull = sum(shuffVarsFull >= realVarFull, 2) / numShifts;
+                pValFull(realVarFull == 0) = 1.0; 
+                
+                pValMoving = sum(shuffVarsMoving >= realVarMovingOnly, 2) / numShifts;
+                pValMoving(realVarMovingOnly == 0) = 1.0; 
+            end
+            
+            % Map data 
+            response.(targetStruct).(fname).statMean = statMean;
+            response.(targetStruct).(fname).statSEM  = statSEM;
+            response.(targetStruct).(fname).statCount = statCount;
+            response.(targetStruct).(fname).moveMean = mMean;
+            response.(targetStruct).(fname).moveSEM  = mSEM;
+            response.(targetStruct).(fname).moveCount = mCount;
+            
+            response.(targetStruct).(fname).modulationRatio_move = modRatio_move;
+            response.(targetStruct).(fname).percentModulated_move = modRatio_move * 100;
+            response.(targetStruct).(fname).modulationRatio_full = modRatio_full;
+            response.(targetStruct).(fname).percentModulated_full = modRatio_full * 100;
+            
+            response.(targetStruct).(fname).tuningVarFull = realVarFull;
+            response.(targetStruct).(fname).tuningVarMoving = realVarMovingOnly;
+            response.(targetStruct).(fname).pValFull = pValFull;
+            response.(targetStruct).(fname).pValMoving = pValMoving;
+            response.(targetStruct).(fname).isSignificant_999 = pValFull <= 0.001;
+            response.(targetStruct).(fname).isSignificantMoving_999 = pValMoving <= 0.001;
+            response.stimName = stimName; 
         end
-        pValFull = sum(shuffVarsFull >= realVarFull, 2) / numShifts;
-        pValMoving = sum(shuffVarsMoving >= realVarMovingOnly, 2) / numShifts;
     end
     
-    % Store
-    response.tuningCurve.(fname).statMean = statMean;
-    response.tuningCurve.(fname).statSEM  = statSEM;
-    response.tuningCurve.(fname).statCount = statCount;
-    response.tuningCurve.(fname).moveMean = mMean;
-    response.tuningCurve.(fname).moveSEM  = mSEM;
-    response.tuningCurve.(fname).moveCount = mCount;
+   % save response structure
+    stimFileName = sprintf('%s_%s_Response_%s.mat', ...
+        sessionFileInfo.animal_name, sessionFileInfo.session_name, stimName);
+    savePath = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
     
-    response.tuningCurve.(fname).modulationRatio_move = modRatio_move;
-    response.tuningCurve.(fname).percentModulated_move = modRatio_move * 100;
-    response.tuningCurve.(fname).modulationRatio_full = modRatio_full;
-    response.tuningCurve.(fname).percentModulated_full = modRatio_full * 100;
+    % update file path in sessionsfileinfo
+    sessionFileInfo.stimFiles(stimIdx).Response = savePath; 
     
-    response.tuningCurve.(fname).peakSpeed = peakSpeed;
-    response.tuningCurve.(fname).tuningVarFull = realVarFull;
-    response.tuningCurve.(fname).tuningVarMoving = realVarMovingOnly;
-    response.tuningCurve.(fname).pValFull = pValFull;
-    response.tuningCurve.(fname).pValMoving = pValMoving;
-    response.tuningCurve.(fname).isSignificant_999 = pValFull <= 0.001;
-    response.tuningCurve.(fname).isSignificantMoving_999 = pValMoving <= 0.001;
+    % save sfi
+    save(savePath, 'response', '-v7.3');
+    save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 end
-
-stimFileName = sprintf('%s_%s_Response_%s.mat', ...
-    sessionFileInfo.animal_name, sessionFileInfo.session_name, stimName);
-savePath = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
-save(savePath, 'response', '-v7.3');
-end
-
-%%
-% could use for plotting: 
-% plotRunningTuningCurves(respGray, respDark, pdfPath)
-%%
-% To check variance during debugging: not saving the shiffle distribution
-% if needed 
-% debugROI = 4; 
-% debugField = fname; % or 'dFF'
-% 
-% %
-% realStat = mean(sigData(debugROI, sIdx), 'omitnan');
-% realMove = zeros(1, numBins);
-% for b = 1:numBins
-%     realMove(b) = mean(sigData(debugROI, binIndices{b}), 'omitnan');
-% end
-% realCurve = [realStat, realMove];
-% realVar = var(realCurve, 0, 2, 'omitnan');
-% 
-% % Run a quick mini-shuffle (50 perms) just for this ROI to see the "cloud"
-% numDebugShifts = 50;
-% debugShuffVars = zeros(1, numDebugShifts);
-% figure('Color', 'w', 'Name', ['Debug ROI ' num2str(debugROI)]);
-% subplot(1,2,1); hold on;
-% 
-% for i = 1:numDebugShifts
-%     shift = randi([600, length(wheelSpeed)-600]);
-%     sigS = circshift(sigData(debugROI, :), shift);
-% 
-%     sM = mean(sigS(sIdx), 'omitnan');
-%     mM = zeros(1, numBins);
-%     for b = 1:numBins
-%         mM(b) = mean(sigS(binIndices{b}), 'omitnan');
-%     end
-%     shuffCurve = [sM, mM];
-%     debugShuffVars(i) = var(shuffCurve, 0, 2, 'omitnan');
-% 
-%     % Plot the "Null" grey lines
-%     plot([0, 1:numBins], shuffCurve, 'Color', [0.8 0.8 0.8]);
-% end
-% 
-% % 3. Plot the Real curve on top
-% plot([0, 1:numBins], realCurve, 'r', 'LineWidth', 2);
-% title('Tuning: Real (Red) vs Shuffled (Grey)');
-% xticks([0, 1:numBins]); xticklabels(['Stat', string(1:numBins)]);
-% grid on;
-% 
-% % 4. Plot the Variance Distribution
-% subplot(1,2,2);
-% histogram(debugShuffVars, 'FaceColor', [.5 .5 .5]); hold on;
-% xline(realVar, 'r', 'LineWidth', 2, 'Label', 'Real Var');
-% title('Variance Distribution');
-% xlabel('Variance'); ylabel('Count');

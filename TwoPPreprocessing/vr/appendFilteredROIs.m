@@ -4,7 +4,8 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
 %
 % Example usage:
 %   RSPData = getTuningDataByCondition(ExpRSPSessions);
-%   RSPData = appendFilteredROIs(RSPData, 'RhoHalvesThreshold', 0.6, 'CvExpVarThreshold', 0.1);
+%   RSPData = appendFilteredROIs(RSPData, 'RhoHalvesThreshold', 0.6, 'FilterEdgeSMI', true);
+
     p = inputParser;
     addRequired(p, 'sessionMetrics', @isstruct);
     addParameter(p, 'UseHalves', false, @islogical)
@@ -17,6 +18,11 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
     addParameter(p, 'cvExpvarThreshold', 0.1, @isnumeric); 
     addParameter(p, 'FilterDuplicateBoutons', true, @islogical);
     addParameter(p, 'FilterSomasByRF', false, @islogical);
+    addParameter(p, 'RestrictSMIToLandmarkBoundaries', false, @islogical);
+    addParameter(p, 'LandmarkBoundaries', 15, @isnumeric); 
+    
+    % filtering of cells with dominant peaks at track ends
+    addParameter(p, 'FilterEdgeSMI', false, @islogical); 
     
     parse(p, sessionMetrics, varargin{:});
     params = p.Results;
@@ -24,6 +30,14 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
     updatedMetrics = sessionMetrics;
     numSessions = length(sessionMetrics);
     
+    % Define landmark bins to include based on the input boundary 
+    landmarkCentres = [40, 80, 120, 160];
+    landmarkBinsToCheck = [];
+    for iLand = 1:length(landmarkCentres)
+        thislandPos = landmarkCentres(iLand);
+        landmarkBins = thislandPos-params.LandmarkBoundaries:thislandPos+params.LandmarkBoundaries;
+        landmarkBinsToCheck = [landmarkBinsToCheck, landmarkBins];
+    end
     TotalROIs = 0;
     KeptROIs = 0;
     FilteredOutROIs = 0;
@@ -43,34 +57,21 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
         
         roisToKeepIdx = 1:numTotalROIs; 
         
-        % filter 1: cross-validated explained variance (cvExpVar)
+        % filter 1: cross-validated explained variance (cvExpVar) 
         if params.UseExpVar_SigNullDist
-            if isfield(thisSession, 'cvExpVar') && ~isempty(thisSession.cvExpVar) && ...
-               isfield(thisSession, 'cvExpvar_nullDist_pVales') && ~isempty(thisSession.cvExpvar_nullDist_pVales) 
-                
-%                 medianExpVar = median(thisSession.cvExpVar, 2, 'omitnan');
-                realVarIdx = find(thisSession.cvExpvar_nullDist_pVales < 0.05); % & medianExpVar > params.CvExpVarThreshold); 
-                roisToKeepIdx = intersect(roisToKeepIdx, realVarIdx);
-            end
-        end 
-
-        if params.UseExpVar_SigNullDist
-            if isfield(thisSession, 'cvExpvar_nullDist_pVales') && ~isempty(thisSession.cvExpvar_nullDist_pVales) 
-                
-%                 medianExpVar = median(thisSession.cvExpVar, 2, 'omitnan');
-                realVarIdx = find(thisSession.cvExpvar_nullDist_pVales < params.ExpVarSigThreshold); % & medianExpVar > params.CvExpVarThreshold); 
+            if isfield(thisSession, 'cvExpVar') && ~isempty(thisSession.cvExpVar) 
+                realVarIdx = find(thisSession.cvExpVar.pValues <= params.ExpVarSigThreshold); 
                 roisToKeepIdx = intersect(roisToKeepIdx, realVarIdx);
             end
         end 
         
         if params.UseExpVar
             if isfield(thisSession, 'cvExpVar') && ~isempty(thisSession.cvExpVar) 
-                medianExpVar = median(thisSession.cvExpVar, 2, 'omitnan');
-                realVarIdx = find( medianExpVar > params.CvExpVarThreshold);
+                realVarIdx = find( thisSession.cvExpVar.medianExpVar > params.cvExpvarThreshold);
                 roisToKeepIdx = intersect(roisToKeepIdx, realVarIdx);
             end
         end
-
+        
         % filter 2: Halves Rho 
         if params.UseHalves
             if isfield(thisSession, 'Rho_Halves') && ~isempty(thisSession.Rho_Halves)
@@ -80,18 +81,17 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
                 warning('Mouse %s Session %s is missing ''Rho_Halves'' data.', thisSession.MouseID, thisSession.Session);
             end
         end 
-
-        %Option Filter 2: @Aman Odd Even Rho 
+        
+        % Option Filter 2: Odd Even Rho 
         if params.UseOddEven
             if isfield(thisSession, 'Rho_OddEven') && ~isempty(thisSession.Rho_OddEven)
                 stableIdx = find(thisSession.Rho_OddEven >= params.RhoOddEvenThreshold);
                 roisToKeepIdx = intersect(roisToKeepIdx, stableIdx);
             else
-                warning('Mouse %s Session %s is missing ''Rho_Halves'' data.', thisSession.MouseID, thisSession.Session);
+                warning('Mouse %s Session %s is missing ''Rho_OddEven'' data.', thisSession.MouseID, thisSession.Session);
             end
         end 
-
-
+        
         % Filter 3: Bouton-specific unique index filtering
         if params.FilterDuplicateBoutons && strcmpi(thisSession.TypeImaged, 'Boutons')
             if isfield(thisSession, 'uniqueBoutonIdx') && ~isempty(thisSession.uniqueBoutonIdx)
@@ -102,23 +102,39 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
         % Filter 4: Receptive Field Location Filter (-70 to -40 Azimuth)
         if params.FilterSomasByRF && strcmpi(thisSession.TypeImaged, 'Somas')
             if isfield(thisSession, 'sparseNoiseMatrix') && ~isempty(thisSession.sparseNoiseMatrix)
-
                 roisWithinWindow = [];
-
                 for neuronIdx = 1:numTotalROIs
                     rfRaw = flipud(thisSession.sparseNoiseMatrix.initMap{neuronIdx}(:, :, end, 4));
                     rfSmoothed = imgaussfilt(rfRaw, 1);
                     azimuthCoords = linspace(-70, 20, size(rfRaw, 2));
                     [~, maxIdx] = max(rfSmoothed(:));
                     [~, maxCol] = ind2sub(size(rfSmoothed), maxIdx);
-
                     peakAzimuth = azimuthCoords(maxCol);
-
                     if peakAzimuth >= -70 && peakAzimuth <= -40
                         roisWithinWindow(end+1) = neuronIdx;
                     end
                 end
                 roisToKeepIdx = intersect(roisToKeepIdx, roisWithinWindow);
+            end
+        end
+        
+        % Filter 5: Spatial Modulation Boundary Restrictions
+        if params.RestrictSMIToLandmarkBoundaries
+            if isfield(thisSession.SMI, 'PeakBinPosition') && ~isempty(thisSession.SMI.PeakBinPosition)
+                ROIsWithinLandmarkWindows = find(ismember(thisSession.SMI.PeakBinPosition, landmarkBinsToCheck));
+                roisToKeepIdx = intersect(roisToKeepIdx, ROIsWithinLandmarkWindows);
+            end 
+        end 
+        
+        % NEW FILTER: Exclude ROIs whose global maximum peak lies in the first/last 30cm
+        if params.FilterEdgeSMI
+            % Check inside the parsed SMI field/struct for the saved exclusion flags
+            if isfield(thisSession, 'SMI') && isfield(thisSession.SMI, 'ExcludeEdgePeakCells') && ~isempty(thisSession.SMI.ExcludeEdgePeakCells)
+                % Find indexes of cells that are NOT flagged for edge exclusions
+                cleanSMIIdx = find(~thisSession.SMI.ExcludeEdgePeakCells);
+                roisToKeepIdx = intersect(roisToKeepIdx, cleanSMIIdx);
+            else
+                warning('Mouse %s Session %s is missing ''SMI.ExcludeEdgePeakCells'' data.', thisSession.MouseID, thisSession.Session);
             end
         end
         
@@ -146,5 +162,4 @@ function updatedMetrics = appendFilteredROIs(sessionMetrics, varargin)
     else
         fprintf('No valid sessions were evaluated for counts.\n');
     end
-
 end

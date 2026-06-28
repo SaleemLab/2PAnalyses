@@ -153,7 +153,7 @@ masterTable = readtable(filepath, opts);
 columnsToParse = {
     'VRCorr', 'BaselineCorridor', 'LandManipCorridor' ,'RFMapping', 'GrayScreen', 'DirTuning', ...
     'CheckerBoard', 'DotMotion_SpeedTuning', 'DriftingBar', ...
-    'FullFiledFlash', 'SparseNoiseTexture', 'zStack', 'LapsRecorded', 'LapsCompleted'
+    'FullFiledFlash', 'SparseNoiseTexture', 'zStack', 'LapsRecorded', 'LapsCompleted', 'Darkness'
     };
 columnsToParse = columnsToParse(ismember(columnsToParse, masterTable.Properties.VariableNames));
 

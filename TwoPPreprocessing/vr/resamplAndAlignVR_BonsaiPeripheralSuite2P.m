@@ -174,6 +174,8 @@ if isfield(bonsaiData, 'MousePos')
     end
     bonsaiData.MousePos.Value = newValue;
     bonsaiData.MousePos.sampleTimes = newTime;
+
+    
 end
 
 disp('Processing Bonsai Data: Trial Info')

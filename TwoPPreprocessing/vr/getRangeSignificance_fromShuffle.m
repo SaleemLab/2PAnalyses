@@ -4,124 +4,125 @@ function [isSignificantByRangeShuffling_local, realRangePercentileRank_local] = 
 % and determines which cells have a range greater than the 95th percentile.
 %
 % Aman and Sonali November 2025
+
 %% Input Checks and Preparation
 if nargin < 2
     error('Must provide the response struct.');
 end
-%signalNames = fieldnames(response.lapPositionActivity);
-signalNames = {'dFF', 'dFFNeuropilCorrected'};
+
 if ~isfield(response, 'lapPositionActivity_ShuffleMatrix')
     error('Shuffled data (lapPositionActivity_ShuffleMatrix) not found in response struct. Run getLapPositionActivity_withShuffle first.');
 end
+
+% Default signal list
+signalNames = {'dFF', 'dFFNeuropilCorrected'};
+
+% Dynamic integration of spks if available in both real and shuffled data fields
+if isfield(response.lapPositionActivity, 'spks') && isfield(response.lapPositionActivity_ShuffleMatrix, 'spks')
+    signalNames{end+1} = 'spks';
+end
+
 % Index of significant cells (1 = significant, 0 = not significant)
-% Variables are renamed for range analysis:
 isSignificantByRangeShuffling_local = struct(); % Local container for saving
 % Percentile of real peak relative to shuffle peaks
 realRangePercentileRank_local = struct(); % Local container for saving
 % Target percentile for significance
 targetPercentile = 95;
+
 %% Main Processing Loop
 disp('Starting range significance calculation...');
 for iSignal = 1:length(signalNames)
     currentSignalName = signalNames{iSignal};
-
+    
+    % Safety guard if a signal is unexpectedly missing from a container
+    if ~isfield(response.lapPositionActivity, currentSignalName) || ...
+       ~isfield(response.lapPositionActivity_ShuffleMatrix, currentSignalName)
+        warning('Field %s not found across all tracking matrices. Skipping.', currentSignalName);
+        continue;
+    end
+    
     disp(['Processing signal: ', currentSignalName]);
-
+    
     % Real activity (Neurons x Laps x Bins)
     realActivity = response.lapPositionActivity.(currentSignalName); 
     % Shuffled activity (Neurons x Bins x Shuffles)
     shuffleMatrix = response.lapPositionActivity_ShuffleMatrix.(currentSignalName);
-
-    numROIs = size(realActivity,1);
-    numShuffles = size(shuffleMatrix,3);
-
-    %Calculate the mean real tuning curve
+    
+    numROIs = size(realActivity, 1);
+    numShuffles = size(shuffleMatrix, 3);
+    
+    % Calculate the mean real tuning curve
     % Average activity across all laps to get the real tuning curve (Neurons x Bins)
     meanRealTuningCurve = mean(realActivity, 2, 'omitnan'); 
     meanRealTuningCurve = squeeze(meanRealTuningCurve); % (numROIs x numBins)
-
-    %Find real range
-    % Find the real max value across position bins
+    
+    % Handle single-ROI squeeze edge case (preserves horizontal bin structure)
+    if numROIs == 1 && size(meanRealTuningCurve, 1) ~= 1
+        meanRealTuningCurve = meanRealTuningCurve';
+    end
+    
+    % Find real range
     realMaxValues = max(meanRealTuningCurve, [], 2, 'omitnan'); % (numROIs x 1)
-    % Find the real min value across position bins
     realMinValues = min(meanRealTuningCurve, [], 2, 'omitnan'); % (numROIs x 1)
-    % Calculate the real range (Max - Min)
     realRangeValues = realMaxValues - realMinValues; % (numROIs x 1)
-
-    %Find shuffle range 
-    % Find the max activity within each shuffle across bins
+    
+    % Find shuffle range 
     shuffleMaxValues = squeeze(max(shuffleMatrix, [], 2, 'omitnan')); % (numROIs x numShuffles)
-    % Find the min activity within each shuffle across bins
     shuffleMinValues = squeeze(min(shuffleMatrix, [], 2, 'omitnan')); % (numROIs x numShuffles)
+    
+    % Handle single-ROI squeeze edge case for shuffle extractions
+    if numROIs == 1
+        if size(shuffleMaxValues, 1) ~= 1, shuffleMaxValues = shuffleMaxValues'; end
+        if size(shuffleMinValues, 1) ~= 1, shuffleMinValues = shuffleMinValues'; end
+    end
+    
     % Calculate the shuffle range distribution (Max - Min) for every shuffle
     shuffleRangeDistribution = shuffleMaxValues - shuffleMinValues; % (numROIs x numShuffles)
-
+    
     % Sig and percentiles 
-
     significanceIndex = zeros(numROIs, 1);
     percentileValues = nan(numROIs, 1);
-
-
+    
     % Loop over each ROI to compare its real range against the shuffle range distribution
     for thisROI = 1:numROIs
-
-        % Distribution of range values for the current neuron across all 1000 shuffles
+        % Distribution of range values for the current neuron across all shuffles
         currentShuffleDistribution = shuffleRangeDistribution(thisROI, :);
-
         % The actual range value for the current neuron
         currentRealRange = realRangeValues(thisROI);
-
+        
         % Calculate the target significance threshold (95th percentile)
-        % This is the range value that only 5% of the shuffled ranges exceed.
         rangeThreshold_95th = prctile(currentShuffleDistribution, targetPercentile);
-
+        
         % Check for significance: Is the Real Range > 95th Percentile Threshold?
         if currentRealRange > rangeThreshold_95th
             significanceIndex(thisROI) = 1; % Mark as significant
         end
-
+        
         % Calculate the percentile of the real range relative to the shuffle distribution
-        % Formula: (Number of shuffle ranges <= Real Range) / Total Shuffles * 100
-
-        % Count how many shuffled ranges are less than or equal to the real range
         numRangesBelowReal = sum(currentShuffleDistribution <= currentRealRange);
-
-        % Calculate the percentile rank. How many values in the random
-        % shuffle distribution are less than or equal to the roi's actual
-        % range. 
         percentile = (numRangesBelowReal / numShuffles) * 100;
-
         percentileValues(thisROI) = percentile;
     end
-
-    % rangeThreshold_95th_2 = prctile(currentShuffleDistribution, targetPercentile, 1);
-    % percentileValues_2 = sum(realRangeValues >= rangeThreshold_95th_2)/numShuffles * 100;
-    % 
-    % there should be a better way to do this..
-
+    
     isSignificantByRangeShuffling_local.(currentSignalName) = significanceIndex;
     realRangePercentileRank_local.(currentSignalName) = percentileValues;
-
+    
     fprintf('  -> Found %d significant ROIs (Range > %dth Percentile) for %s.\n', ...
         sum(significanceIndex), targetPercentile, currentSignalName);
-
 end
 disp('Range significance calculation complete.');
+
 %% Saving Data to sessionROIData 
-% Assign the local structs to the final variables used in the save command
 nullDist_RangeTuningMetric.isSignificantByRange = isSignificantByRangeShuffling_local;
 nullDist_RangeTuningMetric.realRangePercentileRank = realRangePercentileRank_local;
 nullDist_RangeTuningMetric.targetPercentile = targetPercentile; 
 
 % Check if the file path exists and save the variables
 if isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file') == 2
-
     disp(['Saving range significance results to: ', sessionFileInfo.otherSessFilePaths.sessionROIData]);
-
     save(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
         "nullDist_RangeTuningMetric", ...
          '-append')
-
 elseif isfield(sessionFileInfo, 'otherSessFilePaths')
     warning('sessionROIData file not found at: %s. Cannot append range significance data.', ...
         sessionFileInfo.otherSessFilePaths.sessionROIData);
@@ -129,7 +130,6 @@ else
     warning('sessionFileInfo.otherSessFilePaths field not found. Cannot save range significance data.');
 end
 end
-
 % %% Testing random permutations 
 % function [nullDist_RangeTuningMetric] = getRangeSignificance_fromShuffle(sessionFileInfo, response)
 % % Calculates the range (Max - Min) of each cell's spatial tuning curve,

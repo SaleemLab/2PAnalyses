@@ -210,8 +210,12 @@ stableThresh = 0.4;
 
 %% 1. Find Paths
 allPaths = {sessionFileInfo.stimFiles.Response}; 
-idxCL = find(contains(allPaths, CLStimName));
-idxOL = find(contains(allPaths, OLStimName));
+% idxCL = find(contains(allPaths, CLStimName));
+% idxOL = find(contains(allPaths, OLStimName));
+
+idxCL = find(cellfun(@(x) ischar(x) && contains(x, CLStimName), allPaths));
+idxOL = find(cellfun(@(x) ischar(x) && contains(x, OLStimName), allPaths));
+
 
 if isempty(idxCL); error('CL path not found.'); end
 if isempty(idxOL); error('OL path not found.'); end
@@ -238,6 +242,7 @@ end
 % Subset to stable ROIs for profile calculation
 actCL_stable = responseCL.lapPositionActivity.(signalToUse)(stableIdx, :, :);
 actOL_stable = responseOL.lapPositionActivity.(signalToUse)(stableIdx, :, :);
+
 
 %% 4. Masking Running and Stationary (Raw Means)
 maskRunCL = responseCL.lapPositionRunningSpeed > runThresh;
