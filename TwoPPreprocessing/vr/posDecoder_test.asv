@@ -290,7 +290,7 @@ fprintf('Median decoding error: %.1f cm\n', median(decodeError, 'omitnan'));
 fprintf('Mean decoding error:   %.1f cm\n', mean(decodeError,   'omitnan'));
 
 
-%% plot
+%% --- Plot ---
 binSize = 2;
 binEdges_plot = 0:binSize:200;
 nBins_plot = length(binEdges_plot) - 1;
@@ -390,13 +390,11 @@ for iPair = 1:size(landmarkPairs, 1)
     nearLM1 = abs(allTrue - lm1) <= landmarkWindow;
 
     % error to true position
-    % abs(decoded position - where the animal actually was)
     errTrue_LM1     = abs(allDecoded(nearLM1) - allTrue(nearLM1));
     % error to identical landmark (lm2)
-    % abs(decoded position - position of the identical landmark)
     errLandmark_LM1 = abs(allDecoded(nearLM1) - lm2);
 
-    %% frames where animal is near landmark 2 
+    %% --- frames where animal is near landmark 2 ---
     nearLM2 = abs(allTrue - lm2) <= landmarkWindow;
 
     % error to true position

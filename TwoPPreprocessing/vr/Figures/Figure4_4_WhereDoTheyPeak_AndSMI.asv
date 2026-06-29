@@ -1,0 +1,51 @@
+pairs=struct;
+pairs.M25132 = ['20260219','20260220','20260221','20260223', '20260226', '20260228', '20260313'];
+pairs.M25133 = ['20260220','20260221','20260223''20260219','20260224'];
+pairs.M26003 = ['20260316','20260317', '20260320','20260321','20260322', '20260324', '20260325'];
+
+
+
+RSPSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+RSPDataAcrossDays = getTuningDataByCondition(RSPSessions);
+
+RSPData = appendFilteredROIs(RSPData,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
+
+% Filter rois based on critera defined 
+
+%% load VISP for comparion
+
+pairs=struct; 
+pairs.M26005 = ['20260305', '20260306', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs
+pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M25126 = ['20260311', '20260312', '20260313']; % unique fovs 
+ 
+
+VISpSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+
+% 
+%VISpDataSpks = getTuningDataByCondition(VISpSessions, 'signalToUse', 'spks');
+VISpData = getTuningDataByCondition(VISpSessions, 'signalToUse', 'dFFNeuropilCorrected');
+
+
+VISpData = appendFilteredROIs(VISpData,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
+%VISpDataSpks = appendFilteredROIs(VISpDataSpks,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
+
+%%
+
+%% Get spatial tuning data 
+
+
+% plot even pooled across mice 
+plotPooledPopulation_DayWise_Even(RSPDataAcrossDays, ...
+    'RSP', ...
+    'DaysToPlot',[1 2 3 4 5 200], ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter3-RSP-Learning\RSPBoutons_Learning_12345');
+
+
+compareAndPlot_SMI_RSPDaysOfLearning_vs_VISp(RSPDataAcrossDays, VISpData)
+
+for s = 1:length(RSPDataAcrossDays)
+    nLaps = RSPDataAcrossDays(s).ConditionData.Baseline.NumLaps;  % or whatever your lap field is
+    fprintf('Day %d: %d laps | Mouse %s \n', RSPDataAcrossDays(s).Day, nLaps, RSPDataAcrossDays(s).MouseID);
+end

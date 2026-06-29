@@ -1,4 +1,4 @@
-function figHandle = plotPooledPopulation_DayWise_OddEven(allData, targetArea, varargin)
+function figHandle = plotPooledPopulation_DayWise_Even(allData, targetArea, varargin)
 % plotPooledPopulation_DayWise_OddEven: Cross-day timeline visualizer.
 % Plots only Even trials SORTED by local matching Odd peaks. Every day panel 
 % is independently local range normalized, maintaining perfect square aspect ratios,
@@ -180,7 +180,7 @@ function figHandle = plotPooledPopulation_DayWise_OddEven(allData, targetArea, v
         end
     end
     
-    if ~isempty(p.Results.SavePath)
-        saveFigureFormats(figHandle, p.Results.SavePath);
-    end
+
+    if ~exist(p.Results.SavePath, 'dir'), mkdir(p.Results.SavePath); end
+    saveFigureFormats(figHandle, fullfile(p.Results.SavePath, 'peakbin_halves_within_lap_rsp_visp'));
 end
