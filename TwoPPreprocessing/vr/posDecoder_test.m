@@ -1,23 +1,23 @@
 % response = load("Z:\ibn-vision\DATA\SUBJECTS\M26003\Analysis\20260322\M26003_20260322_Response_M26003_BaselineCorridor_20260322_00002.mat")
 % procTwoP = load("Z:\ibn-vision\DATA\SUBJECTS\M26003\Analysis\20260322\M26003_20260322_processed2PData_M26003_BaselineCorridor_20260322_00002.mat")
 % pairs = struct; 
-% pairs.M26003 = ['20260322']
+% pairs.M26003 = '20260322' % day 5
 
 % 
-response = load("Z:\ibn-vision\DATA\SUBJECTS\M25132\Analysis\20260226\M25132_20260226_Response_M25132_BaselineCorridor_20260226_00002.mat")
-procTwoP = load("Z:\ibn-vision\DATA\SUBJECTS\M25132\Analysis\20260226\M25132_20260226_processed2PData_M25132_BaselineCorridor_20260226_00002.mat")
+% response = load("Z:\ibn-vision\DATA\SUBJECTS\M25132\Analysis\20260226\M25132_20260226_Response_M25132_BaselineCorridor_20260226_00002.mat")
+% procTwoP = load("Z:\ibn-vision\DATA\SUBJECTS\M25132\Analysis\20260226\M25132_20260226_processed2PData_M25132_BaselineCorridor_20260226_00002.mat")
+% pairs = struct; 
+% pairs.M25132 = '20260226' % day 5
+
+
+response = load("Z:\ibn-vision\DATA\SUBJECTS\M25126\Analysis\20260311\M25126_20260311_Response_M25126_LandManipCorridor_20260311_00001.mat");
+procTwoP = load("Z:\ibn-vision\DATA\SUBJECTS\M25126\Analysis\20260311\M25126_20260311_processed2PData_M25126_LandManipCorridor_20260311_00001.mat");
 pairs = struct; 
-pairs.M25132 = ['20260226']
+pairs.M25126 = '20260311'; %day 2!! 
 
 %% loop through all sessions and mice and plot pdfs with the decoding 
 % one page one session - to get an idea of what this looks like across
 % sessions and animals 
-
-% response = load("Z:\ibn-vision\DATA\SUBJECTS\M25133\Analysis\20260220\M25133_20260220_Response_M25133_BaselineCorridor_20260220_00001.mat")
-% procTwoP = load("Z:\ibn-vision\DATA\SUBJECTS\M25133\Analysis\20260220\M25133_20260220_processed2PData_M25133_BaselineCorridor_20260220_00001.mat")
-% pairs = struct; 
-% pairs.M25133 = ['20260220'];
-
 
 % pairs=struct;
 % pairs.M25132 = ['20260226', '20260228', '20260313'];
@@ -25,16 +25,36 @@ pairs.M25132 = ['20260226']
 % pairs.M26003 = ['20260322', '20260324', '20260325'];
 
 
+%% 
+% make the following changes
+% train on odd and test on even 
+% also train on evena and test on odd
+% and then find a way to combine the two 
+% this change needs to be made 
+% i also need to find a way to save this information somehweer so i can
+% plot it later on 
 
+% then i need to find a way to load the processedTwoData to pull out the
+% twopFrametime and if two sessions are not within a list to combine them 
+% then plot them all one pdf all three mice; one page one session; 
+% edit to only include baseline trials
+% include date for each plot and also the total number of trials used 
+% 
 
+% finally saving - this needs to be saved somwhere 
 
 %%
+% find session 
 testmouse = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
-
+% run this to load the reliability and smi metric; smi metric is only used
+% to exclude rois that have peaks in the first and last 30cm of the
+% corridor. 
 testmousedata = getTuningDataByCondition(testmouse);
+% filers rois based on standard critera used for all other analyses 
+testmousedata = appendFilteredROIs(testmousedata,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', false);
 
-testmousedata = appendFilteredROIs(testmousedata,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
-
+% load data required; interpolated to 60hz 
+% currently looking at the full length of lap including ITI period.. @aman 
 FilteredROIs = testmousedata(1).FilteredROIs;
 timeVec = procTwoP.TwoPFrameTime;
 wheelSpeed = response.wheelSpeed;
@@ -66,8 +86,11 @@ wheelSpeed  = wheelSpeed(:);
 mousePos    = mousePos(:);
 frameLapID  = frameLapID(:);
 
-% running mask: speed > 1 cm/s AND in not an aborted lap: TODO: filter
-% baseline trials only so can test visp mice
+% running mask: speed > 1 cm/s AND in not an aborted lap: removing aborted
+% laps because if the mouse fails to move past position 10cm, this position
+% will remain 10cm until the next lap starts? idk best to clean.. 
+% TODO: filter
+% baseline trials only so can test visp mice  
 runningMask = wheelSpeed > 1 & frameLapID > 0;
 
 fprintf('Total frames: %d\n', nFrames);
@@ -85,100 +108,20 @@ frameSpeed_running  = wheelSpeed(runningMask);
 fluorTrace = procTwoP.processedSignals.dFFNeuropilCorrected(FilteredROIs, :);
 fluorTrace_running = fluorTrace(:, runningMask);
 
-% z-score each ROI across running frames only
-fluorTrace_running = zscore(fluorTrace_running, 0, 2);  % 0 = normalise by std, 2 = across columns (time)
+% z-score each ROI across running frames only [does not seem to make a difference visaully?]
+% fluorTrace_running = zscore(fluorTrace_running, 0, 2);  % 0 = normalise by std, 2 = across columns (time)
 
 fprintf('fluorTrace size: %d ROIs x %d frames\n', size(fluorTrace_running, 1), size(fluorTrace_running, 2));
 fprintf('framePos_running range: %.1f to %.1f cm\n', min(framePos_running), max(framePos_running));
 fprintf('Unique laps: %d\n', length(unique(frameLapID_running)));
 
-% %% Bayesian position dedcoder 
-% nROIs      = size(fluorTrace_running, 1);
-% nFrames    = size(fluorTrace_running, 2);
-% nBins      = 200;  % 1 cm bins
-% binEdges   = 0:1:200;
-% binCentres = (binEdges(1:end-1) + binEdges(2:end)) / 2;  % FIX: added binCentres
-% 
-% % get unique valid laps
-% validLaps = unique(frameLapID_running);
-% oddLaps   = validLaps(1:2:end);
-% evenLaps  = validLaps(2:2:end);
-% 
-% %% training: building training curves on odd 
-% tuningCurves = NaN(nROIs, nBins);
-% oddMask = ismember(frameLapID_running, oddLaps);
-% 
-% for iBin = 1:nBins
-%     binMask = oddMask & framePos_running >= binEdges(iBin) & framePos_running < binEdges(iBin+1);
-%     if sum(binMask) < 3, continue; end
-%     tuningCurves(:, iBin) = mean(fluorTrace_running(:, binMask), 2, 'omitnan');
-% end
-% 
-% % smooth tuning curves with 5 cm Gaussian window (Saleem et al.)
-% w = gausswin(15); w = w/sum(w);  % is 15 too much? 
-% for iROI = 1:nROIs
-%     tc = tuningCurves(iROI, :);
-%     if all(isnan(tc)), continue; end
-%     nm = isnan(tc); tc(nm) = 0;
-%     tc = filtfilt(w, 1, tc);
-%     tc(nm) = NaN;
-%     tuningCurves(iROI, :) = tc;
-% end
-% 
-% fprintf('Tuning curves computed for %d ROIs\n', nROIs);
-% 
-% %% TESTING: decode position on even laps ---
-% evenMask   = ismember(frameLapID_running, evenLaps);
-% testFrames = find(evenMask);
-% 
-% allDecoded = NaN(length(testFrames), 1);
-% allTrue    = framePos_running(testFrames);
-% 
-% for f = 1:length(testFrames)
-%     frameIdx = testFrames(f);
-%     % pulls out the fluorescence value of every neuron at that single moment in time — 
-%     % this is the "population vector", a snapshot of what all neurons are doing right now
-%     popVec = fluorTrace_running(:, frameIdx);
-% 
-%     if sum(~isnan(popVec)) < 3, continue; end
-% 
-%     % Gaussian log likelihood
-%     logLik = NaN(nBins, 1);
-%     for xBin = 1:nBins
-% 
-%         %For each candidate position (xBin), pulls out the tuning curve column — 
-%         % this is what the population should look like if the animal were at that position
-%         expected = tuningCurves(:, xBin);
-%         % d is the difference between what neurons are actually doing vs. 
-%         % what they should be doing at that position
-%         d = popVec - expected;
-%         valid = ~isnan(d);
-%         if sum(valid) < 3, continue; end
-%         %The score is -0.5 * sum(d2) — this is the Gaussian log-likelihood: 
-%         % the more the activity matches the tuning curve, the smaller d is, 
-%         % the less negative (i.e. higher) the score
-% 
-%         % It's essentially asking: 
-%         % "does the current population vector look most like the animal is at position 1? position 2? position 3?...
-%         logLik(xBin) = -0.5 * sum(d(valid).^2);
-%     end
-%     % And then takes the maximum 
-%     [~, bestBin]   = max(logLik);
-%     allDecoded(f)  = binCentres(bestBin);  % FIX: store position in cm not bin index
-% end
-% 
-% %% --- Compute error ---
-% decodeError = abs(allDecoded - allTrue);
-% 
-% fprintf('Median decoding error: %.1f cm\n', median(decodeError, 'omitnan'));
-% fprintf('Mean decoding error: %.1f cm\n', mean(decodeError, 'omitnan'));
 
-%% Bayesian position decoder
+%% Niave bayesian position decoder
 nROIs      = size(fluorTrace_running, 1);
 nFrames    = size(fluorTrace_running, 2);
 nBins      = 200;  % 1 cm bins
 binEdges   = 0:1:200;
-binCentres = (binEdges(1:end-1) + binEdges(2:end)) / 2;
+binCentres = (binEdges(1:end-1) + binEdges(2:end)) / 2; % should this be edges? no? 
 
 % get unique valid laps
 validLaps = unique(frameLapID_running);
@@ -194,8 +137,9 @@ for iBin = 1:nBins
     if sum(binMask) < 3, continue; end
     tuningCurves(:, iBin) = mean(fluorTrace_running(:, binMask), 2, 'omitnan');
 end
-
-% smooth tuning curves with Gaussian window (Saleem et al.)
+ 
+% smooth tuning curves with Gaussian window (Saleem et al.); is smoothning
+% going to make things worse? @aman
 w = gausswin(5); w = w/sum(w);
 for iROI = 1:nROIs
     tc = tuningCurves(iROI, :);
@@ -221,7 +165,7 @@ fprintf('Prior occupancy range: %.4f to %.4f\n', min(occupancy), max(occupancy))
 % sanity check prior
 assert(~all(isnan(tuningCurves(:))), 'tuningCurves is all NaN — check training data');
 assert(abs(sum(occupancy) - 1) < 0.01,  'occupancy prior does not sum to 1 — check binning');
-%%
+%% check occupancy 
 
 coveredBins = sum(~all(isnan(tuningCurves), 1));
 fprintf('Bins with valid tuning curves: %d / %d\n', coveredBins, nBins);
@@ -234,7 +178,7 @@ title('Prior: fractional occupancy per bin (odd laps)');
 xline(40,  '--k'); xline(80,  '--k');
 xline(120, '--k'); xline(160, '--k');
 
-%% how many samples per bins? aka 
+%% how many samples per bins? 
 samplesPerBin = zeros(1, nBins);
 for iBin = 1:nBins
     binMask = oddMask & framePos_running >= binEdges(iBin) & framePos_running < binEdges(iBin+1);
@@ -248,7 +192,7 @@ bar(binCentres, samplesPerBin);
 xlabel('Position (cm)'); ylabel('Samples per bin (odd laps)');
 title('Training data density');
 %% TESTING: decode position on even laps
-% full Bayesian decoder:
+
 % log P(position | activity) = log P(activity | position) + log P(position)
 %                             = Gaussian log-likelihood        + log prior
 evenMask   = ismember(frameLapID_running, evenLaps);
@@ -284,7 +228,7 @@ for f = 1:length(testFrames)
     allDecoded(f) = binCentres(bestBin);
 end
 
-%% --- Compute error ---
+%% compute error
 decodeError = abs(allDecoded - allTrue);
 fprintf('Median decoding error: %.1f cm\n', median(decodeError, 'omitnan'));
 fprintf('Mean decoding error:   %.1f cm\n', mean(decodeError,   'omitnan'));
@@ -319,13 +263,13 @@ densityMap_chance_smooth = imgaussfilt(densityMap_chance, 2);
 
 figure('Color', 'w', 'Position', [100 100 500 480]);
 imagesc(binEdges_plot(1:end-1), binEdges_plot(1:end-1), log2(densityMap_chance_smooth'));
-colormap(redWhiteBlue(-1, 1, 256));
+colormap(redWhiteBlue(-2, 2, 256));
 
 cb = colorbar;
-cb.Label.String = 'Prob. density/chance';
-caxis(log2([0.25 4.0]));
-cb.Ticks = log2([0.5 1.0 2.0]);
-cb.TickLabels = {'0.5', '1.0', '2.0'};
+caxis([-2, 2]);
+cb.Ticks      = [-2, -1, 0, 1, 2];
+cb.TickLabels = {'-2', '-1', '0', '+1', '+2'};
+cb.Label.String = 'log_{2}(Prob. density / chance)';
 cb.TickDirection = 'out';
 cb.Box = 'off';
 cb.FontName = 'Arial';
@@ -359,7 +303,7 @@ set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 11);
 
 
 
-%% --- Save ---
+%% save
 
 outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\positionDecoding\MaxLinkelihoodDecoding_m25133_20260220_day2_zscoredSignals';
 if ~exist(outputDir, 'dir'), mkdir(outputDir); end
@@ -367,7 +311,7 @@ saveFigureFormats(gcf, fullfile(outputDir, 'RSP_MaxLinkelihoodDecoding_DensityMa
 
 
 
-%% --- Landmark confusion analysis ---
+%% landmark analysis 
 % Pair A: 40 and 120 cm (identical)
 % Pair B: 80 and 160 cm (identical)
 
@@ -404,7 +348,7 @@ for iPair = 1:size(landmarkPairs, 1)
     % error to identical landmark (lm1)
     errLandmark_LM2 = abs(allDecoded(nearLM2) - lm1);
 
-    %% --- pool across both landmarks in the pair ---
+    %% pool across both landmarks in the pair 
     errTrue_pool     = [errTrue_LM1;     errTrue_LM2];
     errLandmark_pool = [errLandmark_LM1; errLandmark_LM2];
 
@@ -428,7 +372,7 @@ for iPair = 1:size(landmarkPairs, 1)
     end
 end
 
-%% --- Plot ---
+%% plot
 figure('Color', 'w', 'Position', [100 100 700 400]);
 
 pairNames  = fieldnames(results);
@@ -460,9 +404,8 @@ end
 
 sgtitle('Landmark confusion analysis', 'FontName', 'Arial', 'FontSize', 13, 'FontWeight', 'normal');
 
-%% --- Save ---
+%% save
 outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\positionDecoding\BayesianDecoding_m25133_20260220_day2';
 if ~exist(outputDir, 'dir'), mkdir(outputDir); end
 saveFigureFormats(gcf, fullfile(outputDir, 'LandmarkConfusion_analysis'));
 
-%%

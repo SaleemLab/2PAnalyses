@@ -1,4 +1,4 @@
-% process_all_mice_sessions_combined_final.m
+% process_all_mice_sessions_combined.m
 % Combined script with dynamic parameter loading based on TypeImaged from filteredTable.
 clear; clc;
 %% DEFINE MICE, SESSIONS, AND KEYWORDS

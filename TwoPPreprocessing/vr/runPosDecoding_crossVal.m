@@ -1,0 +1,625 @@
+%% Naive Bayesian Position Decoder — All Sessions, All Mice
+% One PDF page per mouse, subplot grid per session/run
+% - doNotCombine runs decoded independently
+% - ROI filtering from sessionROIData (cvExpVar) + SMI_Metrics
+% - Day label from filteredTable.DayOfExperience
+% - Smoothing commented out
+
+clc;
+
+%% settings
+signalName      = 'dFFNeuropilCorrected';
+nBins           = 200;
+binEdges        = 0:1:200;
+binCentres      = (binEdges(1:end-1) + binEdges(2:end)) / 2;
+binSize_plot    = 2;
+nCols           = 4;
+nRows           = 3;
+minLapsRequired = 10;
+
+% ROI filtering thresholds
+expVarPvalThresh = 0.01;
+expVarThresh     = 0.1;
+
+gaussWinSize = 5;
+w = gausswin(gaussWinSize); w = w / sum(w);
+
+doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', ...
+    'M25057_VRCorr_20250526_00001', 'M25057_VRCorr_20250526_00002', ...
+    'M25126_VRCorr_20260123_00001', 'M25126_VRCorrBaseline_20260123_00002', ...
+    'M25126_VRCorrWithManipulations_20260123_00003', ...
+    'M25132_BaselineCorridor_20260219_00001', 'M25132_BaselineCorridor_20260219_00002', ...
+    'M26003_BaselineCorridor_20260322_00001', 'M26003_BaselineCorridor_20260322_00002', ...
+    'M26003_BaselineCorridor_20260324_00001', 'M25131_BaselineCorridor_20260421_00001', ...
+    'M26005_BaselineCorridor_20260421_00001'};
+
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\positionDecoding\BayesianDecoding_AllSessions';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+pdfPath = fullfile(outputDir, 'BayesianDecoding_AllMice_withoutSmoothing.pdf');
+
+%% --- LOAD SESSION TABLE ---
+pairs = struct;
+pairs.M25132 = ['20260219','20260220','20260221','20260223','20260226','20260228','20260313'];
+pairs.M25133 = ['20260220','20260221','20260223','20260219','20260224'];
+pairs.M26003 = ['20260316','20260317','20260320','20260321','20260322','20260324','20260325'];
+pairs.M26005 = ['20260305', '20260306', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs
+pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M25126 = ['20260311', '20260312', '20260313']; % unique fovs 
+
+filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+
+%% get uinque mice
+allMice    = filteredTable.MouseID;
+uniqueMice = unique(allMice, 'stable');
+
+%% loop over mice
+for iMouse = 1:length(uniqueMice)
+    thisMouse    = uniqueMice{iMouse};
+    mouseSessIdx = find(strcmp(allMice, thisMouse));
+
+    fprintf('\n##############################################\n');
+    fprintf('MOUSE: %s | %d sessions\n', thisMouse, length(mouseSessIdx));
+    fprintf('##############################################\n');
+
+    decodeSessions = {};
+
+    %% build 
+    for iSess = 1:length(mouseSessIdx)
+        tableRow        = filteredTable(mouseSessIdx(iSess), :);
+        thisSessionName = char(tableRow.Session);
+        thisDay         = tableRow.DayOfExperience;
+        thisArea        = tableRow.TargetArea;
+
+
+        infoPath = findSessionFileInfoFilePath(thisMouse, thisSessionName);
+        if ~isfile(infoPath)
+            warning('sfi missing for %s — skipping.', thisSessionName);
+            continue;
+        end
+
+        loadedInfo      = load(infoPath, 'sessionFileInfo');
+        sessionFileInfo = loadedInfo.sessionFileInfo;
+        stimNames       = {sessionFileInfo.stimFiles.name};
+
+        % find all corridor runs excluding CombinedRuns
+        corridorIdx = find(contains(stimNames, 'Corridor') & ...
+                           ~contains(stimNames, 'CombinedRuns'));
+
+        if isempty(corridorIdx)
+            warning('No corridor files for %s — skipping.', thisSessionName);
+            continue;
+        end
+
+        % debug print — remove once confirmed working
+        fprintf('\nSession: %s | Corridor stim names:\n', thisSessionName);
+        for iC = 1:length(corridorIdx)
+            fprintf('  [%d] %s\n', corridorIdx(iC), stimNames{corridorIdx(iC)});
+        end
+
+        % check doNotCombine
+        corridorNames   = stimNames(corridorIdx);
+        anyDoNotCombine = any(ismember(corridorNames, doNotCombine));
+
+        if anyDoNotCombine
+            % decode each doNotCombine run independently
+            for iRun = 1:length(corridorIdx)
+                runName = stimNames{corridorIdx(iRun)};
+                if ismember(runName, doNotCombine)
+                    decodeSessions{end+1} = struct(...
+                        'sessionName',     thisSessionName, ...
+                        'day',             thisDay, ...
+                        'runIdx',          {corridorIdx(iRun)}, ...
+                        'runName',         runName, ...
+                        'independent',     true, ...
+                        'sessionFileInfo', sessionFileInfo, ...
+                        'stimNames',       {stimNames});
+                end
+            end
+        else
+            % all runs combined into one decode unit
+            decodeSessions{end+1} = struct(...
+                'sessionName',     thisSessionName, ...
+                'day',             thisDay, ...
+                'runIdx',          {corridorIdx}, ...
+                'runName',         thisSessionName, ...
+                'independent',     false, ...
+                'sessionFileInfo', sessionFileInfo, ...
+                'stimNames',       {stimNames});
+        end
+    end
+
+    fprintf('\nTotal decode sessions for %s: %d\n', thisMouse, length(decodeSessions));
+
+    %% create fig
+    figHandle = figure('Color', 'w', 'Position', [50 50 1600 1100], 'Visible', 'off');
+    sgtitle(sprintf('Mouse %s — Naive Bayesian Position Decoding', thisMouse), ...
+        'FontName', 'Arial', 'FontSize', 14, 'FontWeight', 'bold');
+
+    %% loop through
+    for thisSessions = 1:length(decodeSessions)
+        sess            = decodeSessions{thisSessions};
+        thisSessionName = sess.sessionName;
+        thisDay         = sess.day;
+        sessionFileInfo = sess.sessionFileInfo;
+        stimNames       = sess.stimNames;
+        isIndependent   = sess.independent;
+        runIdxList      = sess.runIdx;  % vector of stim indices to load
+        % TODO: how do i treat day 300 (open loop experiment?)
+        if thisDay == 200 % manipulation corridor 
+            dayLabel = 'Day 200';
+        else
+            dayLabel = sprintf('Day %d', thisDay);
+        end
+
+        fprintf('\n--- Unit %d/%d: %s | %s | independent=%d ---\n', ...
+            thisSessions, length(decodeSessions), thisSessionName, dayLabel, isIndependent);
+
+        ax = subplot(nRows, nCols, thisSessions, 'Parent', figHandle);
+
+        %% load cvExpVar from sessionROIData (always session-level)
+        try
+            sessionROIData = load(sessionFileInfo.otherSessFilePaths.sessionROIData, ...
+                                  'crossValExpVar');
+            cvExpVar       = sessionROIData.crossValExpVar.(signalName);
+        catch ME
+            warning('  Could not load sessionROIData for %s: %s', thisSessionName, ME.message);
+            title(ax, sprintf('%s | %s\nNo ROI data', thisSessionName, dayLabel), ...
+                'FontName', 'Arial', 'FontSize', 7);
+            axis(ax, 'off'); continue;
+        end
+
+%         %% --- load SMI_Metrics ---
+% %         combined session: from CombinedRuns response file, or first run
+% %         independent run:  from that run's response file
+%         SMI_Metrics = [];
+%         if ~isIndependent
+%             combinedStimulusIdx = find(contains(stimNames, 'Corridor') & ...
+%                                        contains(stimNames, 'CombinedRuns'), 1);
+%             if ~isempty(combinedStimulusIdx)
+%                 try
+%                     smiResp     = load(sessionFileInfo.stimFiles(combinedStimulusIdx).Response, ...
+%                                        'SMI_Metrics');
+%                     SMI_Metrics = smiResp.SMI_Metrics;
+%                     fprintf('  SMI loaded from CombinedRuns.\n');
+%                 catch ME
+%                     warning('  Could not load SMI from CombinedRuns: %s', ME.message);
+%                 end
+%             else
+%                 % fallback: first individual run
+%                 try
+%                     smiResp     = load(sessionFileInfo.stimFiles(runIdxList(1)).Response, ...
+%                                        'SMI_Metrics');
+%                     SMI_Metrics = smiResp.SMI_Metrics;
+%                     fprintf('  SMI loaded from first run (no CombinedRuns).\n');
+%                 catch ME
+%                     warning('  Could not load SMI from first run: %s', ME.message);
+%                 end
+%             end
+%         else
+%             try
+%                 smiResp     = load(sessionFileInfo.stimFiles(runIdxList).Response, ...
+%                                    'SMI_Metrics');
+%                 SMI_Metrics = smiResp.SMI_Metrics;
+%                 fprintf('  SMI loaded from independent run.\n');
+%             catch ME
+%                 warning('  Could not load SMI for run %s: %s', unit.runName, ME.message);
+%             end
+%         end
+
+        %% compute FilteredROIs 
+        nTotalROIs = length(cvExpVar.pValues);
+        roisToKeep = 1:nTotalROIs;
+
+        % filter 1: cvExpVar p-value significance
+        if isfield(cvExpVar, 'pValues')
+            sigIdx     = find(cvExpVar.pValues <= expVarPvalThresh);
+            roisToKeep = intersect(roisToKeep, sigIdx);
+        end
+
+        % filter 2: cvExpVar median explained variance threshold
+        if isfield(cvExpVar, 'medianExpVar')
+            expVarIdx  = find(cvExpVar.medianExpVar > expVarThresh);
+            roisToKeep = intersect(roisToKeep, expVarIdx);
+        end
+
+% %         filter 3: edge SMI filter — exclude ROIs with peaks at track edges
+%         if ~isempty(SMI_Metrics) && isfield(SMI_Metrics, signalName)
+%             smiData = SMI_Metrics.(signalName);
+%             if isfield(smiData, 'ExcludeEdgePeakCells')
+%                 cleanIdx   = find(~smiData.ExcludeEdgePeakCells);
+%                 roisToKeep = intersect(roisToKeep, cleanIdx);
+%             else
+%                 warning('  ExcludeEdgePeakCells missing for %s.', thisSessionName);
+%             end
+%         else
+%             warning('  SMI_Metrics missing for %s — skipping edge filter.', thisSessionName);
+%         end
+
+        fprintf('  ROIs after filtering: %d / %d\n', length(roisToKeep), nTotalROIs);
+
+        if isempty(roisToKeep)
+            warning('  No ROIs passed filters for %s — skipping.', thisSessionName);
+            title(ax, sprintf('%s | %s\nNo ROIs', thisSessionName, dayLabel), ...
+                'FontName', 'Arial', 'FontSize', 7);
+            axis(ax, 'off'); continue;
+        end
+
+        %% load and accumulate running frames across runs 
+        signalAll         = [];
+        posAll           = [];
+        lapIDAll         = [];
+        lapOffset        = 0;
+        totalLaps        = 0;
+        saveResponsePath = [];
+        speedAll  = []; 
+
+        for iRun = 1:length(runIdxList)
+            thisStimIdx  = runIdxList(iRun);
+            thisStimName = stimNames{thisStimIdx};
+
+            fprintf('  Run %d: %s\n', iRun, thisStimName);
+
+            %% load response
+            try
+                responsePath = sessionFileInfo.stimFiles(thisStimIdx).Response;
+                response     = load(responsePath, ...
+                    'completedStartTimes', 'completedEndTimes', ...
+                    'trialIndicesByCondition');
+                % take the nan_corrected mouse position from here 
+                bonsaiPath = sessionFileInfo.stimFiles(thisStimIdx).BonsaiData;
+                bonsaiStruct = load(bonsaiPath);
+                bonsaiData = bonsaiStruct.bonsaiData;
+
+                % take the wheel data from here 
+                peripheralPath = sessionFileInfo.stimFiles(thisStimIdx).processedPeripheralData;
+                peripheralStruct = load(peripheralPath);
+                peripheralData = peripheralStruct.peripheralData;
+
+
+
+
+            catch ME
+                warning('  Could not load response for %s: %s', thisStimName, ME.message);
+                continue;
+            end
+
+            if isempty(saveResponsePath)
+                saveResponsePath = responsePath;
+            end
+
+            %% load 2P data
+            try
+                twoPPath = sessionFileInfo.stimFiles(thisStimIdx).processedMergedBonsaiSuite2pData;
+                twoPData = load(twoPPath, 'processedSignals', 'TwoPFrameTime');
+            catch ME
+                warning('  Could not load 2P data for %s: %s', thisStimName, ME.message);
+                continue;
+            end
+
+            %% extract signals (recompute where appropriate) 
+            
+            % compute wheel speed from aligned wheel data
+            tickToCmConversion = 3.1415 * 20 / 1024;  % Wheel radius 20 cm, 1024 ticks per revolution
+            displacement = [0; diff(peripheralData.Wheel.Value * tickToCmConversion)];
+
+            % Handle unrealistic large changes (e.g., due to teleportation or resets)
+            displacement(displacement < -100) = 0;  % Negative large jumps
+            displacement(displacement > 100) = 0;   % Positive large jumps
+
+            % Calculate speed (in cm/s)
+            wheelSpeed = displacement ./ [0; diff(peripheralData.Wheel.sampleTimes)];
+            wheelSpeed = wheelSpeed(:);
+            
+            % mouse position nan corrected - this is to make up for
+            % uncertainty with trial start/end indices due to interpolation
+            
+            
+            mousePos   = bonsaiData.MousePos.Value_nanCorrected(:);
+            lapStart   = response.completedStartTimes;
+            lapEnd     = response.completedEndTimes;
+            timeVec    = twoPData.TwoPFrameTime(:);
+            nFrames    = length(timeVec);
+
+            %% frame count check
+            if size(twoPData.processedSignals.(signalName), 2) ~= nFrames
+                warning('  Frame count mismatch for %s — skipping run.', thisStimName);
+                continue;
+            end
+
+            % extract fluorescence for filtered ROIs only
+            fluorRun = twoPData.processedSignals.(signalName)(roisToKeep, :);
+
+            %% build frame-wise lap ID
+            % completedStartTimes already excludes aborted laps 
+            nCompletedLaps = length(lapStart);
+            frameLapID     = zeros(1, nFrames);
+
+            for iLap = 1:nCompletedLaps
+                % using the time stamp to extract time vector
+                lapMask = timeVec >= lapStart(iLap) & timeVec <= lapEnd(iLap);
+                frameLapID(lapMask) = iLap + lapOffset;
+            end
+
+            %% baseline trials only — zero out non-baseline laps
+            if isfield(response, 'trialIndicesByCondition') && ...
+               isfield(response.trialIndicesByCondition, 'Baseline')
+                baselineLapIdx    = response.trialIndicesByCondition.Baseline;
+                baselineLapIdx    = baselineLapIdx(baselineLapIdx > 0 & ...
+                                                   baselineLapIdx <= nCompletedLaps);
+                baselineGlobal    = baselineLapIdx + lapOffset;
+                allGlobalLapIDs   = (1:nCompletedLaps) + lapOffset;
+                nonBaselineGlobal = setdiff(allGlobalLapIDs, baselineGlobal);
+                for iLap = 1:length(nonBaselineGlobal)
+                    frameLapID(frameLapID == nonBaselineGlobal(iLap)) = 0;
+                end
+                fprintf('  Baseline laps: %d / %d completed\n', ...
+                    length(baselineLapIdx), nCompletedLaps);
+            else
+                warning('  No Baseline condition for %s — using all laps.', thisStimName);
+                baselineLapIdx = 1:nCompletedLaps;
+            end
+
+            lapOffset  = lapOffset + nCompletedLaps;
+            frameLapID = frameLapID(:);
+
+            %% running mask
+            runMask    = wheelSpeed > 1 & frameLapID > 0;
+            nValidLaps = length(unique(frameLapID(frameLapID > 0)));
+            totalLaps  = totalLaps + nValidLaps;
+
+            fprintf('  Running frames: %d | Valid laps: %d\n', sum(runMask), nValidLaps);
+
+            %% accumulate running frames
+            signalAll = [signalAll, fluorRun(:, runMask)];
+            posAll   = [posAll;   mousePos(runMask)];
+            lapIDAll = [lapIDAll; frameLapID(runMask)];
+            speedAll = [speedAll; wheelSpeed(runMask)];   
+        end
+
+        %% guard: no data ---
+        if isempty(signalAll)
+            warning('Unit %s: no data loaded — skipping.', thisSessionName);
+            title(ax, sprintf('%s | %s\nLoad failed', thisSessionName, dayLabel), ...
+                'FontName', 'Arial', 'FontSize', 7);
+            axis(ax, 'off'); continue;
+        end
+
+        %%  guard: too few laps
+        if totalLaps < minLapsRequired
+            warning('Unit %s: only %d laps — skipping.', thisSessionName, totalLaps);
+            title(ax, sprintf('%s | %s\nToo few laps (%d)', ...
+                thisSessionName, dayLabel, totalLaps), ...
+                'FontName', 'Arial', 'FontSize', 7);
+            axis(ax, 'off'); continue;
+        end
+
+        nROIs = size(signalAll, 1);
+        fprintf('Unit total: %d ROIs | %d frames | %d laps\n', ...
+            nROIs, size(signalAll, 2), totalLaps);
+
+        %% cross-validated decoding 
+        validLaps = unique(lapIDAll);
+        oddLaps   = validLaps(1:2:end);
+        evenLaps  = validLaps(2:2:end);
+
+        allDecoded_combined = [];
+        allTrue_combined    = [];
+
+        for iFold = 1:2
+            if iFold == 1
+                trainLaps = oddLaps;  
+                testLaps = evenLaps;
+            else
+                trainLaps = evenLaps;
+                testLaps = oddLaps;
+            end
+
+            trainMask = ismember(lapIDAll, trainLaps);
+            testMask  = ismember(lapIDAll, testLaps);
+
+            if sum(trainMask) == 0 || length(unique(lapIDAll(trainMask))) < 2
+                warning('  Fold %d: not enough training laps — skipping.', iFold);
+                continue;
+            end
+
+            %% build tuning curves
+            tuningCurves = NaN(nROIs, nBins);
+            for iBin = 1:nBins
+                binMask = trainMask & posAll >= binEdges(iBin) & posAll < binEdges(iBin+1);
+                if sum(binMask) < 3, continue; end
+                tuningCurves(:, iBin) = mean(signalAll(:, binMask), 2, 'omitnan');
+            end
+
+%             smooth tuning curves — uncomment to re-enable
+%             for iROI = 1:nROIs
+%                 tc = tuningCurves(iROI, :);
+%                 if all(isnan(tc)), continue; end
+%                 nm = isnan(tc); tc(nm) = 0;
+%                 tc = filtfilt(w, 1, tc);
+%                 tc(nm) = NaN;
+%                 tuningCurves(iROI, :) = tc;
+%             end
+
+            validTuningBins = sum(~all(isnan(tuningCurves), 1));
+            fprintf('  Fold %d: valid tuning curve bins: %d / %d\n', iFold, validTuningBins, nBins);
+            fprintf('  Fold %d: NaN tuning curves (all NaN ROIs): %d / %d\n', iFold, sum(all(isnan(tuningCurves), 2)), nROIs);
+            fprintf('  Fold %d: training frames: %d\n', iFold, sum(trainMask));
+
+      
+            %% occupancy prior — capped to prevent landmark-driven spikes from dominating
+%             occupancy = histcounts(posAll(trainMask), binEdges, 'Normalization', 'probability');
+% 
+%             % cap any bin at no more than 2x the median occupancy
+%             % this prevents landmark-pause spikes from creating an overwhelming prior
+%             medianOcc = median(occupancy(occupancy > 0));
+%             capValue  = 2 * medianOcc;
+%             occupancy = min(occupancy, capValue);
+% 
+%             % smooth lightly after capping
+%             w_occ     = gausswin(5); w_occ = w_occ / sum(w_occ);
+%             occupancy = filtfilt(w_occ, 1, occupancy);
+%             occupancy = max(occupancy, eps);
+%             occupancy = occupancy / sum(occupancy);
+
+
+            %% decode test frames
+            testFrames = find(testMask);
+            allDecoded = NaN(length(testFrames), 1);
+            allTrue    = posAll(testFrames);
+
+            for f = 1:length(testFrames)
+                frameIdx = testFrames(f);
+                popVec   = signalAll(:, frameIdx);
+                if sum(~isnan(popVec)) < 3, continue; end
+
+                logPosterior = NaN(nBins, 1);
+                for xBin = 1:nBins
+                    expected = tuningCurves(:, xBin);
+                    d        = popVec - expected;
+                    valid    = ~isnan(d);
+                    if sum(valid) < 3, continue; end
+                    logPosterior(xBin) = -0.5 * sum(d(valid).^2); %+ log(occupancy(xBin));
+                end
+
+                [~, bestBin]  = max(logPosterior);
+                allDecoded(f) = binCentres(bestBin);
+            end
+
+            allDecoded_combined = [allDecoded_combined; allDecoded];
+            allTrue_combined    = [allTrue_combined;    allTrue];
+
+            fprintf('  Fold %d median error: %.1f cm\n', iFold, ...
+                median(abs(allDecoded - allTrue), 'omitnan'));
+        end
+
+        %%  guard: no decoded output 
+        if isempty(allDecoded_combined)
+            warning('Unit %s: decoding failed.', thisSessionName);
+            title(ax, sprintf('%s | %s\nDecoding failed', thisSessionName, dayLabel), ...
+                'FontName', 'Arial', 'FontSize', 7);
+            axis(ax, 'off'); continue;
+        end
+
+        %% compute error
+        decodeError = abs(allDecoded_combined - allTrue_combined);
+        medErr      = median(decodeError, 'omitnan');
+        meanErr     = mean(decodeError,   'omitnan');
+        fprintf('Combined median error: %.1f cm\n', medErr);
+
+        %%  save results 
+        try
+            % prefer CombinedRuns response if available and not independent
+            combinedStimulusIdx = find(contains(stimNames, 'Corridor') & ...
+                                       contains(stimNames, 'CombinedRuns'), 1);
+            if ~isempty(combinedStimulusIdx) && ~isIndependent
+                saveResponsePath = sessionFileInfo.stimFiles(combinedStimulusIdx).Response;
+                fprintf('  Saving to CombinedRuns response.\n');
+            else
+                fprintf('  Saving to run response file.\n');
+            end
+
+            decodingResults.allDecoded  = allDecoded_combined;
+            decodingResults.allTrue     = allTrue_combined;
+            decodingResults.decodeError = decodeError;
+            decodingResults.medianError = medErr;
+            decodingResults.meanError   = meanErr;
+            decodingResults.nROIs       = nROIs;
+            decodingResults.totalLaps   = totalLaps;
+            decodingResults.signalName  = signalName;
+            decodingResults.session     = thisSessionName;
+            decodingResults.runName     = sess.runName;
+            decodingResults.day         = thisDay;
+
+            save(saveResponsePath, 'decodingResults', '-append');
+            fprintf('  Results saved.\n');
+        catch ME
+            warning('Could not save results for %s: %s', thisSessionName, ME.message);
+        end
+
+        %% build density map 
+        binEdges_plot = 0:binSize_plot:200;
+        nBins_plot    = length(binEdges_plot) - 1;
+        densityMap    = zeros(nBins_plot, nBins_plot);
+
+        for f = 1:length(allTrue_combined)
+            if isnan(allDecoded_combined(f)), continue; end
+            trueBin   = min(nBins_plot, max(1, ceil(allTrue_combined(f)   / binSize_plot)));
+            decodeBin = min(nBins_plot, max(1, ceil(allDecoded_combined(f) / binSize_plot)));
+            densityMap(trueBin, decodeBin) = densityMap(trueBin, decodeBin) + 1;
+        end
+
+        for iBin = 1:nBins_plot
+            rowSum = sum(densityMap(iBin, :));
+            if rowSum > 0
+                densityMap(iBin, :) = densityMap(iBin, :) / rowSum;
+            end
+        end
+
+        chanceLevel              = 1 / nBins_plot;
+        densityMap_chance        = densityMap / chanceLevel;
+        densityMap_chance_smooth = imgaussfilt(densityMap_chance, 2);
+
+        %% debug 
+%         fprintf('densityMap size: %d x %d\n', size(densityMap));
+%         fprintf('allTrue range: %.1f to %.1f\n', min(allTrue_combined), max(allTrue_combined));
+%         fprintf('allDecoded range: %.1f to %.1f\n', min(allDecoded_combined,'omitnan'), max(allDecoded_combined,[],'omitnan'));
+
+        %% plot into subplot
+        if ~isvalid(figHandle) || ~isvalid(ax)
+            warning('Invalid figure/axes for %s — skipping plot.', thisSessionName);
+            continue;
+        end
+
+        set(figHandle, 'CurrentAxes', ax);
+        imagesc(ax, binEdges_plot(1:end-1), binEdges_plot(1:end-1), ...
+            log2(densityMap_chance'));
+        colormap(ax, redWhiteBlue(-2, 2, 256));
+        set(ax, 'CLim', [-2, 2]);
+
+        cb = colorbar(ax);
+        cb.Ticks         = [-2, -1, 0, 1, 2];
+        cb.TickLabels    = {'-2', '-1', '0', '+1', '+2'};
+        cb.Label.String  = 'log_{2}(Prob. density / chance)';
+        cb.TickDirection = 'out';
+        cb.Box           = 'off';
+        cb.FontName      = 'Arial';
+        cb.FontSize      = 7;
+
+        hold(ax, 'on');
+        plot(ax, [0 200], [0 200], 'k-', 'LineWidth', 1);
+        for xL = [40 80 120 160]
+            xline(ax, xL, 'k--', 'LineWidth', 0.8);
+            yline(ax, xL, 'k--', 'LineWidth', 0.8);
+        end
+
+        xlabel(ax, 'True (cm)',    'FontName', 'Arial', 'FontSize', 7);
+        ylabel(ax, 'Decoded (cm)', 'FontName', 'Arial', 'FontSize', 7);
+        set(ax, 'XTick', [40 80 120 160], 'YTick', [40 80 120 160], ...
+            'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 6);
+        if isIndependent
+            titleStr = sprintf('%s\n%s | %s | n=%d ROIs | %d laps | err=%.1fcm', ...
+                sess.runName, dayLabel, char(thisArea), nROIs, totalLaps, medErr);
+        else
+            titleStr = sprintf('%s | %s | %s\nn=%d ROIs | %d laps | err=%.1fcm', ...
+                thisSessionName, dayLabel, char(thisArea), nROIs, totalLaps, medErr);
+        end
+        title(ax, titleStr, 'FontName', 'Arial', 'FontSize', 6, 'FontWeight', 'normal');
+        axis(ax, 'square');
+    end
+
+    %% hide unused subplot slots 
+    for iEmpty = (length(decodeSessions)+1):(nRows*nCols)
+        axEmpty = subplot(nRows, nCols, iEmpty, 'Parent', figHandle);
+        axis(axEmpty, 'off');
+    end
+
+    %% save page to PDF 
+    if isvalid(figHandle)
+        exportgraphics(figHandle, pdfPath, 'Append', true, 'Resolution', 150);
+        close(figHandle);
+        fprintf('\nPage for mouse %s saved to PDF.\n', thisMouse);
+    end
+end
+
+fprintf('\nAll done. PDF saved to:\n%s\n', pdfPath);
