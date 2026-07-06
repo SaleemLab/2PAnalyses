@@ -1,5 +1,14 @@
 function plotSpeedTuning_TemporNasalSpeedInc(sessionFileInfo, response, doSmooth)
 % plotSpeedTuning: Custom order, negative connectivity, Red +64, and shared raster colorbar.
+%
+% PATCHED: alignedResponses is RAW (not baseline-subtracted) upstream.
+% This version now baseline-subtracts each trial (using baseWin, defined
+% below) before using it for EITHER the PSTH panel or the rasters, and
+% derives the raster color scale (globalCLim) from that baseline-
+% subtracted data -- not from raw absolute fluorescence pooled across
+% baseline+response+all-speeds, which was swamping the color scale with
+% baseline-offset variability rather than actual response magnitude.
+
 if nargin < 3; doSmooth = true; end
 
 %% --- Setup Directory and PDF Path ---
@@ -32,7 +41,9 @@ for i = 1:length(targetOrder)
 end
 
 nSpeeds = length(finalLabels);
+baseWin = [-0.5 0];   % pre-stim baseline window, consistent with the DirTuning analysis
 respWin = [0.5 5]; 
+baseIdx = timeVec >= baseWin(1) & timeVec <= baseWin(2);
 respIdx = timeVec >= respWin(1) & timeVec <= respWin(2);
 tWin = 5; 
 
@@ -43,14 +54,23 @@ for iROI = 1:nROI
     clf(hFig);
     means = zeros(nSpeeds, 1);
     sems  = zeros(nSpeeds, 1);
-    
+
+    % Pre-compute baseline-subtracted trials for every speed ONCE per ROI
+    % (used by both Panel A/B and Panel C, and by the shared CLim calc)
+    subTrialsPerSpeed = cell(nSpeeds, 1);
+    for s = 1:nSpeeds
+        trials = squeeze(sortedPsthData(s).alignedResponses(iROI, :, :)); % [nTimepoints x nTrials]
+        perTrialBaseline = mean(trials(baseIdx, :), 1, 'omitnan');        % [1 x nTrials]
+        subTrialsPerSpeed{s} = trials - perTrialBaseline;                 % baseline-subtracted, same shape
+    end
+
     % --- Panel A: PSTH ---
     subplot(2, 2, 1); hold on;
     cmap = parula(nSpeeds);
     pHandles = gobjects(nSpeeds, 1);
     
     for s = 1:nSpeeds
-        trials = squeeze(sortedPsthData(s).alignedResponses(iROI, :, :)); 
+        trials = subTrialsPerSpeed{s}; % now baseline-subtracted
         mTrace = mean(trials, 2, 'omitnan');
         sTrace = std(trials, 0, 2, 'omitnan') ./ sqrt(size(trials, 2));
         if doSmooth, mTrace = smoothdata(mTrace, 'gaussian', tWin); end
@@ -66,7 +86,7 @@ for iROI = 1:nROI
             lCol, 'FaceAlpha', 0.1, 'EdgeColor', 'none', 'HandleVisibility', 'off');
         pHandles(s) = plot(timeVec, mTrace, 'Color', lCol, 'LineWidth', 1.5);
     end
-    xline(0, 'k--', 'LineWidth', 1); ylabel('\DeltaF/F'); xlabel('Time (s)');
+    xline(0, 'k--', 'LineWidth', 1); ylabel('\DeltaF/F (baseline-subtracted)'); xlabel('Time (s)');
     lgd = legend(pHandles, finalLabels, 'Location', 'bestoutside');
     title(lgd, 'Speeds'); title('PSTH');
 
@@ -91,7 +111,7 @@ for iROI = 1:nROI
     end
     
     set(gca, 'XTick', xPts, 'XTickLabel', finalLabels);
-    ylabel('Avg \DeltaF/F'); title('Speed Tuning Curve');
+    ylabel('Avg \DeltaF/F (baseline-subtracted)'); title('Speed Tuning Curve');
     xlabel('Visual Speeds (deg/s)');
 
     % --- Panel C: Trial Rasters ---
@@ -100,11 +120,13 @@ for iROI = 1:nROI
     rasterHeight = 0.25;
     bottomY = 0.1;
 
-    % Calculate Global Color Limits for visual consistency across the row
+    % Global color limits, now computed from BASELINE-SUBTRACTED data
+    % (previously this was raw absolute fluorescence pooled across
+    % baseline+response+all-speeds, which swamped the scale with
+    % baseline-offset variability rather than actual response magnitude).
     allDataAcrossSpeeds = [];
     for s = 1:nSpeeds
-        tempData = squeeze(sortedPsthData(s).alignedResponses(iROI, :, :));
-        allDataAcrossSpeeds = [allDataAcrossSpeeds; tempData(:)];
+        allDataAcrossSpeeds = [allDataAcrossSpeeds; subTrialsPerSpeed{s}(:)];
     end
     globalCLim = [quantile(allDataAcrossSpeeds, 0.05), quantile(allDataAcrossSpeeds, 0.98) + 1e-6];
 
@@ -112,13 +134,12 @@ for iROI = 1:nROI
         axPos = [startX + (s-1)*widthPerRaster, bottomY, widthPerRaster*0.85, rasterHeight];
         axR = axes('Position', axPos);
         
-        currData = squeeze(sortedPsthData(s).alignedResponses(iROI, :, :))'; 
+        currData = subTrialsPerSpeed{s}'; % [nTrials x nTimepoints], baseline-subtracted
         
         if ~isempty(currData)
             imagesc(timeVec, 1:size(currData,1), currData);
-            colormap(axR, parula); hold on; xline(0, 'w:', 'LineWidth', 1.2);
+            colormap(axR, redblue_local()); hold on; xline(0, 'k:', 'LineWidth', 1.2);
             
-            % Apply shared color scale [cite: 48-55, 140-147]
             if globalCLim(1) < globalCLim(2)
                 set(axR, 'CLim', globalCLim); 
             end
@@ -134,7 +155,7 @@ for iROI = 1:nROI
         if s == nSpeeds
             cbPos = [startX + s*widthPerRaster, bottomY, 0.012, rasterHeight];
             cb = colorbar(axR, 'Position', cbPos);
-            ylabel(cb, '\DeltaF/F', 'FontSize', 7);
+            ylabel(cb, '\DeltaF/F (baseline-subtracted)', 'FontSize', 7);
         end
     end
     
@@ -144,4 +165,14 @@ for iROI = 1:nROI
 end
 close(hFig);
 fprintf('Finished processing %d ROIs. PDF: %s\n', nROI, pdfPath);
+end
+
+function cmap = redblue_local()
+% Simple diverging blue-white-red colormap, since MATLAB has no built-in
+% 'redblue'. Blue = below baseline, white = at baseline, red = above.
+n = 128;
+r = [linspace(0, 1, n), ones(1, n)];
+g = [linspace(0, 1, n), linspace(1, 0, n)];
+b = [ones(1, n), linspace(1, 0, n)];
+cmap = [r(:), g(:), b(:)];
 end

@@ -7,7 +7,7 @@ if nargin < 3; doSmooth = true; end
 saveFolder = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
 if ~exist(saveFolder, 'dir'), mkdir(saveFolder); end
 pdfPath = fullfile(saveFolder, [sessionFileInfo.animal_name, '_' ...
-    sessionFileInfo.session_name '_SpeedTuning.pdf']);
+    sessionFileInfo.session_name '_SpeedTuning_withtrials.pdf']);
 
 if exist(pdfPath, 'file'), delete(pdfPath); end 
 

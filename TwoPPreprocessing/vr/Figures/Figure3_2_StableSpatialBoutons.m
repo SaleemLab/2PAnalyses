@@ -59,7 +59,7 @@ hold on;
 bin_width = 0.02; 
 bin_edges = -0.8:bin_width:1.0; 
 
-% 1. Shuffled Baseline Profile Line
+% Shuffled Baseline Profile Line
 h_null = histogram(pooled_null_EV, 'BinEdges', bin_edges, ...
     'Normalization', 'probability', 'DisplayStyle', 'stairs', ...
     'EdgeColor', [0.55, 0.55, 0.55], 'LineWidth', 1.5);

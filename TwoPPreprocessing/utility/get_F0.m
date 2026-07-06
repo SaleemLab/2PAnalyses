@@ -36,7 +36,7 @@ Fc_q = ordfilt2(signal, rank_idx, domain, 'symmetric');
 % if using plane_rate at 7.5 * 60 = 450 would be ok; 
 % Since we're running this function on 60hz data I have changed this line of
 % code to smooth slightly otherwise the baseline looked like a flat line @Aman 
-smoothWin = round(5 * plane_rate); %60*5=300
+smoothWin = round(0.5 * plane_rate); %60*5=300
 F0 = smoothdata(Fc_q, 1, 'gaussian', smoothWin);
 
 end

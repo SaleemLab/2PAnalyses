@@ -1,11 +1,17 @@
 %% temp test
 function [response, sessionFileInfo] = get2PFramesByTrial(sessionFileInfo, stimName, excludeBadFrames, preStimTime, postStimTime)
-%% Handle Input Defaults and Stimulus Overrides
+%% Handle Input Defaults
 if nargin < 3, excludeBadFrames = true; end % Default to true to clean data
 if nargin < 4, preStimTime = 2; end
 if nargin < 5, postStimTime = 4; end
 
-% (Your existing stimulus overrides logic here...)
+%% Load Data (moved up so DirTuning duration detection below can use bonsaiData)
+isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
+iStim = find(isStim, 1);
+processedData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
+load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
+
+%% Stimulus Overrides
 if contains(stimName, 'RFMapping', 'IgnoreCase',true)
     postStimTime = 4; preStimTime = 2; 
 end
@@ -18,18 +24,32 @@ if contains(stimName, 'DotMotion_RFMapping')
     postStimTime = 6; preStimTime = 2;
 end 
 
-if contains(stimName, 'DotMotion_SpeedTuning')
-    postStimTime = 4; preStimTime = 2;
+if (contains(stimName, 'DirTuning') || contains(stimName, 'DotMotion_SpeedTuning')) ...
+        && ~contains(stimName, 'DotMotion_SpeedTuning_Contrast') && ~contains(stimName, 'DotMotion_RFMapping') 
+    % Two known timing variants exist: 2s-on/2s-off (postStimTime=4) and
+    % 1s-on/2s-off (postStimTime=3). Detect which one this session used
+    % from the actual stim on/off times rather than assuming.
+    % NOTE: explicitly excludes DotMotion_SpeedTuning_Contrast, since
+    % 'DotMotion_SpeedTuning' is a substring of that name and would
+    % otherwise match here too and overwrite its postStimTime=6 override
+    % above.
+    preStimTime = 2;
+    if isfield(bonsaiData, 'onARDTimes') && isfield(bonsaiData, 'offARDTimes')
+        stimDuration = median(bonsaiData.offARDTimes(:) - bonsaiData.onARDTimes(:), 'omitnan');
+        if abs(stimDuration - 1) < abs(stimDuration - 2)
+            postStimTime = 3; % 1s-on/2s-off
+        else
+            postStimTime = 4; % 2s-on/2s-off
+        end
+        fprintf('  %s: detected stim duration %.2fs -> preStim=%.1f, postStim=%.1f\n', ...
+            stimName, stimDuration, preStimTime, postStimTime);
+    else
+        warning(['  %s: onARDTimes/offARDTimes not found in bonsaiData -- ' ...
+            'cannot detect stim duration, falling back to postStimTime=4. ' ...
+            'Verify this is correct.'], stimName);
+        postStimTime = 4;
+    end
 end 
-
-if contains(stimName, 'DirTuning')
-    postStimTime = 4; preStimTime = 2;
-end 
-%% Load Data
-isStim = strcmp(stimName, {sessionFileInfo.stimFiles.name});
-iStim = find(isStim, 1);
-processedData = load(sessionFileInfo.stimFiles(iStim).processedMergedBonsaiSuite2pData);
-load(sessionFileInfo.stimFiles(iStim).BonsaiData, 'bonsaiData');
 
 % Set output path
 stimFileName = sprintf('%s_%s_Response_%s.mat', ...
@@ -81,7 +101,6 @@ for iTrial = 1:nTrials
     % Store the mask for later indexing
     response.responseFrameIdx{iTrial} = timeWindowMask;
 
-    % --- THE ALIGNMENT FIX ---
     % Calculate exact relative times for the frames we found
     relTimes = frameTimes(timeWindowMask) - combinedStimARDTimes(iTrial);
 
@@ -100,5 +119,3 @@ response.postStimTime = postStimTime;
 save(sessionFileInfo.stimFiles(iStim).Response, 'response');
 fprintf('Done. %d trials flagged. Alignment grid set to 60Hz.\n', sum(response.badTrialMask));
 end
-
-

@@ -20,7 +20,11 @@ crossValVarName = 'crossValExpVar';
 % names in sessionROIData the first time it's loaded so you can
 % identify the correct name.
 signalName = 'dFFNeuropilCorrected';
+
 % this will always be neu for the boutons but just to be safe 
+
+%% sessions to load 
+
 pairs=struct;
 pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
 pairs.M25133 = {'20260219','20260223','20260221'};
@@ -33,8 +37,8 @@ allRFMapping        = [];   % concatenated RFMapping struct array across ALL bou
 RFMappingMetadata    = [];  % metadata from the first session that has it — used as the shared reference
 sessionLabels        = {};  % track which mouse/session each bouton chunk came from (for debugging/QC)
 allMedianCrossValR2  = [];  % cross-validated explained variance from the other stimulus, per bouton
-allMeanCrossValR2    = [];  % FIX: Initialized missing array for mean cross-val R2
-allShuffPVal         = [];  % FIX: Initialized missing array for shuffled p-values
+allMeanCrossValR2    = [];  % 
+allShuffPVal         = [];  % 
 haveWarnedMissingVar  = false; % only print the "available variables" note once
 %% loop over mice
 for iMouse = 1:length(uniqueMice)
@@ -265,7 +269,7 @@ for iROI = 1:numBoutons
     [prefVal, mI] = max(meanGridResponse(:));
     
     % critera 
-    isResponsive = (pValANOVA < 0.05)   && (prefVal > (blankMean + 1.5 * blankStd));
+    isResponsive = (pValANOVA < 0.05)   && (prefVal > (blankMean + 2 * blankStd));
     
     % update update
     allRFMapping(iROI).pValANOVA    = pValANOVA;
@@ -338,7 +342,7 @@ plotAllRFResponsiveBoutons
 respIdxList   = find([allRFMapping.isResponsive]);
 unrespIdxList = find(~[allRFMapping.isResponsive]);
 %% manually chosen (picked by eye from plotAllResponsiveBoutons)
-responsiveBoutons = [2330, 3182, 3565];   %  3189, 
+responsiveBoutons = [2330,3850, 3189];   %  3189, 
 unresponsiveBoutons  = [2637, 69];           % 
 
 exampleSet    = [responsiveBoutons, unresponsiveBoutons];
@@ -372,6 +376,12 @@ for i = 1:nEx
         'FontName', 'Arial', 'FontSize', 10, 'FontWeight', 'bold');
 end
 
+% save
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\eg_rfs';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+set(figA, 'Visible', 'off');
+saveFigureFormats(figA, fullfile(outputDir, 'responsive_unresponsive_examplegrid_linesuperimposed'));
+
 %%  PANEL B 
 % Bar chart(s): % responsive vs unresponsive boutons (using selectionMethod)
 
@@ -386,110 +396,247 @@ ylabel('% of boutons', 'FontName', 'Arial', 'FontSize', 9);
 ylim([0 100]);
 title(sprintf('n = %d boutons (%s)', numel(allRFMapping), selectionMethod), ...
     'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'normal');
+defaultAxesProperties(gca,true);
 
+
+% save
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\overall_rep_unresp_hist';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+set(figB, 'Visible', 'off');
+saveFigureFormats(figB, fullfile(outputDir, 'responsive_unresponsive_overall_percent'));
+
+%% Panel B2: % responsive per animal (bar = mean across sessions, dots = individual sessions)
+
+boutonMouseID = cellfun(@(s) extractBefore(s, '_'), sessionLabels, 'UniformOutput', false);
+nTotalResp = numel(candidateRespIdxList);
+
+respMouseID       = boutonMouseID(candidateRespIdxList);
+respSessionLabels = sessionLabels(candidateRespIdxList);
+
+uniqueMiceInData = unique(boutonMouseID, 'stable');
+nMiceInData = numel(uniqueMiceInData);
+
+pctRespByMouse = nan(nMiceInData, 1);
+
+figComp = figure('Color', 'w', 'Position', [50 50 500 400], 'Name', 'Composition of responsive pool');
+hold on;
+
+fprintf('\nComposition of %d responsive boutons:\n', nTotalResp);
+for m = 1:nMiceInData
+    pctRespByMouse(m) = 100 * sum(strcmp(respMouseID, uniqueMiceInData{m})) / nTotalResp;
+    bar(m, pctRespByMouse(m), 'FaceColor', [0.4 0.4 0.4], 'FaceAlpha', 0.7, 'EdgeColor', 'none');
+
+    sessionsForMouse = unique(respSessionLabels(strcmp(respMouseID, uniqueMiceInData{m})), 'stable');
+    nSessThisMouse = numel(sessionsForMouse);
+    pctPerSession = nan(nSessThisMouse, 1);
+    for s = 1:nSessThisMouse
+        pctPerSession(s) = 100 * sum(strcmp(respSessionLabels, sessionsForMouse{s})) / nTotalResp;
+    end
+
+    % fixed, deterministic horizontal spread (no randomness) -- if only
+    % one session, it sits exactly on the bar's x position
+    if nSessThisMouse > 1
+        xOffsets = linspace(-0.25, 0.25, nSessThisMouse);
+    else
+        xOffsets = 0;
+    end
+    xFixed = m + xOffsets;
+
+    scatter(xFixed, pctPerSession, 30, [0.8 0.1 0.1], 'filled', 'MarkerFaceAlpha', 0.7);
+
+    fprintf('  %s: %.1f%% of pool total, from %d session(s): %s\n', ...
+        uniqueMiceInData{m}, pctRespByMouse(m), nSessThisMouse, ...
+        strjoin(arrayfun(@(x) sprintf('%.1f%%',x), pctPerSession, 'UniformOutput', false), ', '));
+end
+
+set(gca, 'XTick', 1:nMiceInData, 'XTickLabel', uniqueMiceInData, 'Box', 'off', 'TickDir', 'out', ...
+    'FontName', 'Arial', 'FontSize', 9);
+ylabel('% of responsive pool', 'FontName', 'Arial', 'FontSize', 9);
+ytickformat(gca, '%g%%');
+xlim([0.5, nMiceInData+0.5]);
+title(sprintf('n = %d responsive boutons -- bars = per mouse, dots = per session', nTotalResp), ...
+    'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'normal');
+defaultAxesProperties(gca, true);
+
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\responsive_percent_per_animal';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+set(figComp, 'Visible', 'off');
+saveFigureFormats(figComp, fullfile(outputDir, 'responsive_percent_per_animal_with_sessions'));
 
 %%  PANEL C 
-% Side-by-side histograms of preferred Az / El, plus Az-vs-El scatter
-% Extract preferred coordinates for responsive boutons only
-isResp = [allRFMapping.isResponsive];
-responsiveBoutons = allRFMapping(isResp);
+figC = figure('Position', [100, 100, 850, 280]);
 
-prefAz = [responsiveBoutons.centerAz];
-prefEl = [responsiveBoutons.centerEl];
-
-% Filter out any leftover NaNs just to be clean
-validCoords = ~isnan(prefAz) & ~isnan(prefEl);
-prefAz = prefAz(validCoords);
-prefEl = prefEl(validCoords);
-
-
-%% 
-figure('Position', [100, 100, 850, 280]);
 % az histogram
-subplot(1,3,1);
+axC1 = subplot(1,3,1);
 if length(uAz) > 1
     azStep = mean(diff(uAz));
     azEdges = (min(uAz) - azStep/2) : azStep : (max(uAz) + azStep/2);
-    histogram(prefAz, azEdges, 'Normalization', 'probability', 'FaceColor', [0.3 0.5 0.8]);
 else
-    histogram(prefAz, 'Normalization', 'probability', 'FaceColor', [0.3 0.5 0.8]);
+    azEdges = uAz;
 end
+azCounts  = histcounts(prefAz, azEdges);
+azPct     = 100 * azCounts / numel(prefAz);
+azCenters = azEdges(1:end-1) + diff(azEdges)/2;
+bar(azCenters, azPct, 1, 'FaceColor', [0.3 0.5 0.8]);
 xlabel('Preferred Azimuth (\circ)', 'FontName', 'Arial', 'FontSize', 9);
 ylabel('% of boutons', 'FontName', 'Arial', 'FontSize', 9);
-set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
+set(axC1, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8, 'XTick', sort(uAz));
+drawnow;
+defaultAxesProperties(axC1, true);
+
 % el histogram
-subplot(1,3,2);
+axC2 = subplot(1,3,2);
 if length(uEl_plot) > 1
-    elStep = abs(mean(diff(uEl_plot))); % use abs in case it's descending
+    elStep = abs(mean(diff(uEl_plot)));
     elEdges = (min(uEl_plot) - elStep/2) : elStep : (max(uEl_plot) + elStep/2);
-    histogram(prefEl, elEdges, 'Normalization', 'probability', 'FaceColor', [0.8 0.4 0.3]);
 else
-    histogram(prefEl, 'Normalization', 'probability', 'FaceColor', [0.8 0.4 0.3]);
+    elEdges = uEl_plot;
 end
+elCounts  = histcounts(prefEl, elEdges);
+elPct     = 100 * elCounts / numel(prefEl);
+elCenters = elEdges(1:end-1) + diff(elEdges)/2;
+bar(elCenters, elPct, 1, 'FaceColor', [0.8 0.4 0.3]);
 xlabel('Preferred Elevation (\circ)', 'FontName', 'Arial', 'FontSize', 9);
 ylabel('% of boutons', 'FontName', 'Arial', 'FontSize', 9);
-set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-% 2d scatter
-% subplot(1,3,3);
-% [uniqueCoords, ~, idx] = unique([prefAz(:), prefEl(:)], 'rows');
-% counts = accumarray(idx, 1);
-% bubbleSizes = counts * 25; 
-% scatter(uniqueCoords(:,1), uniqueCoords(:,2), bubbleSizes, [0.2 0.2 0.2], 'filled', 'MarkerFaceAlpha', 0.5);
-% xlabel('Preferred Azimuth (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-% ylabel('Preferred Elevation (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-% set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-% xlim([min(uAz)-10, max(uAz)+10]);
-% ylim([min(uEl_plot)-10, max(uEl_plot)+10]);
-% axis square;
+set(axC2, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8, 'XTick', sort(uEl_plot));
+drawnow;
+defaultAxesProperties(axC2, true);
 
-
-subplot(1,3,3);
+% bubble scatter
+axC3 = subplot(1,3,3);
 [uniqueCoords, ~, idx] = unique([prefAz(:), prefEl(:)], 'rows');
 counts = accumarray(idx, 1);
-bubbleSizes = counts * 25;
+bubbleSizes = counts * 80;
 scatter(uniqueCoords(:,1), uniqueCoords(:,2), bubbleSizes, [0.2 0.2 0.2], 'filled', 'MarkerFaceAlpha', 0.5);
 xlabel('Preferred Azimuth (\circ)', 'FontName', 'Arial', 'FontSize', 9);
 ylabel('Preferred Elevation (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-xlim([min(uAz)-10, max(uAz)+10]);
-ylim([min(uEl_plot)-10, max(uEl_plot)+10]);
-axis square;
-
-% write the count directly on each bubble instead of a separate legend --
-% avoids wasting figure space and guarantees the number always matches
-% that exact bubble's size, unlike a legend with a few sampled sizes.
-hold on;
+set(axC3, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
+xlim(axC3, [min(uAz)-10, max(uAz)+10]);
+ylim(axC3, [min(uEl_plot)-10, max(uEl_plot)+10]);
+set(axC3, 'XTick', sort(uAz), 'YTick', sort(uEl_plot));
+hold(axC3, 'on');
 for i = 1:size(uniqueCoords,1)
     text(uniqueCoords(i,1), uniqueCoords(i,2), sprintf('%d', counts(i)), ...
         'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
-        'FontSize', 7, 'Color', 'w', 'FontWeight', 'bold');
+        'FontSize', 12, 'Color', 'w', 'FontWeight', 'bold');
+end
+axis(axC3, 'square');
+drawnow;
+defaultAxesProperties(axC3, true);
+
+
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\pref_az_el';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+set(figC, 'Visible', 'off');
+saveFigureFormats(figC, fullfile(outputDir, 'responsive_pref_az_el'));
+
+
+%% Test: is there any within session differences of preferred Az/El positions
+uniqueSessResp = unique(respSessionLabels, 'stable');  % from your composition code
+nSessResp = numel(uniqueSessResp);
+nPossiblePositions = numel(uAz) * numel(uEl_plot);
+
+sessionDiversity = table('Size', [nSessResp, 4], ...
+    'VariableTypes', {'string', 'double', 'double', 'double'}, ...
+    'VariableNames', {'Session', 'nBoutons', 'nUniquePositions', 'pctPositionsCovered'});
+
+for s = 1:nSessResp
+    sessMask = strcmp(respSessionLabels, uniqueSessResp{s});
+    sessAz = prefAz(sessMask);
+    sessEl = prefEl(sessMask);
+    uniquePos = unique([sessAz(:), sessEl(:)], 'rows');
+
+    sessionDiversity.Session(s) = uniqueSessResp{s};
+    sessionDiversity.nBoutons(s) = sum(sessMask);
+    sessionDiversity.nUniquePositions(s) = size(uniquePos, 1);
+    sessionDiversity.pctPositionsCovered(s) = 100 * size(uniquePos,1) / nPossiblePositions;
 end
 
+disp(sessionDiversity);
 
-%%  Panel E-ish: cross-val R2 relationship 
-% Quick check: is RF-mapping responsiveness related to how well-explained a
+% one bubble plot per session (small multiples)
+nCols = 4;
+nRows = ceil(nSessResp / nCols);
+figDiv = figure('Color', 'w', 'Position', [50 50 nCols*250 nRows*250], ...
+    'Name', 'Preferred position diversity by session');
+
+for s = 1:nSessResp
+    sessMask = strcmp(respSessionLabels, uniqueSessResp{s});
+    sessAz = prefAz(sessMask);
+    sessEl = prefEl(sessMask);
+    [uniquePos, ~, idx] = unique([sessAz(:), sessEl(:)], 'rows');
+    counts = accumarray(idx, 1);
+
+    axS = subplot(nRows, nCols, s);
+    scatter(uniquePos(:,1), uniquePos(:,2), counts*60, [0.2 0.2 0.2], 'filled', 'MarkerFaceAlpha', 0.6);
+    xlim([min(uAz)-10, max(uAz)+10]);
+    ylim([min(uEl_plot)-10, max(uEl_plot)+10]);
+    set(axS, 'XTick', sort(uAz), 'YTick', sort(uEl_plot), 'FontSize', 6, ...
+        'Box', 'off', 'TickDir', 'out');
+    axis(axS, 'square');
+    title(sprintf('%s\nn=%d, %d/%d pos', uniqueSessResp{s}, sum(sessMask), ...
+        size(uniquePos,1), nPossiblePositions), 'FontSize', 7, 'FontWeight', 'normal');
+end
+
+% inspectClusteredBoutons
+% inspectSessionDiversity
+%%  Panel E-ish: cross-val R2 relationship
+% is RF-mapping responsiveness related to how well-explained a
 % bouton is by the OTHER (e.g. moving-dot) stimulus's cross-validated model?
 if any(~isnan(allMedianCrossValR2))
     figE = figure('Color', 'w', 'Position', [50 50 500 400], 'Name', 'Cross-val R2 vs RF responsiveness');
-    hold on;
-    % use shared, explicit bin edges so both groups are directly comparable
-    edgesShared = linspace(-0.6, 1, 40);  % adjust range/count to your data
+    axC3 = axes(figE);
+    hold(axC3, 'on');
+    edgesShared = linspace(-0.8, 1, 40);
+    histogram(axC3, allMedianCrossValR2(candidateRespIdxList), edgesShared, 'Normalization', 'probability', ...
+        'DisplayStyle', 'stairs', 'EdgeColor', [0.1 0.5 0.1], 'LineWidth', 2, ...
+        'DisplayName', 'RF-responsive');
+    histogram(axC3, allMedianCrossValR2(candidateUnrespIdxList), edgesShared, 'Normalization', 'probability', ...
+        'DisplayStyle', 'stairs', 'EdgeColor', [0.6 0.2 0.2], 'LineWidth', 2, ...
+        'DisplayName', 'RF-non-responsive');
+    xline(axC3, 0.1, ':', 'Color', [0.3 0.3 0.3], 'LineWidth', 1.2, ...
+        'Label', '0.1', 'LabelHorizontalAlignment', 'left', 'FontSize', 8);
 
-    histogram(allMedianCrossValR2(candidateRespIdxList), edgesShared, 'Normalization', 'probability', ...
-    'FaceColor', [0.2 0.6 0.2], 'FaceAlpha', 0.6, 'DisplayName', 'RF-responsive');
-    histogram(allMedianCrossValR2(candidateUnrespIdxList), edgesShared, 'Normalization', 'probability', ...
-    'FaceColor', [0.6 0.2 0.2], 'FaceAlpha', 0.6, 'DisplayName', 'RF-non-responsive');
-    xlabel('Cross-validated R^2 (other stimulus)', 'FontName', 'Arial', 'FontSize', 9);
-    ylabel('Proportion of boutons', 'FontName', 'Arial', 'FontSize', 9);
-    legend('Location', 'best');
-    set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-    title('Do RF-responsive boutons also have better cross-val tuning elsewhere?', ...
+    % --- combined criterion: EV > 0.1 AND significant vs shuffle ---
+    % computed for BOTH groups, so you can see how many RF-non-responsive
+    % boutons still pass the other stimulus's criteria (i.e. "responding
+    % there but not here")
+    sigThresh = 0.01;  % matches the 99th-percentile shuffle threshold used elsewhere
+
+    passing_resp = (allMedianCrossValR2(candidateRespIdxList) > 0.1) & (allShuffPVal(candidateRespIdxList) < sigThresh);
+    pct_passing_resp = 100 * sum(passing_resp) / numel(passing_resp);
+
+    passing_unresp = (allMedianCrossValR2(candidateUnrespIdxList) > 0.1) & (allShuffPVal(candidateUnrespIdxList) < sigThresh);
+    pct_passing_unresp = 100 * sum(passing_unresp) / numel(passing_unresp);
+
+    fprintf('\nBoutons meeting BOTH criteria (EV>0.1 AND p<%.2f vs shuffle):\n', sigThresh);
+    fprintf('  RF-responsive:     %.1f%% (%d/%d)\n', pct_passing_resp, sum(passing_resp), numel(passing_resp));
+    fprintf('  RF-non-responsive: %.1f%% (%d/%d)\n', pct_passing_unresp, sum(passing_unresp), numel(passing_unresp));
+
+    % --- annotations on the figure, color-matched to each group ---
+    yl = ylim(axC3);
+    text(axC3, 0.12, yl(2)*0.90, sprintf('Passing both: %.1f%%', pct_passing_resp), ...
+        'Color', [0.1 0.5 0.1], 'FontSize', 9, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+    text(axC3, 0.12, yl(2)*0.82, sprintf('Passing both: %.1f%%', pct_passing_unresp), ...
+        'Color', [0.6 0.2 0.2], 'FontSize', 9, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+
+    xlabel(axC3, 'Cross-validated R^2 (other stimulus)', 'FontName', 'Arial', 'FontSize', 9);
+    ylabel(axC3, 'Proportion of boutons', 'FontName', 'Arial', 'FontSize', 9);
+    legend(axC3, 'Location', 'best');
+    set(axC3, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
+    title(axC3, 'Do RF-responsive boutons also have better cross-val tuning elsewhere?', ...
         'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'normal');
+    drawnow;
+    defaultAxesProperties(axC3, true);
 else
     fprintf('\nallCrossValR2 is all-NaN -- check crossValVarName at the top of this script.\n');
-
 end
 
+
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\spatialTuning_EVComparions';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+set(figC, 'Visible', 'off');
+saveFigureFormats(figC, fullfile(outputDir, 'spatialEComparions'));
 
 %% gaussian fit (allen sdk)
 % % Fit on all boutons that pass ANOVA alone (923 in your last run), independent
