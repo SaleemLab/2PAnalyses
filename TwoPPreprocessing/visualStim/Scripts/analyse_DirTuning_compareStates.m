@@ -1,4 +1,5 @@
-% DirTuning_Pooled_BehaviorSplit.m
+% DirTuning_Pooled_BehaviorSplit.m 
+% TODO: (compare 
 %
 % Pools DirTuning boutons across MULTIPLE mice/sessions, splitting trials
 % into RUNNING vs STATIONARY using the same wheel-speed classification

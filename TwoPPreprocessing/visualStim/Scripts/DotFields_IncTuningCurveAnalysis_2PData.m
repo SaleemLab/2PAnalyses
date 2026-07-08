@@ -27,7 +27,7 @@
 
 mouseList = {'M25132', 'M25133', 'M26003'};  % 
 
-stimWindowMask_range = [0 2.5];  % window for extracting per-trial calcium response (matches original script)
+stimWindowMask_range = [0.5 2];  % window for extracting per-trial calcium response (matches original script)
 stimFramesMask_range = [0 2.0];  % window for wheel-speed behavior evaluation (matches original script; unused here since no state split, kept for reference)
 
 ALPHA = 0.05;
@@ -172,7 +172,7 @@ fprintf('\nDone pooling. %d boutons total across %d mice.\n', nBoutonsTotal, num
 % trials' mean + NSD*SD (not a pre-stim baseline period as done for the direction tuning stimulus).
 
 alpha = 0.05;
-numSD = 2;
+numSD = 1;
 
 anovaP_thresh    = nan(nBoutonsTotal, 1);
 blankMean        = nan(nBoutonsTotal, 1);

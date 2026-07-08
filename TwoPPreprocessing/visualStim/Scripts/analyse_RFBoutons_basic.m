@@ -18,9 +18,18 @@ signalName = 'dFFNeuropilCorrected';
 %% sessions to load 
 
 pairs=struct;
-pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
-pairs.M25133 = {'20260219','20260223','20260221'};
-pairs.M26003 = {'20260316','20260322','20260324','20260325'};
+% fov sweep sessions: 16 grids (including blanks) 
+pairs.M25132 = {...
+                '20260214A','20260214B','20260214C','20260214D', ...
+                '20260216A','20260216B','20260216C', ...
+                '20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
+pairs.M25133 = {'20260216A','20260216B','20260216C','20260216D', ...
+                 '20260219','20260223','20260221'};
+pairs.M26003 = {'20260307A','20260307B', ...
+                '20260313A','20260313B','20260313C', ...
+                '20260316','20260322','20260324','20260325'};
+
+
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'RFMapping', 'BaselinCorridor', 'LandManipCorridor'});
 allMice    = filteredTable.MouseID;
 uniqueMice = unique(allMice, 'stable');
@@ -57,7 +66,10 @@ for iMouse = 1:length(uniqueMice)
         % find all RFMapping runs
         RFMapIdx = find(contains(stimNames, 'RFMapping'));
         if isempty(RFMapIdx)
+
+            
             warning('No RFMapping files for %s — skipping.', thisSessionName);
+
             continue;
         end
         %% load RFMapping + metadata for this session (from sessionROIData)
@@ -172,7 +184,9 @@ fprintf('Pooling complete: %d total boutons across %d sessions.\n', ...
 uAz        = RFMappingMetadata.uAz;
 uEl_plot   = RFMappingMetadata.uEl;
 timeVector = RFMappingMetadata.timeVector;
-respWin    = RFMappingMetadata.respWin;
+% respWin    = RFMappingMetadata.respWin;
+respWin    = [0.5 2];   % override saved window (was [0.5 3]) to match published method
+
 
 nAz = length(uAz);
 nEl = length(uEl_plot);
@@ -183,6 +197,20 @@ nEl = length(uEl_plot);
 % 
 % fprintf('Total boutons: %d | Responsive (isResponsive): %d (%.1f%%)\n', ...
 %     numel(allRFMapping), numel(respIdxList), 100*numel(respIdxList)/numel(allRFMapping));
+%%
+
+visualReliability = nan(numBoutons, 1);
+for iROI = 1:numBoutons
+    visualReliability(iROI) = computeVisualReliabilityIndex(iROI, allRFMapping);
+end
+
+figure;
+histogram(visualReliability, 50);
+xline(0.1, 'r--', 'Threshold (0.3)');
+xlabel('Visual reliability index (75th percentile pairwise r)');
+title('Stimulus-independent reliability (pairwise correlation method)');
+
+
 
 %% Recompute responsiveness and RF centers manually for all pooled boutons
 numBoutons = numel(allRFMapping);
@@ -195,9 +223,10 @@ fprintf('Recomputing responsiveness for %d boutons using spatial grids...\n', nu
 for iROI = 1:numBoutons
     trialMatrix      = allRFMapping(iROI).baselineSubtracted;       % Cell array [nEl x nAz]
     bTrialsCorrected = allRFMapping(iROI).baselineSubtractedBlank;  % Matrix [Trials x Time]
-    meanGridResponse = allRFMapping(iROI).meanGridResponse;         % Matrix [nEl x nAz]
-    
-    % cheks 
+%     meanGridResponse = allRFMapping(iROI).meanGridResponse;         % Matrix [nEl x nAz]
+    meanGridResponse = nan(size(allRFMapping(iROI).meanGridResponse));   % will be recomputed below, not reused
+
+    % cheks
     if isempty(trialMatrix) || isempty(bTrialsCorrected) || isempty(meanGridResponse)
         allRFMapping(iROI).pValANOVA    = NaN;
         allRFMapping(iROI).isResponsive = false;
@@ -205,65 +234,92 @@ for iROI = 1:numBoutons
         allRFMapping(iROI).centerEl     = NaN;
         continue;
     end
-    
+
     % Force types to double numeric matrices
     bTrialsCorrected = double(bTrialsCorrected);
     meanGridResponse = double(meanGridResponse);
-    
+
     % In analyseRFMapping, blankTrialMeans = squeeze(mean(bTrialsCorrected(1, respIdx, :), 2))
     % Depending on how it squeezed, check format: [Trials x Time]
     blankTrialMeans = mean(bTrialsCorrected(:, respIdx), 2, 'omitnan');
-    
+
     allTrialMeans = blankTrialMeans(:);
-    groupLabels   = repmat(17, numel(blankTrialMeans), 1); % Group 17 is Blank
-    
+    groupLabels   = repmat(17, numel(blankTrialMeans), 1); % Group 17 is Blank % is this just a label that was assigned?
+
+
     % loop through grid locations to run ANOVA
     [nEl_curr, nAz_curr] = size(trialMatrix);
     posCounter = 1;
-    
+
+    %     for r = 1:nEl_curr
+    %         for c = 1:nAz_curr
+    %             % Extract the [Trials x Time] matrix for this specific grid location
+    %             correctedTrials = trialMatrix{r, c};
+    %
+    %             if ~isempty(correctedTrials)
+    %                 correctedTrials = double(correctedTrials);
+    %
+    %                 % Compute the mean response inside the window for each trial
+    %                 posTrialMeans = mean(correctedTrials(:, respIdx), 2, 'omitnan');
+    %
+    %                 % Append to vectors
+    %                 allTrialMeans = [allTrialMeans; posTrialMeans(:)];
+    %                 groupLabels   = [groupLabels; repmat(posCounter, numel(posTrialMeans), 1)];
+    %             end
+    %             posCounter = posCounter + 1;
+    %         end
+    %     end
+
     for r = 1:nEl_curr
         for c = 1:nAz_curr
-            % Extract the [Trials x Time] matrix for this specific grid location
             correctedTrials = trialMatrix{r, c};
-            
+
             if ~isempty(correctedTrials)
                 correctedTrials = double(correctedTrials);
-                
-                % Compute the mean response inside the window for each trial
                 posTrialMeans = mean(correctedTrials(:, respIdx), 2, 'omitnan');
-                
-                % Append to vectors
+
                 allTrialMeans = [allTrialMeans; posTrialMeans(:)];
                 groupLabels   = [groupLabels; repmat(posCounter, numel(posTrialMeans), 1)];
+
+                meanGridResponse(r, c) = mean(posTrialMeans, 'omitnan');   % <-- ADD THIS LINE
             end
             posCounter = posCounter + 1;
         end
     end
-    
-    % Clean out NaN trials to preserve ANOVA 
+
+    % Clean out NaN trials to preserve ANOVA
     validIdx = ~isnan(allTrialMeans) & ~isnan(groupLabels);
     allTrialMeans = allTrialMeans(validIdx);
     groupLabels   = groupLabels(validIdx);
-    
+
     if isempty(allTrialMeans) || length(unique(groupLabels)) < 2
         allRFMapping(iROI).pValANOVA    = NaN;
         allRFMapping(iROI).isResponsive = false;
         continue;
     end
-    
-    % run inclusion critera 
+
+    % run inclusion critera
     pValANOVA = anova1(allTrialMeans, groupLabels, 'off');
-    
+%     pValANOVA = kruskalwallis(allTrialMeans, groupLabels, 'off');
+
     blankMean = mean(blankTrialMeans, 'omitnan');
     blankStd  = std(blankTrialMeans, 'omitnan');
     
-    % peak preferred value across the grid
+    % mean responses (avg across trials) at the preferred position
     [prefVal, mI] = max(meanGridResponse(:));
     
     % critera 
-    isResponsive = (pValANOVA < 0.05)   && (prefVal > (blankMean + 2 * blankStd));
+    isResponsive = (pValANOVA < 0.05)   && (prefVal > (blankMean + 1 * blankStd));
+
     
-    % update update
+%     blankMean = median(blankTrialMeans, 'omitnan');
+%     blankMAD  = mad(blankTrialMeans, 1) * 1.4826;   % scaled MAD, robust equivalent of SD
+%     % mean responses (avg across trials) at the preferred position
+%     [prefVal, mI] = max(meanGridResponse(:));
+%     % criteria
+%     isResponsive = (pValANOVA < 0.05) && (prefVal > (blankMean + 1 * blankMAD));
+%     
+    % update
     allRFMapping(iROI).pValANOVA    = pValANOVA;
     allRFMapping(iROI).isResponsive = isResponsive;
     
@@ -278,6 +334,9 @@ for iROI = 1:numBoutons
     end
 end
 
+
+%% run to understand how a decision about 1SD was made? 
+%RFMapping_ZScoreThresholdAnalysis
 %% Basic responsiveness bookkeeping 
 isResp        = [allRFMapping.isResponsive];
 respIdxList   = find(isResp);
@@ -327,12 +386,25 @@ fprintf('\nUsing selectionMethod = ''%s'' --> %d boutons feeding Panel A/B/C/D a
     selectionMethod, numel(candidateRespIdxList));
 
 
-%%
+%% plot all responsive boutons 
 % careful when running this - it plots all selected 
-plotAllRFResponsiveBoutons
+%plotAllRFResponsiveBoutons
 % check
 respIdxList   = find([allRFMapping.isResponsive]);
 unrespIdxList = find(~[allRFMapping.isResponsive]);
+
+%% quantify running vs stationry trials across grid positions and blanks 
+RFMapping_OverallRunningStationaryFraction
+
+%% running vs stationry modulation at preferred position 
+
+RFMapping_RunningStationaryScatterPerBouton
+
+%%  responsive boutons per session against the fraction of running trials 
+RFMapping_SessionResponsivenessVsRunningFraction
+% Extracts the percentage of responsive boutons per session and plots it
+% against the fraction of running trials in that session to test for a
+% behavioral bias
 %% manually chosen (picked by eye from plotAllResponsiveBoutons)
 responsiveBoutons = [2330,3850, 3189];   %  3189, 
 unresponsiveBoutons  = [2637, 69];           % 
@@ -456,6 +528,9 @@ set(figComp, 'Visible', 'off');
 saveFigureFormats(figComp, fullfile(outputDir, 'responsive_percent_per_animal_with_sessions'));
 
 %%  PANEL C 
+prefAz = [allRFMapping(candidateRespIdxList).centerAz];
+prefEl = [allRFMapping(candidateRespIdxList).centerEl];
+
 figC = figure('Position', [100, 100, 850, 280]);
 
 % az histogram
@@ -498,7 +573,7 @@ defaultAxesProperties(axC2, true);
 axC3 = subplot(1,3,3);
 [uniqueCoords, ~, idx] = unique([prefAz(:), prefEl(:)], 'rows');
 counts = accumarray(idx, 1);
-bubbleSizes = counts * 80;
+bubbleSizes = counts * 15;
 scatter(uniqueCoords(:,1), uniqueCoords(:,2), bubbleSizes, [0.2 0.2 0.2], 'filled', 'MarkerFaceAlpha', 0.5);
 xlabel('Preferred Azimuth (\circ)', 'FontName', 'Arial', 'FontSize', 9);
 ylabel('Preferred Elevation (\circ)', 'FontName', 'Arial', 'FontSize', 9);
@@ -638,225 +713,47 @@ if ~exist(outputDir, 'dir'), mkdir(outputDir); end
 set(figE, 'Visible', 'off');
 saveFigureFormats(figE, fullfile(outputDir, 'spatialEV_vs_resp_unresp'));
 
-%% gaussian fit (allen sdk)
-% % Fit on all boutons that pass ANOVA alone (923 in your last run), independent
-% % of the amplitude gate -- this lets 'gaussianR2' serve as a genuinely
-% % alternative/independent responsiveness criterion to compare against isResponsive.
-% 
-% gaussianFitCandidates = find(anovaOnlyMask);
-% nCand = numel(gaussianFitCandidates);
-% 
-% fitR2_all            = nan(nCand, 1);
-% fitFWHM_az_all       = nan(nCand, 1);
-% fitFWHM_el_all       = nan(nCand, 1);
-% fitFWHM_combined_all = nan(nCand, 1);
-% 
-% for k = 1:nCand
-%     b = allRFMapping(gaussianFitCandidates(k));
-%     Z = b.meanGridResponse;
-% 
-%     try
-%         [fitFun, fwhmX, fwhmY] = fitGaussian2D(uAz, uEl_plot, Z);
-% 
-%         [Xg, Yg] = meshgrid(uAz, uEl_plot);
-%         Zhat = fitFun(Xg, Yg);
-%         validMask = ~isnan(Z);
-% 
-%         SSres = sum((Z(validMask) - Zhat(validMask)).^2);
-%         SStot = sum((Z(validMask) - mean(Z(validMask))).^2);
-%         r2 = 1 - SSres/SStot;
-% 
-%         fitR2_all(k)            = r2;
-%         fitFWHM_az_all(k)       = fwhmX;
-%         fitFWHM_el_all(k)       = fwhmY;
-%         fitFWHM_combined_all(k) = sqrt(fwhmX * fwhmY);
-%     catch ME
-%         warning('Gaussian fit failed for bouton %d: %s', gaussianFitCandidates(k), ME.message);
-%     end
-% end
-% 
-% figure('Name', 'Gaussian fit R2 distribution (ANOVA-passing boutons)');
-% histogram(fitR2_all, 30);
-% xlabel('R^2 of 2D Gaussian fit'); ylabel('# boutons');
-% title(sprintf('n = %d ANOVA-passing boutons -- check for a bimodal split before setting r2Thresh', nCand));
-% 
-% gaussianRespMaskLocal = fitR2_all > r2Thresh;
-% gaussianRespIdxList   = gaussianFitCandidates(gaussianRespMaskLocal);
-% 
-% fprintf('\nGaussian-fit criterion (R2 > %.2f, fit on %d ANOVA-passing boutons): %d well-fit (%.1f%% of candidates)\n', ...
-%     r2Thresh, nCand, numel(gaussianRespIdxList), 100*numel(gaussianRespIdxList)/nCand);
-% 
-% overlapCount = numel(intersect(respIdxList, gaussianRespIdxList));
-% fprintf('Overlap between isResponsive (%d) and gaussianR2 (%d) sets: %d boutons in both\n', ...
-%     numel(respIdxList), numel(gaussianRespIdxList), overlapCount);
+%% gaussian fit (melina)
+RFMapping_Gaussian2DFit % bootstaps 500 times with replacements to estimate how much the fitted centre moves across the sample..  
+RFMapping_PlotGaussianFitExamples
+RFMapping_PlotGaussianFitSummary
 
-%% 
-%% Panel A: per-bouton Gaussian fit  (allen SDK: fitgaussian2D) https://github.com/AllenInstitute/AllenSDK
-% % Fit Gaussian specifically to the chosen candidate pool for width-based
-% % example selection (re-fit here since gaussianFitCandidates above was the
-% % broader ANOVA-passing pool, not necessarily == candidateRespIdxList).
-% 
-% % Set up arrays for the optimization loop
-% nResp = numel(candidateRespIdxList);
-% fitR2            = nan(nResp, 1);
-% fitFWHM_combined = nan(nResp, 1);
-% 
-% for k = 1:nResp
-%     %  data for this responsive bouton
-%     b = allRFMapping(candidateRespIdxList(k));
-%     Z = b.meanGridResponse;
-%     
-%     try
-%         % Fit 2D Gaussian to get the spatial tuning curves and width parameters
-%         [fitFun, fwhmX, fwhmY] = fitGaussian2D(uAz, uEl_plot, Z);
-%         
-%         % Generate a grid to evaluate our model fit
-%         [Xg, Yg] = meshgrid(uAz, uEl_plot);
-%         Zhat = fitFun(Xg, Yg);
-%         
-%         % Handle any missing data blocks cleanly
-%         validMask = ~isnan(Z);
-%         
-%         % Compute R-squared to evaluate fit quality
-%         SSres = sum((Z(validMask) - Zhat(validMask)).^2);
-%         SStot = sum((Z(validMask) - mean(Z(validMask))).^2);
-%         fitR2(k) = 1 - SSres/SStot;
-%         
-%         %  geometric mean of X/Y widths as a single size metric
-%         fitFWHM_combined(k) = sqrt(fwhmX * fwhmY);
-%         
-%     catch ME
-%         % Don't crash the script if a noisy bouton fails optimization
-%         warning('Gaussian fit failed for bouton %d: %s', candidateRespIdxList(k), ME.message);
-%     end
-% end
-% 
-% % Filter for boutons that actually match a Gaussian profile well
-% wellFitIdxInResp = find(fitR2 > r2Thresh);
-% wellFitBoutonIdx = candidateRespIdxList(wellFitIdxInResp);
-% widths           = fitFWHM_combined(wellFitIdxInResp);
-% 
-% % Sort remaining population from narrowest to widest receptive fields
-% [sortedWidths, sortOrder] = sort(widths);
-% nWellFit = numel(sortedWidths);
-% 
-% % Select specific percentiles to grab diverse RF sizes for Panel A
-% pctTargets = [10 50 90];  % narrow, medium, broad representatives
-% exampleRespIdxList = nan(1,3);
-% for i = 1:3
-%     targetRank = round(pctTargets(i)/100 * nWellFit);
-%     targetRank = max(1, min(nWellFit, targetRank)); % boundary guard
-%     exampleRespIdxList(i) = wellFitBoutonIdx(sortOrder(targetRank));
-% end
-% 
-% % Print selection summary to command window
-% fprintf('\nSelected responsive examples (bouton IDs): narrow=%d, medium=%d, broad=%d\n', ...
-%     exampleRespIdxList);
-% fprintf('Corresponding combined FWHM (deg): %.1f, %.1f, %.1f\n', ...
-%     sortedWidths(max(1,min(nWellFit,round(pctTargets/100*nWellFit)))));
-% 
-% % Pick two non-responsive boutons at different noise/amplitude levels as controls
-% unrespAmps       = [allRFMapping(candidateUnrespIdxList).peakAmplitude];
-% [~, medRankIdx]  = sort(unrespAmps);
-% exampleUnrespIdx1 = candidateUnrespIdxList(medRankIdx(round(numel(medRankIdx) * 0.25)));
-% exampleUnrespIdx2 = candidateUnrespIdxList(medRankIdx(round(numel(medRankIdx) * 0.75)));
-% 
-% % Combine examples and labels for the final multi-panel plot
-% exampleSet    = [exampleRespIdxList, exampleUnrespIdx1, exampleUnrespIdx2];
-% exampleLabels = {'Narrow RF', 'Medium RF', 'Broad RF', 'Non-responsive', 'Non-responsive'};
-% nEx  = numel(exampleSet);
-% colW = 1 / nEx;
-% 
-% figA = figure('Color', 'w', 'Position', [50 50 nEx*550 750], 'Name', 'Panel A: RF examples');
-% 
-% for i = 1:nEx
-%     b = allRFMapping(exampleSet(i));
-%     xBase = (i-1)*colW;
-%     
-%     % Format axes positions dynamically across the canvas width
-%     axPanel = axes('Position', [xBase+0.03 0.12 colW-0.06 0.75]);
-%     
-%     % Generate the final raw trace map visualization
-%     plotRFHeatmapWithTraces(axPanel, b, uAz, uEl_plot, timeVector, 'Smooth', true);
-%     
-%     title(axPanel, sprintf('%s (bouton %d)', exampleLabels{i}, exampleSet(i)), ...
-%         'FontName', 'Arial', 'FontSize', 14, 'FontWeight', 'bold');
-% end
+responsiveBoutons = [2330,3850, 3189];   %  3189, 
+unresponsiveBoutons  = [2637, 69];           % 
 
-%%%%  PANEL D 
-% Population receptive field widths (re-centered on each bouton's own peak).
-% nResp = numel(candidateRespIdxList);
-% azProfiles = nan(nResp, nAz);
-% elProfiles = nan(nResp, nEl);
-% grid2D_stack = nan(nEl, nAz, nResp);
-% 
-% for k = 1:nResp
-%     b = allRFMapping(candidateRespIdxList(k));
-%     g = b.meanGridResponse;
-% 
-%     peakVal = max(g(:), [], 'omitnan');
-%     if peakVal <= 0 || isnan(peakVal), continue; end
-%     gNorm = g / peakVal;
-% 
-%     [~, mI] = max(gNorm(:), [], 'omitnan');
-%     [rPeak, cPeak] = ind2sub(size(gNorm), mI);
-% 
-%     azProfiles(k, :) = gNorm(rPeak, :);
-%     elProfiles(k, :) = gNorm(:, cPeak)';
-% 
-%     shiftRows = round(nEl/2) - rPeak;
-%     shiftCols = round(nAz/2) - cPeak;
-%     grid2D_stack(:, :, k) = circshift(gNorm, [shiftRows, shiftCols]);
-% end
-% 
-% azOffset = uAz - uAz(round(nAz/2));
-% elOffset = uEl_plot - uEl_plot(round(nEl/2));
-% 
-% meanAzProfile = mean(azProfiles, 1, 'omitnan');
-% meanElProfile = mean(elProfiles, 1, 'omitnan');
-% meanGrid2D    = mean(grid2D_stack, 3, 'omitnan');
-% 
-% [azFit, azFWHM] = fitGaussian1D(azOffset, meanAzProfile);
-% [elFit, elFWHM] = fitGaussian1D(elOffset, meanElProfile);
-% [fit2D, fwhmX, fwhmY] = fitGaussian2D(azOffset, elOffset, meanGrid2D);
-% 
-% fprintf('\nPopulation RF widths (n = %d %s boutons):\n', nResp, selectionMethod);
-% fprintf('  Azimuth   FWHM (1D fit): %.1f deg\n', azFWHM);
-% fprintf('  Elevation FWHM (1D fit): %.1f deg\n', elFWHM);
-% fprintf('  Azimuth   FWHM (2D fit): %.1f deg\n', fwhmX);
-% fprintf('  Elevation FWHM (2D fit): %.1f deg\n', fwhmY);
-% 
-% figD = figure('Color', 'w', 'Position', [50 50 1200 400], 'Name', 'Panel D: population RF widths');
-% 
-% subplot(1,3,1);
-% plot(azOffset, meanAzProfile, 'o', 'Color', [0.3 0.5 0.8], 'MarkerFaceColor', [0.3 0.5 0.8]);
-% hold on;
-% xFine = linspace(min(azOffset), max(azOffset), 200);
-% plot(xFine, azFit(xFine), 'k-', 'LineWidth', 1.5);
-% xlabel('Azimuth offset from peak (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-% ylabel('Normalized response', 'FontName', 'Arial', 'FontSize', 9);
-% title(sprintf('FWHM = %.1f\\circ', azFWHM), 'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'normal');
-% set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-% 
-% subplot(1,3,2);
-% plot(elOffset, meanElProfile, 'o', 'Color', [0.8 0.4 0.3], 'MarkerFaceColor', [0.8 0.4 0.3]);
-% hold on;
-% xFine = linspace(min(elOffset), max(elOffset), 200);
-% plot(xFine, elFit(xFine), 'k-', 'LineWidth', 1.5);
-% xlabel('Elevation offset from peak (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-% ylabel('Normalized response', 'FontName', 'Arial', 'FontSize', 9);
-% title(sprintf('FWHM = %.1f\\circ', elFWHM), 'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'normal');
-% set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-% 
-% subplot(1,3,3);
-% imagesc(azOffset, elOffset, meanGrid2D);
-% axis image; set(gca, 'YDir', 'normal');
-% colormap(gca, 'parula'); colorbar;
-% xlabel('Azimuth offset (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-% ylabel('Elevation offset (\circ)', 'FontName', 'Arial', 'FontSize', 9);
-% title(sprintf('2D fit: FWHM_x=%.1f\\circ, FWHM_y=%.1f\\circ', fwhmX, fwhmY), ...
-%     'FontName', 'Arial', 'FontSize', 8, 'FontWeight', 'normal');
-% set(gca, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 8);
-% 
+exampleSet    = [responsiveBoutons, unresponsiveBoutons];
+exampleLabels = {'Responsive', 'Responsive', 'Responsive', ...
+                  'Unresponsive', 'Unresponsive'};
+
+nEx  = numel(exampleSet);
+colW = 1 / nEx;
+
+figA = figure('Color', 'w', 'Position', [50 50 nEx*550 750], 'Name', 'Panel A: hand-picked examples');
+
+for i = 1:nEx
+    b = allRFMapping(exampleSet(i));
+    xBase = (i-1)*colW;
+    axPanel = axes('Position', [xBase+0.03 0.15 colW-0.05 0.70]);
+    plotRFHeatmapWithTraces(axPanel, b, uAz, uEl_plot, timeVector, 'Smooth', true);
+    title(axPanel, sprintf('%s\n(Bouton %d)', exampleLabels{i}, exampleSet(i)), ...
+        'FontName', 'Arial', 'FontSize', 10, 'FontWeight', 'bold');
+end
 
 
+for i = 1:nEx
+    b = allRFMapping(exampleSet(i));
+    xBase = (i-1)*colW;
+    
+    axPanel = axes('Position', [xBase+0.03 0.15 colW-0.05 0.70]);
+    
+    plotRFHeatmapWithTraces(axPanel, b, uAz, uEl_plot, timeVector, 'Smooth', true);
+    
+    title(axPanel, sprintf('%s\n(Bouton %d)', exampleLabels{i}, exampleSet(i)), ...
+        'FontName', 'Arial', 'FontSize', 10, 'FontWeight', 'bold');
+end
+
+% save
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\gaussianfitsummary\eg_rfs';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+set(figA, 'Visible', 'off');
+saveFigureFormats(figA, fullfile(outputDir, 'responsive_unresponsive_examplegrid_gaussianfit_linesuperimposed'));

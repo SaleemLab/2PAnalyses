@@ -1,32 +1,41 @@
-% DotFields_Pooled_BehaviorSplit_Full.m
+% DotFields_TuningCurveAnalysis_compareStatesV2_2PData.m
 %
-% Combines:
 %   - Edd's wheel-based running/stationary trial classification
 %     (DotFields_TuningCurveAnalysis_compareStates_2PData.m)
 %   - Multi-session/mouse pooling (same pattern as DirTuning scripts)
 %   -  blank-trial retention (not discarded) as the literal blank
-%     reference, same as DotFields_Pooled_AllTrials.m
+%     reference, same as DotFields_Pooled_AllTrials.m 
 %   - ANOVA(speeds+blank)+2SD-threshold, ANOVA-protected t-test/Wilcoxon,
 %     cross-validated R^2, Gaussian fitting, dynamic range/Fano factor --
 %     ALL computed SEPARATELY per behavioral state (stationary/running),
 %     with blank trials ALSO split by state so each state is compared
 %     against its own matched-state blank, not a pooled-across-states one.
+
+%   - Things to remember:
+%      - black trials have been assigned stimValue = 1 
+%      - as an additional check the number of dots is used (should be 0
+%        relative to 576 dots for all other speed catergories) 
 %
-% Requires calc_kfold_R2.m and fitGaussianTemplates_tuning.m on your
-% MATLAB path.
+% Requires calc_kfold_R2.m and fitGaussianTemplates_tuning.m from
+% NeuralDataAnalyses (github repo)
+% 
+
+%% to do
+% check the stimulus durtation across these 6 sessions... were they always
+% 2s on 2s off? 
 
 %%
 mouseList = {'M25132', 'M25133', 'M26003'};
 
-stimWindowMask_range = [0 2.5];  % window for extracting per-trial calcium response
+stimWindowMask_range = [0.5 2];  % window for extracting per-trial calcium response
 stimFramesMask_range = [0 2.0];  % window for wheel-speed behavior classification
 
-runSpeedThresh  = 3;    % mean speed above this = candidate "running"
+runSpeedThresh  = 3;    % mean speed above this =  "running"
 statSpeedThresh = 0.5;  % mean speed below this = candidate "stationary"
 propThresh      = 0.75;
 
 ALPHA = 0.05;
-NSD   = 2;
+NSD   = 1;
 
 r2opts.kval       = 3;
 r2opts.nPerms     = 10;
@@ -35,14 +44,15 @@ r2opts.validMeans = 1;
 r2opts.nShuffle   = 100;
 
 options.binSpacing = 2.0; % matches 2s-on/2s-off stimulus timing
-%% ===================================================
 
+%%
 filteredTable = filterMasterTable('MouseID', mouseList, 'HasStimulus', 'DotMotion_SpeedTuning', ...
     'Suite2PPreprocessing', 1, 'Exclude', 0);
 allMice    = filteredTable.MouseID;
 uniqueMice = unique(allMice, 'stable');
 
-allDotUnits = struct('alltraces', {}, 'blankTrials', {}, 'tuning', {}, 'sessionLabel', {});
+allDotUnits = struct('alltraces', {}, 'blankTrials', {}, 'tuning', {}, 'sessionLabel', {}, ...
+    'mouseID', {}, 'sessionName', {}, 'roiIdx', {});
 haveWarnedShape = false;
 
 for iMouse = 1:length(uniqueMice)
@@ -73,7 +83,7 @@ for iMouse = 1:length(uniqueMice)
             warning('    Missing wheelData or psthData -- skipping.'); continue;
         end
 
-        %% --- build trial list + classify running/stationary for EVERY trial (incl. blank) ---
+        %%  build trial list + classify running/stationary for EVERY trial (incl. blank)
         nGroups = numel(response.wheelData);
         trialsSpeed2D = struct('VelX1', {}, 'numDots1', {}, 'runFlag', {}, ...
                                 'origGroup', {}, 'origTrialInGroup', {});
@@ -107,7 +117,7 @@ for iMouse = 1:length(uniqueMice)
                 if grpWheel.stimValue == 1
                     trialsSpeed2D(trialCounter).numDots1 = 0; % blank
                 else
-                    trialsSpeed2D(trialCounter).numDots1 = 573;
+                    trialsSpeed2D(trialCounter).numDots1 = 573; % all other speeds 
                 end
                 trialsSpeed2D(trialCounter).runFlag          = runFlag;
                 trialsSpeed2D(trialCounter).origGroup        = g;
@@ -135,7 +145,7 @@ for iMouse = 1:length(uniqueMice)
         end
 
         uniqueVelocities = unique(abs([temp_tsd.VelX1]));
-        nSpeeds = numel(uniqueVelocities);
+        nSpeeds = numel(uniqueVelocities); % 0    16    32    64   128   256 (speed 0 is also included here)
 
         nBoutons = size(response.psthData(1).alignedResponses, 1);
         if ~haveWarnedShape
@@ -149,14 +159,14 @@ for iMouse = 1:length(uniqueMice)
         timeVec = response.psthData(1).timeVector(:)';
         stimWindowMask = timeVec >= stimWindowMask_range(1) & timeVec <= stimWindowMask_range(2);
 
-        %% --- per-bouton extraction, split by state (speeds AND blank) ---
+        %%  per-bouton, split responses by state (speeds AND blank) 
         for thisROI = 1:nBoutons
             alltraces   = cell(nSpeeds, 2); % column 1 = stationary, column 2 = running
-            blankTrials = cell(1, 2);
+            blankTrials = cell(1, 2); % same coloumn structure as above 
 
-            for s = 1:nSpeeds
+            for thisSpeed = 1:nSpeeds
                 for istate = 1:2
-                    matchingTrials = find(abs([temp_tsd.VelX1]) == uniqueVelocities(s) & ...
+                    matchingTrials = find(abs([temp_tsd.VelX1]) == uniqueVelocities(thisSpeed) & ...
                                           [temp_tsd.runFlag] == (istate - 1));
                     traceAccumulator = nan(1, numel(matchingTrials));
                     for mt = 1:numel(matchingTrials)
@@ -165,7 +175,7 @@ for iMouse = 1:length(uniqueMice)
                         fullTrace = squeeze(response.psthData(origGroup).alignedResponses(thisROI, :, origTi));
                         traceAccumulator(mt) = nanmean(fullTrace(stimWindowMask));
                     end
-                    alltraces{s, istate} = traceAccumulator;
+                    alltraces{thisSpeed, istate} = traceAccumulator;
                 end
             end
 
@@ -185,7 +195,10 @@ for iMouse = 1:length(uniqueMice)
                 'alltraces',    {alltraces}, ...
                 'blankTrials',  {blankTrials}, ...
                 'tuning',       cellfun(@nanmean, alltraces), ...
-                'sessionLabel', sprintf('%s_%s', thisMouse, thisSessionName));
+                'sessionLabel', sprintf('%s_%s', thisMouse, thisSessionName), ...
+                'mouseID',      thisMouse, ...
+                'sessionName',  thisSessionName, ...
+                'roiIdx',       thisROI);
         end
         fprintf('    Added %d boutons (running total: %d).\n', nBoutons, numel(allDotUnits));
     end
@@ -197,9 +210,9 @@ fprintf('\nDone pooling. %d boutons total across %d mice.\n', nBoutonsTotal, num
 stateNames  = {'stat', 'run'};
 stateLabels = {'Stationary', 'Locomotion'};
 
-%% ===================== ANOVA(speeds+blank) + 2SD-above-blank threshold, PER STATE =====================
+%%  ANOVA(speeds+blank) + 2SD-above-blank threshold, PER STATE 
 for si = 1:2
-    st = stateNames{si};
+    thisState = stateNames{si};
     anovaP_thresh    = nan(nBoutonsTotal, 1);
     blankMean        = nan(nBoutonsTotal, 1);
     blankSD          = nan(nBoutonsTotal, 1);
@@ -207,18 +220,20 @@ for si = 1:2
     prefSpeedIdx     = nan(nBoutonsTotal, 1);
     isResponsive     = false(nBoutonsTotal, 1);
 
-    for b = 1:nBoutonsTotal
-        alltraces   = allDotUnits(b).alltraces(:, si);
-        blankTrials = allDotUnits(b).blankTrials{si}(:);
+    for thisBouton = 1:nBoutonsTotal
+        alltraces   = allDotUnits(thisBouton).alltraces(:, si); % speeds 
+        blankTrials = allDotUnits(thisBouton).blankTrials{si}(:); % blank only 
         blankTrials = blankTrials(~isnan(blankTrials));
         nSpeeds = numel(alltraces);
-
-        y = []; grp = [];
-        for s = 1:nSpeeds
-            vals = alltraces{s}(:);
+        % every single trial's response value, from every speed condition and the blank condition
+        y = [];  
+        % same length as y telling which condition each entry in y came from
+        grp = [];
+        for thisSpeed = 1:nSpeeds
+            vals = alltraces{thisSpeed}(:);
             vals = vals(~isnan(vals));
             y   = [y; vals];
-            grp = [grp; repmat(s, numel(vals), 1)];
+            grp = [grp; repmat(thisSpeed, numel(vals), 1)];
         end
         y   = [y;   blankTrials];
         grp = [grp; repmat(nSpeeds + 1, numel(blankTrials), 1)];
@@ -226,63 +241,67 @@ for si = 1:2
         if numel(y) < (nSpeeds + 1) * 2 || isempty(blankTrials)
             continue;
         end
-        anovaP_thresh(b) = anova1(y, grp, 'off');
-        blankMean(b) = mean(blankTrials);
-        blankSD(b)   = std(blankTrials);
+        anovaP_thresh(thisBouton) = anova1(y, grp, 'off');
+        blankMean(thisBouton) = mean(blankTrials);
+        blankSD(thisBouton)   = std(blankTrials);
 
         tuningThisState = cellfun(@(x) mean(x, 'omitnan'), alltraces);
-        [~, prefSpeedIdx(b)] = max(tuningThisState);
-        meanPreferredRaw(b) = mean(alltraces{prefSpeedIdx(b)}, 'omitnan');
+        [~, prefSpeedIdx(thisBouton)] = max(tuningThisState);
+        meanPreferredRaw(thisBouton) = mean(alltraces{prefSpeedIdx(thisBouton)}, 'omitnan');
 
-        isResponsive(b) = (anovaP_thresh(b) < ALPHA) && ...
-                          (meanPreferredRaw(b) > blankMean(b) + NSD * blankSD(b));
+        isResponsive(thisBouton) = (anovaP_thresh(thisBouton) < ALPHA) && ...
+                          (meanPreferredRaw(thisBouton) > blankMean(thisBouton) + NSD * blankSD(thisBouton));
     end
 
     fprintf('\n[%s] %d / %d boutons responsive (ANOVA[speeds+blank]+threshold, p<%.2f, >%dSD above blank).\n', ...
         stateLabels{si}, sum(isResponsive), nBoutonsTotal, ALPHA, NSD);
 
-    for b = 1:nBoutonsTotal
-        allDotUnits(b).(['anovaP_thresh_' st])    = anovaP_thresh(b);
-        allDotUnits(b).(['blankMean_' st])        = blankMean(b);
-        allDotUnits(b).(['blankSD_' st])          = blankSD(b);
-        allDotUnits(b).(['meanPreferredRaw_' st]) = meanPreferredRaw(b);
-        allDotUnits(b).(['prefSpeedIdx_' st])     = prefSpeedIdx(b);
-        allDotUnits(b).(['isResponsive_' st])     = isResponsive(b);
+    for thisBouton = 1:nBoutonsTotal
+        allDotUnits(thisBouton).(['anovaP_thresh_' thisState])    = anovaP_thresh(thisBouton);
+        allDotUnits(thisBouton).(['blankMean_' thisState])        = blankMean(thisBouton);
+        allDotUnits(thisBouton).(['blankSD_' thisState])          = blankSD(thisBouton);
+        allDotUnits(thisBouton).(['meanPreferredRaw_' thisState]) = meanPreferredRaw(thisBouton);
+        allDotUnits(thisBouton).(['prefSpeedIdx_' thisState])     = prefSpeedIdx(thisBouton);
+        allDotUnits(thisBouton).(['isResponsive_' thisState])     = isResponsive(thisBouton); 
     end
 end
 
-%% ===================== ANOVA-protected t-test / Wilcoxon vs blank, PER STATE =====================
+
+%% 
+%DotFields_CheckTrialCountsByState
+
+%%  ANOVA-protected t-test / Wilcoxon vs blank, PER STATE 
 for si = 1:2
-    st = stateNames{si};
+    thisState = stateNames{si};
     ttestP    = nan(nBoutonsTotal, 1);
     ranksumP  = nan(nBoutonsTotal, 1);
     isResp_ttest   = false(nBoutonsTotal, 1);
     isResp_ranksum = false(nBoutonsTotal, 1);
 
-    for b = 1:nBoutonsTotal
-        anovaP_thresh_b = allDotUnits(b).(['anovaP_thresh_' st]);
-        prefSpeedIdx_b  = allDotUnits(b).(['prefSpeedIdx_' st]);
+    for thisBouton = 1:nBoutonsTotal
+        anovaP_thresh_b = allDotUnits(thisBouton).(['anovaP_thresh_' thisState]);
+        prefSpeedIdx_b  = allDotUnits(thisBouton).(['prefSpeedIdx_' thisState]);
         if isnan(anovaP_thresh_b) || isnan(prefSpeedIdx_b)
             continue;
         end
 
-        prefTrials  = allDotUnits(b).alltraces{prefSpeedIdx_b, si}(:);
+        prefTrials  = allDotUnits(thisBouton).alltraces{prefSpeedIdx_b, si}(:);
         prefTrials  = prefTrials(~isnan(prefTrials));
-        blankTrials = allDotUnits(b).blankTrials{si}(:);
+        blankTrials = allDotUnits(thisBouton).blankTrials{si}(:);
         blankTrials = blankTrials(~isnan(blankTrials));
 
         if numel(prefTrials) < 2 || numel(blankTrials) < 2
             continue;
         end
 
-        [~, ttestP(b)] = ttest2(prefTrials, blankTrials, 'Vartype', 'unequal');
-        ranksumP(b) = ranksum(prefTrials, blankTrials);
+        [~, ttestP(thisBouton)] = ttest2(prefTrials, blankTrials, 'Vartype', 'unequal');
+        ranksumP(thisBouton) = ranksum(prefTrials, blankTrials);
 
-        blankMean_b = allDotUnits(b).(['blankMean_' st]);
-        meanPreferredRaw_b = allDotUnits(b).(['meanPreferredRaw_' st]);
+        blankMean_b = allDotUnits(thisBouton).(['blankMean_' thisState]);
+        meanPreferredRaw_b = allDotUnits(thisBouton).(['meanPreferredRaw_' thisState]);
 
-        isResp_ttest(b)   = (anovaP_thresh_b < ALPHA) && (ttestP(b) < ALPHA) && (meanPreferredRaw_b > blankMean_b);
-        isResp_ranksum(b) = (anovaP_thresh_b < ALPHA) && (ranksumP(b) < ALPHA) && (meanPreferredRaw_b > blankMean_b);
+        isResp_ttest(thisBouton)   = (anovaP_thresh_b < ALPHA) && (ttestP(thisBouton) < ALPHA) && (meanPreferredRaw_b > blankMean_b);
+        isResp_ranksum(thisBouton) = (anovaP_thresh_b < ALPHA) && (ranksumP(thisBouton) < ALPHA) && (meanPreferredRaw_b > blankMean_b);
     end
 
     fprintf('[%s] %d / %d boutons responsive (ANOVA-protected Welch t-test, p<%.2f).\n', ...
@@ -290,29 +309,42 @@ for si = 1:2
     fprintf('[%s] %d / %d boutons responsive (ANOVA-protected Wilcoxon, p<%.2f).\n', ...
         stateLabels{si}, sum(isResp_ranksum), nBoutonsTotal, ALPHA);
 
-    for b = 1:nBoutonsTotal
-        allDotUnits(b).(['ttestP_' st])             = ttestP(b);
-        allDotUnits(b).(['ranksumP_' st])           = ranksumP(b);
-        allDotUnits(b).(['isResponsive_ttest_' st])   = isResp_ttest(b);
-        allDotUnits(b).(['isResponsive_ranksum_' st]) = isResp_ranksum(b);
+    for thisBouton = 1:nBoutonsTotal
+        allDotUnits(thisBouton).(['ttestP_' thisState])             = ttestP(thisBouton);
+        allDotUnits(thisBouton).(['ranksumP_' thisState])           = ranksumP(thisBouton);
+        allDotUnits(thisBouton).(['isResponsive_ttest_' thisState])   = isResp_ttest(thisBouton);
+        allDotUnits(thisBouton).(['isResponsive_ranksum_' thisState]) = isResp_ranksum(thisBouton);
     end
 end
 
-%% ===================== method comparison summary, PER STATE =====================
+%% method comparison summary, PER STATE
 for si = 1:2
-    st = stateNames{si};
+    thisState = stateNames{si};
     fprintf('\n=== Method comparison [%s] (n=%d boutons) ===\n', stateLabels{si}, nBoutonsTotal);
-    fprintf('%-35s %6d\n', 'SD-heuristic',                 sum([allDotUnits.(['isResponsive_' st])]));
-    fprintf('%-35s %6d\n', 'ANOVA-protected Welch t-test',  sum([allDotUnits.(['isResponsive_ttest_' st])]));
-    fprintf('%-35s %6d\n', 'ANOVA-protected Wilcoxon',      sum([allDotUnits.(['isResponsive_ranksum_' st])]));
+    fprintf('%-35s %6d\n', 'SD-heuristic',                 sum([allDotUnits.(['isResponsive_' thisState])]));
+    fprintf('%-35s %6d\n', 'ANOVA-protected Welch t-test',  sum([allDotUnits.(['isResponsive_ttest_' thisState])]));
+    fprintf('%-35s %6d\n', 'ANOVA-protected Wilcoxon',      sum([allDotUnits.(['isResponsive_ranksum_' thisState])]));
 end
 
-%% ===================== cross-validated R^2, PER STATE (downsample across BOTH states together, matching Edd's convention) =====================
+
+%%
+reliability_stat = nan(nBoutonsTotal, 1);
+reliability_run  = nan(nBoutonsTotal, 1);
+
+for thisBouton = 1:nBoutonsTotal
+    reliability_stat(thisBouton) = computeVisualReliabilityIndex_DotFields_fromScalars(thisBouton, allDotUnits, 1);
+    reliability_run(thisBouton)  = computeVisualReliabilityIndex_DotFields_fromScalars(thisBouton, allDotUnits, 2);
+end
+
+figure('Color','w');
+subplot(1,2,1); histogram(reliability_stat, 30); xlabel('Reliability'); title('Dot Fields - Stationary');
+subplot(1,2,2); histogram(reliability_run, 30); xlabel('Reliability'); title('Dot Fields - Locomotion');
+%% cross-validated R^2, PER STATE (downsample across BOTH states together, matching Edd's script)
 statR2 = nan(nBoutonsTotal, 1); statR2_pval = nan(nBoutonsTotal, 1);
 runR2  = nan(nBoutonsTotal, 1); runR2_pval  = nan(nBoutonsTotal, 1);
 
-for b = 1:nBoutonsTotal
-    alltraces = allDotUnits(b).alltraces; % nSpeeds x 2
+for thisBouton = 1:nBoutonsTotal
+    alltraces = allDotUnits(thisBouton).alltraces; % nSpeeds x 2
 
     minTrial = min(min(cellfun(@(x) sum(~isnan(x)), alltraces)));
     if minTrial < r2opts.kval
@@ -321,15 +353,15 @@ for b = 1:nBoutonsTotal
     alltracesDownsampled = cellfun(@(x) x(find(~isnan(x), minTrial)), alltraces, 'UniformOutput', false);
 
     gca_stat = alltracesDownsampled(:, 1)';
-    [statR2(b), statR2_pval(b)] = calc_kfold_R2(gca_stat, r2opts.kval, r2opts.nPerms, ...
+    [statR2(thisBouton), statR2_pval(thisBouton)] = calc_kfold_R2(gca_stat, r2opts.kval, r2opts.nPerms, ...
         r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle);
 
     gca_run = alltracesDownsampled(:, 2)';
-    [runR2(b), runR2_pval(b)] = calc_kfold_R2(gca_run, r2opts.kval, r2opts.nPerms, ...
+    [runR2(thisBouton), runR2_pval(thisBouton)] = calc_kfold_R2(gca_run, r2opts.kval, r2opts.nPerms, ...
         r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle);
 
-    if mod(b, 100) == 0
-        fprintf('Cross-val R^2: %d / %d boutons...\n', b, nBoutonsTotal);
+    if mod(thisBouton, 100) == 0
+        fprintf('Cross-val R^2: %d / %d boutons...\n', thisBouton, nBoutonsTotal);
     end
 end
 
@@ -340,16 +372,16 @@ fprintf('\n[Stationary] %d / %d boutons show significant cross-validated tuning 
 fprintf('[Locomotion] %d / %d boutons show significant cross-validated tuning (p<%.2f).\n', ...
     sum(isTunedRun, 'omitnan'), nBoutonsTotal, ALPHA);
 
-for b = 1:nBoutonsTotal
-    allDotUnits(b).statR2      = statR2(b);
-    allDotUnits(b).statR2_pval = statR2_pval(b);
-    allDotUnits(b).runR2       = runR2(b);
-    allDotUnits(b).runR2_pval  = runR2_pval(b);
-    allDotUnits(b).isTunedStat = isTunedStat(b);
-    allDotUnits(b).isTunedRun  = isTunedRun(b);
+for thisBouton = 1:nBoutonsTotal
+    allDotUnits(thisBouton).statR2      = statR2(thisBouton);
+    allDotUnits(thisBouton).statR2_pval = statR2_pval(thisBouton);
+    allDotUnits(thisBouton).runR2       = runR2(thisBouton);
+    allDotUnits(thisBouton).runR2_pval  = runR2_pval(thisBouton);
+    allDotUnits(thisBouton).isTunedStat = isTunedStat(thisBouton);
+    allDotUnits(thisBouton).isTunedRun  = isTunedRun(thisBouton);
 end
 
-%% ===================== population R^2 comparison (CDF, stat vs run) =====================
+%%  population R^2 comparison (CDF, stat vs run) 
 figure('Color', 'w', 'Name', 'Population Tuning Quality (pooled)', 'Position', [200, 200, 500, 400]);
 hold on;
 allStatR2 = statR2(~isnan(statR2));
@@ -364,7 +396,7 @@ ylabel('Proportion of ROIs', 'FontSize', 11);
 legend('Location', 'southeast');
 hold off;
 
-%% ===================== Gaussian tuning-curve fits, PER STATE =====================
+%%  Gaussian tuning-curve fits, PER STATE 
 gaussParams_stat_all = repmat({nan(1,4)}, nBoutonsTotal, 1);
 gaussChar_stat_all   = nan(nBoutonsTotal, 1);
 gaussR2_stat_all     = nan(nBoutonsTotal, 1);
@@ -375,9 +407,9 @@ gaussChar_run_all    = nan(nBoutonsTotal, 1);
 gaussR2_run_all      = nan(nBoutonsTotal, 1);
 prefSpeed_run_all    = nan(nBoutonsTotal, 1);
 
-for b = 1:nBoutonsTotal
-    alltraces = allDotUnits(b).alltraces;
-    tuning    = allDotUnits(b).tuning;
+for thisBouton = 1:nBoutonsTotal
+    alltraces = allDotUnits(thisBouton).alltraces;
+    tuning    = allDotUnits(thisBouton).tuning;
 
     alltracesClean = cellfun(@(x) x(~isnan(x)), alltraces, 'UniformOutput', false);
     if any(cellfun(@isempty, alltracesClean(:)))
@@ -392,41 +424,42 @@ for b = 1:nBoutonsTotal
     [gp_run, gc_run, gr2_run] = fitGaussianTemplates_tuning(alltracesClean(:,istate), 0.5, false);
     if gc_run == 4, [~, ps_run] = min(tuning(:,istate)); else, [~, ps_run] = max(tuning(:,istate)); end
 
-    gaussParams_stat_all{b} = gp_stat; gaussChar_stat_all(b) = gc_stat; gaussR2_stat_all(b) = gr2_stat; prefSpeed_stat_all(b) = ps_stat;
-    gaussParams_run_all{b}  = gp_run;  gaussChar_run_all(b)  = gc_run;  gaussR2_run_all(b)  = gr2_run;  prefSpeed_run_all(b)  = ps_run;
+    gaussParams_stat_all{thisBouton} = gp_stat; gaussChar_stat_all(thisBouton) = gc_stat; gaussR2_stat_all(thisBouton) = gr2_stat; prefSpeed_stat_all(thisBouton) = ps_stat;
+    gaussParams_run_all{thisBouton}  = gp_run;  gaussChar_run_all(thisBouton)  = gc_run;  gaussR2_run_all(thisBouton)  = gr2_run;  prefSpeed_run_all(thisBouton)  = ps_run;
 
-    if mod(b, 100) == 0
-        fprintf('Gaussian fits: %d / %d boutons...\n', b, nBoutonsTotal);
+    if mod(thisBouton, 100) == 0
+        fprintf('Gaussian fits: %d / %d boutons...\n', thisBouton, nBoutonsTotal);
     end
 end
 
-for b = 1:nBoutonsTotal
-    allDotUnits(b).gaussParams_stat = gaussParams_stat_all{b};
-    allDotUnits(b).gaussChar_stat   = gaussChar_stat_all(b);
-    allDotUnits(b).gaussR2_stat     = gaussR2_stat_all(b);
-    allDotUnits(b).prefSpeed_stat   = prefSpeed_stat_all(b);
+for thisBouton = 1:nBoutonsTotal
+    allDotUnits(thisBouton).gaussParams_stat = gaussParams_stat_all{thisBouton};
+    allDotUnits(thisBouton).gaussChar_stat   = gaussChar_stat_all(thisBouton);
+    allDotUnits(thisBouton).gaussR2_stat     = gaussR2_stat_all(thisBouton);
+    allDotUnits(thisBouton).prefSpeed_stat   = prefSpeed_stat_all(thisBouton);
 
-    allDotUnits(b).gaussParams_run  = gaussParams_run_all{b};
-    allDotUnits(b).gaussChar_run    = gaussChar_run_all(b);
-    allDotUnits(b).gaussR2_run      = gaussR2_run_all(b);
-    allDotUnits(b).prefSpeed_run    = prefSpeed_run_all(b);
+    allDotUnits(thisBouton).gaussParams_run  = gaussParams_run_all{thisBouton};
+    allDotUnits(thisBouton).gaussChar_run    = gaussChar_run_all(thisBouton);
+    allDotUnits(thisBouton).gaussR2_run      = gaussR2_run_all(thisBouton);
+    allDotUnits(thisBouton).prefSpeed_run    = prefSpeed_run_all(thisBouton);
 end
 
-%% ===================== dynamic range and Fano factor, PER STATE =====================
-for b = 1:nBoutonsTotal
-    alltraces = allDotUnits(b).alltraces;
-    tuning    = allDotUnits(b).tuning;
+%% dynamic range and Fano factor, PER STATE
+for thisBouton = 1:nBoutonsTotal
+    alltraces = allDotUnits(thisBouton).alltraces;
+    tuning    = allDotUnits(thisBouton).tuning;
 
     istate = 1;
-    allDotUnits(b).dynamicRange_stat = range(tuning(:,istate)) / options.binSpacing;
-    allDotUnits(b).fanoFactor_stat   = mean(cellfun(@(x) var(x)/mean(x), alltraces(:,istate)), 1);
+    allDotUnits(thisBouton).dynamicRange_stat = range(tuning(:,istate)) / options.binSpacing;
+    allDotUnits(thisBouton).fanoFactor_stat   = mean(cellfun(@(x) var(x)/mean(x), alltraces(:,istate)), 1);
 
     istate = 2;
-    allDotUnits(b).dynamicRange_run = range(tuning(:,istate)) / options.binSpacing;
-    allDotUnits(b).fanoFactor_run   = mean(cellfun(@(x) var(x)/mean(x), alltraces(:,istate)), 1);
+    allDotUnits(thisBouton).dynamicRange_run = range(tuning(:,istate)) / options.binSpacing;
+    allDotUnits(thisBouton).fanoFactor_run   = mean(cellfun(@(x) var(x)/mean(x), alltraces(:,istate)), 1);
 end
 
-%% ===================== dual R^2 filter + descriptive summaries =====================
+%%  R2 filter for both stat and loco + descriptive summaries 
+
 r2_thresh  = 0.1;
 r2p_thresh = 0.05;
 validIdx_stat = find(cat(1,allDotUnits.statR2) > r2_thresh & cat(1,allDotUnits.statR2_pval) < r2p_thresh);
@@ -487,19 +520,20 @@ if ~isempty(idx)
     end
     sgtitle(sprintf('Gaussian params: bandpass cells only (n=%d)', numel(idx)));
 end
-
+validIdx_both = validIdx_both(randperm(length(validIdx_both)));
 if ~isempty(validIdx_both)
     maxPlots = min(6, numel(validIdx_both));
     xDense = linspace(1, 6, 100);
     figure('Color', 'w', 'Name', 'Cross-Validated Gaussian Fit Overlays', 'Position', [100, 50, 1100, 800]);
     for iPlot = 1:maxPlots
-        b = validIdx_both(iPlot);
+        
+        thisBouton = validIdx_both(iPlot);
         subplot(2,3,iPlot); hold on;
-        y_data_stat = allDotUnits(b).tuning(:,1) / options.binSpacing;
-        y_data_run  = allDotUnits(b).tuning(:,2) / options.binSpacing;
-        p_stat = allDotUnits(b).gaussParams_stat;
+        y_data_stat = allDotUnits(thisBouton).tuning(:,1) / options.binSpacing;
+        y_data_run  = allDotUnits(thisBouton).tuning(:,2) / options.binSpacing;
+        p_stat = allDotUnits(thisBouton).gaussParams_stat;
         y_fit_stat = (p_stat(1) + p_stat(2)*exp(-((xDense-p_stat(3)).^2)/(2*p_stat(4)^2))) / options.binSpacing;
-        p_run = allDotUnits(b).gaussParams_run;
+        p_run = allDotUnits(thisBouton).gaussParams_run;
         y_fit_run = (p_run(1) + p_run(2)*exp(-((xDense-p_run(3)).^2)/(2*p_run(4)^2))) / options.binSpacing;
 
         plot(1:6, y_data_stat, 'ko', 'MarkerFaceColor','k','MarkerSize',5.5);
@@ -510,9 +544,23 @@ if ~isempty(validIdx_both)
         allVals = [y_data_stat; y_data_run; y_fit_stat'; y_fit_run'];
         ylim([min(allVals)-0.03, max(allVals)+0.03]); xlim([0.5,6.5]); xticks(1:6);
         ylabel('\DeltaF/F'); xlabel('Visual Speed Index');
-        title(sprintf('Bouton %d (%s)\nStat Type %d | Run Type %d', b, allDotUnits(b).sessionLabel, ...
-            allDotUnits(b).gaussChar_stat, allDotUnits(b).gaussChar_run), 'FontSize', 9, 'Interpreter', 'none');
+        title(sprintf('Bouton %d (%s)\nStat Type %d | Run Type %d', thisBouton, allDotUnits(thisBouton).sessionLabel, ...
+            allDotUnits(thisBouton).gaussChar_stat, allDotUnits(thisBouton).gaussChar_run), 'FontSize', 9, 'Interpreter', 'none');
         if iPlot == 1, legend('Location','best'); end
     end
-    sgtitle('Verified Gaussian Model Fits Across States (cross-validated cohort)', 'FontSize', 13, 'FontWeight', 'bold');
+    sgtitle('Gaussian Model Fits Across States (cross-validated cohort)', 'FontSize', 13, 'FontWeight', 'bold');
 end
+
+% tests
+% DotFields_SelectRepresentativeBouton
+
+
+
+plotDotFieldsExampleBoutonStateSplit('M25132', '20260226',12)
+plotDotFieldsExampleBoutonStateSplit('M25132', '20260226',9)
+plotDotFieldsExampleBoutonStateSplit('M25133', '20260224',38)
+
+plotDotFieldsExampleBoutonStateSplit('M26003', '20260326',20)
+
+
+%DotFields_TrialCountMatchedComparison

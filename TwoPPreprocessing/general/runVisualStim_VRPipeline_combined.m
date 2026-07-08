@@ -21,7 +21,7 @@ doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 
 
 
 % pairs.M26005 = '20260318';
-pairs.M26003 = '20260325';
+% pairs.M26003 = '20260325';
 % pairs.M25132 = '20260326';
 % pairs.M25131 = '20260314';
 
@@ -35,6 +35,19 @@ pairs.M26003 = '20260325';
 % pairs.M25133 = '20260224';
 
 % pairs.M25132 = {'20260226'};
+
+
+
+%% additional rf mapping sitmuli to check if there is anything 
+pairs = struct;
+pairs.M25132 = {...
+                '20260214A','20260214B','20260214C','20260214D', ...
+                '20260216A','20260216B','20260216C'};
+pairs.M25133 = {'20260216A','20260216B','20260216C','20260216D'};
+pairs.M26003 = {'20260307A','20260307B', ...
+                '20260313A','20260313B','20260313C'};
+
+%%
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
 mouseInfo = sessionsToProcess(filteredTable);
 
@@ -76,7 +89,7 @@ rfpostStimTime = 3;     % seconds
 method = 2;             % Method for PSTH extraction (e.g., 2 for mean)
 
 %% INITIALISE ERROR LOG
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'FINALRun_20260628_RSPLearning.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', '20260706_processRFMapping_fovSearchSessions.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 % If the log file doesn't exist, create it with headers
 if ~exist(logFilePath, 'file')
@@ -231,7 +244,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         [~, sessionFileInfo] = getTuningStimEventsBonsaiFile(sessionFileInfo, thisName, true);
                         [~, ~, ~, sessionFileInfo] = resamplAndAlignVisualStim_BonsaiPeripheralSuite2P(sessionFileInfo, interpRate, 'TwoPFrameTime', thisName);
                         % 20s window; 5th percentile to compute f0 
-                        [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, thisName, zScoreProcessedSignals,false, false, 5,5,20);
+                        [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, thisName, zScoreProcessedSignals,false, false, 5,5,20); %zscore; do not smooth or do red channel correction 
                         [~, sessionFileInfo] = getStimTimes(sessionFileInfo, thisName, pdThresholdForStimEvents);
                        
                      
@@ -243,6 +256,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                             [response, sessionFileInfo] = getTrialResponsePSTH(sessionFileInfo, thisName, signalName);
                             % plotRFGrid_byPosition_ROIs(sessionFileInfo, thisName);
                             [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, thisName);
+                            [~] = getRunningAndPupilDataByTrials(sessionFileInfo, thisName);
                             % plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,false)
 
                         % elseif contains(thisName, 'DotMotion_RFMapping')

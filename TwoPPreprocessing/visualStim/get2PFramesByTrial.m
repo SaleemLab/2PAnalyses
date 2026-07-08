@@ -54,6 +54,8 @@ end
 % Set output path
 stimFileName = sprintf('%s_%s_Response_%s.mat', ...
     sessionFileInfo.animal_name, sessionFileInfo.session_name, stimName);
+
+% output path should be saved.. 
 sessionFileInfo.stimFiles(iStim).Response = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
 
 %% Setup Timebase
@@ -117,5 +119,6 @@ end
 response.preStimTime = preStimTime;
 response.postStimTime = postStimTime;
 save(sessionFileInfo.stimFiles(iStim).Response, 'response');
+save(sessionFileInfo.sessionFileInfo_filepath, 'sessionFileInfo');
 fprintf('Done. %d trials flagged. Alignment grid set to 60Hz.\n', sum(response.badTrialMask));
 end
