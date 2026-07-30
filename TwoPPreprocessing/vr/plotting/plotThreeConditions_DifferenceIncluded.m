@@ -1,8 +1,9 @@
 function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea, varargin)
-% plotThreeConditions_CombinedHeatmaps: 
-% Row 1: Absolute Normalized Heatmaps (Grayscale, 4 Columns [BaseEven, Swap, Omit2, Omit3])
-% Row 2: Relative Delta Change Heatmaps (Red/White/Blue, 3 Columns [Swap, Omit2, Omit3])
-% Configured with pixel-perfect, locked alignment vectors for zero column drift.
+% plotThreeConditions_DifferenceIncluded: Heatmap-Only Production Layout (3-Condition Version).
+% Row 1: Absolute Normalized Heatmaps (Grayscale, 4 Columns [BaseEven + 3 Conditions])
+% Row 2: Relative Delta Change Heatmaps (Red/White/Blue, 3 Columns)
+% Row 3: Mean Delta Change Line Plots (3 Columns)
+% Layout mirrors plotConditions_DifferenceIncluded, squeezed for a 4/3-column set.
 
     p = inputParser;
     addRequired(p, 'allData', @isstruct);
@@ -18,8 +19,13 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
     targetFont = p.Results.FontName;
     cellType = p.Results.TypeToPlot;
     
-    warmColors = [0.541, 0.012, 0.012; 0.824, 0.016, 0.176];  
-    coolColors = [0.000, 0.400, 1.000];
+    warmColors = [
+        0.541, 0.012, 0.012;  % Omit 2 (Deep Blood Red)
+        0.824, 0.016, 0.176   % Omit 3 (Cherry Red)
+    ];  
+    coolColors = [
+        0.000, 0.400, 1.000   % Swap 2 3 (Azul Blue)
+    ]; 
     
     if all(cellfun(@isempty, {allData.TargetArea})), [allData.TargetArea] = deal(char(targetArea)); end
     if isfield(allData, 'Type') && ~isfield(allData, 'TypeImaged')
@@ -58,6 +64,7 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
         if isempty(baseIdx), baseIdx = 1; end
         baseName = allCondsInDay{baseIdx};
         
+        % Three-condition requirement set: 1 swap + 2 omits
         targetSwaps = {'Swap_2_3'};
         targetOmits = {'Omit_2', 'Omit_3'}; 
         requiredConditions = [{baseName}, targetSwaps, targetOmits];
@@ -144,7 +151,7 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
     
     if isempty(condDataStore), figHandle = []; disp('No sessions matched.'); return; end
     
-    %% --- MASTER SORTING & SUBSET ISOLATION ---
+    %% MASTER SORTING & SUBSET ISOLATION 
     fullBaselineOdd = condDataStore(1).rawMatrices;
     minFullOdd = min(fullBaselineOdd, [], 2, 'omitnan'); 
     maxFullOdd = max(fullBaselineOdd, [], 2, 'omitnan'); 
@@ -158,39 +165,38 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
 
     tuningRange = max(normFullOddRef, [], 2) - min(normFullOddRef, [], 2);
     keepCells = tuningRange > 0.3;
-    fullSortIdx_filtered = fullSortIdx(keepCells(fullSortIdx));
-    numN_filtered = sum(keepCells);
+    fullSortIdx_filtered = fullSortIdx(keepCells(fullSortIdx)); %#ok<NASGU>
+    numN_filtered = sum(keepCells); %#ok<NASGU>
     fprintf('Cells with clear baseline tuning: %d / %d\n', numN_filtered, numN);
     
-    %% --- EXTRACT BASELINE REFERENCE ARRAYS ---
+    % EXTRACT BASELINE REFERENCE ARRAYS 
     baseEvenIdx = find(contains(lower({condDataStore.conditionNames}), 'baseline even'), 1);
     rawBaseEven = condDataStore(baseEvenIdx).rawMatrices;
     normBaseEven = (rawBaseEven - minFullOdd) ./ rangeFullOdd;
     normBaseEven(isnan(normBaseEven)) = 0;
     
-    %% --- FIXED COMPACT GEOMETRIC DESIGN CHANNELS ---
-    % Custom hardcoded spacing coordinates lock down perfect narrow column matching.
-    % Format: [Left, Bottom, Width, Height]
-    row1_Positions = {[0.10, 0.54, 0.16, 0.38], [0.32, 0.54, 0.16, 0.38], [0.54, 0.54, 0.16, 0.38], [0.76, 0.54, 0.16, 0.38]}; % Absolute (4 Columns)
-    row2_Positions = {[0.32, 0.10, 0.16, 0.38], [0.54, 0.10, 0.16, 0.38], [0.76, 0.10, 0.16, 0.38]};                         % Delta Change (3 Columns)
+    %% 
+    % Subplot positions sized for a 4-column absolute row and a 3-column delta/line set.
+    row1_Positions = {[0.10, 0.64, 0.16, 0.28], [0.32, 0.64, 0.16, 0.28], [0.54, 0.64, 0.16, 0.28], [0.76, 0.64, 0.16, 0.28]}; % 4 Absolute Columns
+    row2_Positions = {[0.32, 0.28, 0.16, 0.28], [0.54, 0.28, 0.16, 0.28], [0.76, 0.28, 0.16, 0.28]};                         % 3 Delta Columns (same height as Row 1)
+    row3_Positions = {[0.32, 0.06, 0.16, 0.14], [0.54, 0.06, 0.16, 0.14], [0.76, 0.06, 0.16, 0.14]};                         % 3 Mean Delta Line Columns
     
-    figHandle = figure('Position', [80 80 1150 780], 'Color', 'w');
+    figHandle = figure('Position', [50 50 1150 780], 'Color', 'w');
     
-    % Symmetrical Divergent Red-White-Blue Map Setup
+    % 
     cMapLen = 256;
     b = [linspace(1, 1, cMapLen/2), linspace(1, 0, cMapLen/2)];
     g = [linspace(0, 1, cMapLen/2), linspace(1, 0, cMapLen/2)];
     r = [linspace(0, 1, cMapLen/2), linspace(1, 1, cMapLen/2)];
     redWhiteBlueMap = [b', g', r']; 
     
-    row1_Indices = [2, 3, 4, 5]; % Base Even, Swap 2 3, Omit 2, Omit 3
-    row2_Tokens  = {'swap', 'omit.*2', 'omit.*3'};
+    row1_Indices = [2, 3, 4, 5]; % Base Even + 3 active tracking manipulations
+    row2_Tokens  = {'swap.*2.*3', 'omit.*2', 'omit.*3'};
     displayNames = {'Swap 2 3', 'Omit 2', 'Omit 3'};
     colors = {coolColors(1,:), warmColors(1,:), warmColors(2,:)};
-    
 
-    %%  ABSOLUTE NORMALIZED HEATMAP PANELS (GRAYSCALE)
-
+    %% --- ROW 1: ABSOLUTE INFERRED SPIKE AMPLITUDE HEATMAPS (GRAYSCALE) ---
+  
     for i = 1:4
         axAbs = axes('Position', row1_Positions{i}); 
         currentCond = condDataStore(row1_Indices(i));
@@ -202,10 +208,10 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
         imagesc(axAbs, [0, 200], [1, numN], normalizedDisplay(fullSortIdx, :));
         colormap(axAbs, flipud(gray));
         set(axAbs, 'CLim', [0.25 0.75], 'YDir', 'normal', 'Box', 'off', 'TickDir', 'out');
-        set(axAbs, 'XTick', [40 80 120 160], 'XTickLabel', {'40', '80', '120', '160'}, 'FontName', targetFont, 'FontSize', 11);
+        set(axAbs, 'XTick', [40 80 120 160], 'XTickLabel', {'40', '80', '120', '160'}, 'FontName', targetFont, 'FontSize', 10);
         
         if i == 1
-            title(axAbs, 'Base Even', 'Color', [0 0 0], 'FontSize', 12, 'FontName', targetFont, 'FontWeight', 'bold');
+            title(axAbs, 'Base Even', 'Color', [0 0 0], 'FontSize', 11, 'FontName', targetFont, 'FontWeight', 'bold');
             ylabel(axAbs, sprintf('Sorted Background %s\n(n = %d)', cellType, numN), 'FontName', targetFont, 'FontSize', 12);
             text(axAbs, -15, numN, sprintf('%d background %s', numN, lower(cellType)), ...
                 'Rotation', 90, 'FontName', targetFont, 'FontSize', 11, 'FontAngle', 'italic', ...
@@ -213,7 +219,7 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
         else
             set(axAbs, 'YColor', 'none', 'YTick', []);
             cleanTitle = strrep(currentCond.conditionNames, '_', ' ');
-            title(axAbs, cleanTitle, 'Color', currentCond.titleColors, 'FontSize', 12, 'FontName', targetFont, 'FontWeight', 'bold');
+            title(axAbs, cleanTitle, 'Color', currentCond.titleColors, 'FontSize', 11, 'FontName', targetFont, 'FontWeight', 'bold');
         end
         
         hold(axAbs, 'on');
@@ -222,18 +228,18 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
         end
     end
     
-    % Isolated Grayscale Scale Colorbar
-    axAbsCB = axes('Position', [0.94, 0.54, 0.015, 0.38]); 
+    % Absolute Grayscale Colorbar Flank
+    axAbsCB = axes('Position', [0.94, 0.64, 0.015, 0.28]); 
     set(axAbsCB, 'XColor', 'none', 'YColor', 'none', 'Box', 'off');
     colormap(axAbsCB, flipud(gray));
     cbAbs = colorbar(axAbsCB, 'Location', 'eastoutside');
-    cbAbs.Position = [0.94, 0.54, 0.015, 0.38];
+    cbAbs.Position = [0.94, 0.64, 0.015, 0.28];
     cbAbs.Ticks = [0.25 0.50 0.75]; cbAbs.TickLabels = {'0.25', '0.50', '0.75'};
     cbAbs.TickDirection = 'out'; cbAbs.Box = 'off'; cbAbs.FontName = targetFont; cbAbs.FontSize = 10;
-    cbAbs.Label.String = 'Activity (norm.)'; cbAbs.Label.FontName = targetFont; cbAbs.Label.FontSize = 12;
+    cbAbs.Label.String = 'Inferred Spike Amplitude (norm.)'; cbAbs.Label.FontName = targetFont; cbAbs.Label.FontSize = 11;
 
-    %% ROW 2: RELATIVE CHANGE DELTA HEATMAP PANELS (RED/WHITE/BLUE)
-
+    %%RELATIVE CHANGE DELTA HEATMAP PANELS (RED/WHITE/BLUE) ---
+   
     for i = 1:3
         matchIdx = find(~cellfun(@isempty, regexpi({condDataStore.conditionNames}, row2_Tokens{i})), 1);
         if isempty(matchIdx), continue; end
@@ -243,26 +249,31 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
         normCond = (localMatrix - minFullOdd) ./ rangeFullOdd;
         normCond(isnan(normCond)) = 0; 
         
-        % Relative Delta Subtraction (Condition - Baseline Even)
+        % Subtraction Logic (Condition - Baseline Even)
         diffMat = normCond - normBaseEven;
         
         axHM = axes('Position', row2_Positions{i});
         imagesc(axHM, [0, 200], [1, numN], diffMat(fullSortIdx, :));
-        colormap(axHM, flipud(redWhiteBlueMap)); % Flips order: Red (+), White (0), Blue (-)
+        colormap(axHM, flipud(redWhiteBlueMap)); % Red = Increase (+), Blue = Decrease (-)
         set(axHM, 'CLim', [-0.4 0.4], 'YDir', 'normal', 'Box', 'off', 'TickDir', 'out');
         
-        set(axHM, 'XTick', [40 80 120 160], 'XTickLabel', {'40', '80', '120', '160'}, 'FontName', targetFont, 'FontSize', 11);
-        title(axHM, ['\Delta ' displayNames{i}], 'Color', colors{i}, 'FontSize', 12, 'FontName', targetFont, 'FontWeight', 'bold');
-        xlabel(axHM, 'Position (cm)', 'FontName', targetFont, 'FontSize', 12);
+        set(axHM, 'XTick', [40 80 120 160], 'XTickLabel', {});
+        title(axHM, ['\Delta ' displayNames{i}], 'Color', colors{i}, 'FontSize', 11, 'FontName', targetFont, 'FontWeight', 'bold');
         
-        %
         landmarks = [40 80 120 160];
         currentNameLow = lower(currentCond.conditionNames);
         hold(axHM, 'on');
         for lIdx = 1:4
             posBin = landmarks(lIdx);
             isTargetLandmark = false; 
-            if contains(currentNameLow, num2str(lIdx)), isTargetLandmark = true; end
+            
+         
+            if contains(currentNameLow, 'swap')
+                tokenParts = regexp(row2_Tokens{i}, '\d', 'match');
+                if any(strcmpi(num2str(lIdx), tokenParts)), isTargetLandmark = true; end
+            else
+                if contains(currentNameLow, num2str(lIdx)), isTargetLandmark = true; end
+            end
             
             if isTargetLandmark
                 xline(axHM, posBin, '--', 'Color', colors{i}, 'LineWidth', 2.0);
@@ -276,19 +287,39 @@ function figHandle = plotThreeConditions_DifferenceIncluded(allData, targetArea,
         else
             set(axHM, 'YColor', 'none', 'YTick', []);
         end
+
+        %% --- ROW 3: MEAN DELTA CHANGE LINE PLOT ---
+        meanDiffTrace = mean(diffMat, 1, 'omitnan');
+        nBins = numel(meanDiffTrace);
+        xPositions = linspace(0, 200, nBins);
+
+        axMean = axes('Position', row3_Positions{i});
+        hold(axMean, 'on');
+        yline(axMean, 0, '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 1);
+        plot(axMean, xPositions, meanDiffTrace, '-', 'Color', colors{i}, 'LineWidth', 1.5);
+        xlim(axMean, [1, 200]);
+        set(axMean, 'Box', 'off', 'TickDir', 'out');
+        % Set LAST, after all other formatting, so nothing resets it back to auto
+        set(axMean, 'YLim', [-0.3, 0.3], 'YLimMode', 'manual','XTick', [-0.3,0, 0.3]);
+        set(axMean, 'XTick', [40 80 120 160], 'XTickLabel', {'40', '80', '120', '160'}, 'FontName', targetFont, 'FontSize', 10);
+        xlabel(axMean, 'Position (cm)', 'FontName', targetFont, 'FontSize', 11);
+
+        if i == 1
+            ylabel(axMean, sprintf('Mean activity\n(Cond - Base)'), 'FontName', targetFont, 'FontSize', 11);
+        end
     end
     
     %% 
-    axCB = axes('Position', [0.94, 0.10, 0.015, 0.38]); 
+    axCB = axes('Position', [0.94, 0.28, 0.015, 0.28]); 
     set(axCB, 'XColor', 'none', 'YColor', 'none', 'Box', 'off');
     colormap(axCB, flipud(redWhiteBlueMap));
     
     cbDiff = colorbar(axCB, 'Location', 'eastoutside');
-    cbDiff.Position = [0.94, 0.10, 0.015, 0.38];
+    cbDiff.Position = [0.94, 0.28, 0.015, 0.28];
     cbDiff.Ticks = [-0.4 0 0.4]; cbDiff.TickLabels = {'Decrease (-)', 'No Change (0)', 'Increase (+)'};
     cbDiff.TickDirection = 'out'; cbDiff.Box = 'off'; cbDiff.FontName = targetFont; cbDiff.FontSize = 10;
-    cbDiff.Label.String = '\Delta Activity (Condition - Baseline Even)';
-    cbDiff.Label.FontName = targetFont; cbDiff.Label.FontSize = 12;
+    cbDiff.Label.String = '\Delta Inferred Spike Amplitude (Condition - Baseline Even)';
+    cbDiff.Label.FontName = targetFont; cbDiff.Label.FontSize = 11;
     
     if ~isempty(p.Results.SavePath), saveFigureFormats(figHandle, p.Results.SavePath); end
 end
