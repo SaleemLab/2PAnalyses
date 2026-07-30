@@ -100,3 +100,7 @@ saveFigureFormats(figMid, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\Results
 figHigh = plotRoiSpatialTuning(RSPData, 1, 81, 'High_Significant');
 saveFigureFormats(figHigh, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section3_Fig3.3\exampleROIs\ExampleTuning_High');
 
+
+
+%%  smi for v1 only 
+compareAndPlot_SMI_RSP_vs_VISp(VISpDataSpks, VISpDataSpks)

@@ -153,3 +153,198 @@ rectangle('Position', [x_start, y_start, bar_width_px, bar_height_px], ...
 hold off; 
 saveFigureFormats(fig2, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section1_Fig3.1\Fig3.1_ExpSetup\FOVs\ExampleFOV_GreenChan');
 saveFigureFormats(fig3, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section1_Fig3.1\Fig3.1_ExpSetup\FOVs\ExampleFOV_RedChan');
+
+
+
+
+%% multi plane 
+suite2p_dir = 'Z:\ibn-vision\DATA\SUBJECTS\M25133\Processed\20260219\suite2p';
+num_planes = 8;
+
+plane_images = cell(1, num_planes);
+sharpness_scores = nan(1, num_planes);
+valid_planes = false(1, num_planes);
+
+%% Load images and calculate Laplacian variance sharpness
+fprintf('Loading Fall.mat files across planes...\n');
+
+for p = 0:(num_planes - 1)
+    % Construct folder and file paths (note: backup0, backup1, ...)
+    fall_path = fullfile(suite2p_dir, sprintf('backup%d', p), 'Fall.mat');
+    
+    if ~exist(fall_path, 'file')
+        warning('Plane %d: Fall.mat not found at %s - skipping', p, fall_path);
+        continue;
+    end
+    
+    % Load Fall.mat (ops is stored inside)
+    data = load(fall_path, 'ops');
+    if ~isfield(data, 'ops')
+        warning('Plane %d: "ops" struct not found in %s', p, fall_path);
+        continue;
+    end
+    
+    ops = data.ops;
+    
+    % Extract meanImg (ensure double precision)
+    mean_img = double(ops.meanImg);
+    
+    % Calculate Laplacian variance sharpness score
+    % (fspecial/imfilter equivalent to scipy.ndimage.laplace)
+    lap_filter = [0 1 0; 1 -4 1; 0 1 0];
+    lap_img = imfilter(mean_img, lap_filter, 'replicate');
+    sharpness = var(lap_img(:), 'omitnan');
+    
+    % MATLAB cell indices are 1-based (Plane 0 -> Index 1)
+    plane_idx = p + 1; 
+    plane_images{plane_idx} = mean_img;
+    sharpness_scores(plane_idx) = sharpness;
+    valid_planes(plane_idx) = true;
+    
+    fprintf('Plane %d: sharpness = %.2f\n', p, sharpness);
+end
+
+%% Print Sharpness Summary
+fprintf('\n--- Sharpness Summary (ascending = potential fly-back plane) ---\n');
+[sorted_scores, sort_idx] = sort(sharpness_scores(valid_planes), 'ascend');
+valid_plane_nums = find(valid_planes) - 1; % Convert back to 0-indexed plane numbers
+
+for k = 1:length(sorted_scores)
+    fprintf('Plane %d: %.2f\n', valid_plane_nums(sort_idx(k)), sorted_scores(k));
+end
+
+%% Plot Grid Diagnostic Figure
+num_found = sum(valid_planes);
+n_cols = 4;
+n_rows = ceil(num_found / n_cols);
+
+fig_grid = figure('Color', 'w', 'Position', [100, 100, 1200, 300 * n_rows]);
+t = tiledlayout(n_rows, n_cols, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+found_indices = find(valid_planes);
+
+for i = 1:num_found
+    idx = found_indices(i);
+    plane_num = idx - 1;
+    img = plane_images{idx};
+    
+    nexttile(t);
+    
+    % 1st and 99th percentile contrast stretch (similar to vmin/vmax in pyplot)
+    p_limits = prctile(img(:), [1 99]);
+    
+    imagesc(img, p_limits);
+    colormap gray;
+    axis image off;
+    title(sprintf('Plane %d\nsharpness = %.1f', plane_num, sharpness_scores(idx)), ...
+        'FontSize', 10);
+end
+
+title(t, 'Mean image per plane — look for visibly blurred/smeared planes (fly-back)', ...
+    'FontSize', 12, 'FontWeight', 'bold');
+
+% Save grid plot
+saveFigureFormats(fig_grid, fullfile(suite2p_dir, 'all_plane_mean_images'));
+
+%% Pass collected images into your stack function
+% Filter to valid images only
+valid_images = plane_images(valid_planes);
+
+% Call isometric stack plot (adjust z_spacing and rot_deg as needed)
+fig_stack = plot_isometric_stack(valid_images, 0.25, 180);
+
+
+
+%% supp figure:
+%% Set up Figure 2 Window (FOV Reference Image)
+sessionFileInfo = get2PsessionFilePaths('MI268', '20260721B');
+RF = find(contains({sessionFileInfo.stimFiles.name}, 'RFMapping', 'IgnoreCase', true));
+if length(RF) > 1
+    RF = RF(1); 
+end 
+
+% Scale bar parameters (Zoom 9)
+img_pixels = 256;       
+img_microns = 81;       
+desired_bar_um = 20;
+
+pixel_per_micron = img_pixels / img_microns;
+bar_width_px = desired_bar_um * pixel_per_micron; 
+bar_height_px = 6; 
+edge_padding = 15; 
+
+x_start = img_pixels - edge_padding - bar_width_px;
+y_start = img_pixels - edge_padding - bar_height_px;
+
+% Load ops and stat
+proc2PData = load(sessionFileInfo.stimFiles(RF).processedMergedBonsaiSuite2pData, 'ops', 'stat');
+
+% Extract ops
+if iscell(proc2PData.ops) && iscell(proc2PData.ops{1})
+    ops_p1 = proc2PData.ops{1}{1};
+elseif iscell(proc2PData.ops)
+    ops_p1 = proc2PData.ops{1};
+else
+    ops_p1 = proc2PData.ops;
+end
+
+% FIX: Extract all ROIs without discarding elements by taking {1} prematurely
+stat_all = proc2PData.stat;
+if iscell(stat_all) && length(stat_all) == 1 && iscell(stat_all{1})
+    stat_all = stat_all{1}; % Unwrap plane layer if multi-plane cell
+end
+
+num_rois = length(stat_all);
+
+fig2 = figure('Color', 'w', 'Position', [100, 100, 400, 400]);
+imagesc(ops_p1.meanImgE);
+colormap gray;
+axis image off;
+hold on;
+
+% Concatenate all ROI outline points into single vectors for fast plotting
+all_x = [];
+all_y = [];
+
+for roi_idx = 1:num_rois
+    if iscell(stat_all)
+        st = stat_all{roi_idx};
+        if iscell(st), st = st{1}; end
+    else
+        st = stat_all(roi_idx);
+    end
+    
+    x = double(st.xpix);
+    y = double(st.ypix);
+    
+    % Adjust 0-based Python indices to 1-based MATLAB indices
+    if min(x) == 0 || min(y) == 0
+        x = x + 1;
+        y = y + 1;
+    end
+    
+    try
+        k = convhull(x, y);
+        bx = x(k);
+        by = y(k);
+    catch
+        bx = x;
+        by = y;
+    end
+    
+    % Append polygon coordinates separated by NaN
+    all_x = [all_x, bx(:)', NaN];
+    all_y = [all_y, by(:)', NaN];
+end
+
+% Plot ALL 435 masks in one shot
+plot(all_x, all_y, 'Color', [1, 0.2, 0.2], 'LineWidth', 0.8);
+
+% Scale bar
+rectangle('Position', [x_start, y_start, bar_width_px, bar_height_px], ...
+          'FaceColor', 'w', 'EdgeColor', 'none');
+hold off;
+
+%% Export Figure
+save_path_fig2 = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Supp_Section1_Fig4_1_VISp\fovs\ExampleFOV_Somas';
+saveFigureFormats(fig2, save_path_fig2);

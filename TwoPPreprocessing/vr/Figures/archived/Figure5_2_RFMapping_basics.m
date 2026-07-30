@@ -14,12 +14,14 @@ signalName = 'dFFNeuropilCorrected';
 
 % this will always be neu for the boutons but just to be safe 
 
-%% sessions to load 
+%% sessions to load (include all learning and post learning sessions)
 
 pairs=struct;
 pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
 pairs.M25133 = {'20260219','20260223','20260221'};
 pairs.M26003 = {'20260316','20260322','20260324','20260325'};
+
+
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'RFMapping', 'BaselinCorridor', 'LandManipCorridor'});
 allMice    = filteredTable.MouseID;
 uniqueMice = unique(allMice, 'stable');
@@ -168,10 +170,13 @@ fprintf('Pooling complete: %d total boutons across %d sessions.\n', ...
 
 %% basic responsiveness bookkeeping
 
+
+% change response window here 0.1 to 3s 
 uAz        = RFMappingMetadata.uAz;
 uEl_plot   = RFMappingMetadata.uEl;
 timeVector = RFMappingMetadata.timeVector;
-respWin    = RFMappingMetadata.respWin;
+% respWin    = RFMappingMetadata.respWin;
+respWin = [0.1 3]
 
 nAz = length(uAz);
 nEl = length(uEl_plot);
@@ -260,7 +265,7 @@ for iROI = 1:numBoutons
     [prefVal, mI] = max(meanGridResponse(:));
     
     % critera 
-    isResponsive = (pValANOVA < 0.05)   && (prefVal > (blankMean + 2 * blankStd));
+    isResponsive = (pValANOVA < 0.05)   && (prefVal > (blankMean + 1 * blankStd));
     
     % update update
     allRFMapping(iROI).pValANOVA    = pValANOVA;

@@ -13,13 +13,13 @@
 % zScore/anovaSig (or candidateRespIdxList) already computed for the
 % responsive-population comparison.
 
-respWin = [0.5 3]; 
+respWin = [0.1 3]; 
 runSpeedThresh  = 3;
 statSpeedThresh = 0.5;
 propThresh      = 0.75;
 NSD_final = 1;
 ALPHA = 0.05;
-stimFramesMask_range = [0 2.0];  
+stimFramesMask_range = [-0.2 2.8];  
 isResponsive_1SD = ([allRFMapping.pValANOVA] < ALPHA) & (zScore(:)' > NSD_final);
 respIdxList_1SD = find(isResponsive_1SD);
 fprintf('%d / %d boutons responsive at 1SD criterion.\n', numel(respIdxList_1SD), numel(allRFMapping));

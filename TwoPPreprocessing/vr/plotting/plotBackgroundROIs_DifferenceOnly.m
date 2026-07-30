@@ -178,7 +178,7 @@ function figHandle = plotBackgroundROIs_DifferenceOnly(allData, targetArea, vara
     [~, fullSortIdx] = sort(fullPeaks);
     totalSomas       = size(fullBaselineOdd, 1);
 
-    topRows           = fullSortIdx(max(4300,1):totalSomas);
+    topRows           = fullSortIdx(max(4000,1):totalSomas);
     candidateIndices  = topRows;
     meanVal           = mean(fullBaselineOdd(candidateIndices,:), 2, 'omitnan');
     maxVal            = max(fullBaselineOdd(candidateIndices,:),  [], 2, 'omitnan');

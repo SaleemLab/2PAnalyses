@@ -48,10 +48,10 @@ function allDirTuning = computeDirTuningOSI(allDirTuning, responsivenessField, m
 %   - Neither method changes which trials/response window were used to
 %     compute meanDirResponse -- that was already fixed when
 %     allDirTuning was built. Make sure respWin matches what you intend
-%     to report (e.g. [0.5, 2] to match the paper) BEFORE calling this.
+%     to report (e.g. [0.1, 3] to match the paper) BEFORE calling this.
 
 if nargin < 2 || isempty(responsivenessField)
-    responsivenessField = 'isResponsive_ttest';
+    responsivenessField = 'isTunedCVR2';
 end
 if nargin < 3 || isempty(makePlots)
     makePlots = true;
@@ -62,37 +62,42 @@ fprintf('computeDirTuningOSI: using "%s" as the responsiveness criterion.\n', re
 nBoutonsTotal = numel(allDirTuning);
 
 %% Timplalexi et al 2025
+% VECTOR METHOD -- commented out entirely, keeping only the simple-ratio
+% method below active. OSI/prefOrientationDeg are left as all-NaN so
+% downstream code that checks for these fields doesn't error, it just
+% won't have vector-method values.
 OSI = nan(nBoutonsTotal, 1);
 prefOrientationDeg = nan(nBoutonsTotal, 1);
 
-for b = 1:nBoutonsTotal
-    s = allDirTuning(b);
-
-    if ~isfield(s, responsivenessField) || ~s.(responsivenessField)
-        continue;
-    end
-    if ~isfield(s, 'stimValues')
-        continue;
-    end
-
-    thetaDeg = s.stimValues(:)';
-    thetaRad = deg2rad(thetaDeg);
-    R = s.meanDirResponse(:)';
-    R_rect = max(R, 0); % half-wave rectify
-
-    if sum(R_rect) == 0 || all(isnan(R_rect))
-        continue;
-    end
-
-    vectorSum = sum(R_rect .* exp(1i * 2 * thetaRad));
-    OSI(b) = abs(vectorSum) / sum(R_rect);
-
-    prefAngleRad = angle(vectorSum) / 2;
-    prefOrientationDeg(b) = mod(rad2deg(prefAngleRad), 180);
-end
+% for b = 1:nBoutonsTotal
+%     s = allDirTuning(b);
+%
+%     if ~isfield(s, responsivenessField) || ~s.(responsivenessField)
+%         continue;
+%     end
+%     if ~isfield(s, 'stimValues')
+%         continue;
+%     end
+%
+%     thetaDeg = s.stimValues(:)';
+%     thetaRad = deg2rad(thetaDeg);
+%     R = s.meanDirResponse(:)';
+%     R_rect = max(R, 0); % half-wave rectify
+%
+%     if sum(R_rect) == 0 || all(isnan(R_rect))
+%         continue;
+%     end
+%
+%     vectorSum = sum(R_rect .* exp(1i * 2 * thetaRad));
+%     OSI(b) = abs(vectorSum) / sum(R_rect);
+%
+%     prefAngleRad = angle(vectorSum) / 2;
+%     prefOrientationDeg(b) = mod(rad2deg(prefAngleRad), 180);
+% end
 
 %% simple ratio method (Niell & Stryker) 
 OSI_simple = nan(nBoutonsTotal, 1);
+prefOrientationDeg_simple = nan(nBoutonsTotal, 1); % preferred orientation (0-180) from the simple-ratio method, since vector-method prefOrientationDeg is no longer computed
 
 for b = 1:nBoutonsTotal
     s = allDirTuning(b);
@@ -126,13 +131,15 @@ for b = 1:nBoutonsTotal
         continue;
     end
     OSI_simple(b) = (Rpref - Rortho) / (Rpref + Rortho);
+    prefOrientationDeg_simple(b) = uniqueOrients(prefIdx);
 end
 
 %%  attach results 
 for b = 1:nBoutonsTotal
-    allDirTuning(b).OSI                = OSI(b);
-    allDirTuning(b).prefOrientationDeg = prefOrientationDeg(b);
-    allDirTuning(b).OSI_simple         = OSI_simple(b);
+    allDirTuning(b).OSI                       = OSI(b);
+    allDirTuning(b).prefOrientationDeg        = prefOrientationDeg(b);        % vector method -- all-NaN now, kept for compatibility
+    allDirTuning(b).prefOrientationDeg_simple = prefOrientationDeg_simple(b); % simple-ratio method -- use this instead
+    allDirTuning(b).OSI_simple                = OSI_simple(b);
 end
 
 nResponsive  = sum(arrayfun(@(s) isfield(s, responsivenessField) && s.(responsivenessField), allDirTuning));
@@ -144,32 +151,45 @@ fprintf('%d boutons have a valid simple-ratio OSI.\n', nValidSimple);
 
 %% plots 
 if makePlots
-    figure('Position', [100 100 1300 400]);
-    subplot(1,3,1);
-    histogram(OSI(~isnan(OSI)), 20);
-    xlabel('OSI (vector method / gOSI)'); ylabel('Number of boutons');
-    title(sprintf('Vector-method OSI (n=%d)', nValidOSI));
-
-    subplot(1,3,2);
+    figure('Position', [100 100 500 400]);
     histogram(OSI_simple(~isnan(OSI_simple)), 20);
     xlabel('OSI (simple ratio, N&S-style)'); ylabel('Number of boutons');
-    title(sprintf('Simple-ratio OSI (n=%d)', nValidSimple));
-
-    subplot(1,3,3);
-    bothValid = ~isnan(OSI) & ~isnan(OSI_simple);
-    scatter(OSI_simple(bothValid), OSI(bothValid), 15, 'filled', 'MarkerFaceAlpha', 0.5);
-    hold on;
-    plot([0 1], [0 1], 'k--');
-    xlabel('OSI (simple ratio)'); ylabel('OSI (vector method)');
-    title(sprintf('Method agreement (n=%d)', sum(bothValid)));
-    axis square; xlim([0 1]); ylim([0 1]);
-
-    sgtitle(sprintf('OSI: vector method vs simple ratio (criterion: %s)', responsivenessField), ...
+    title(sprintf('Simple-ratio OSI (n=%d, criterion: %s)', nValidSimple, responsivenessField), ...
         'Interpreter', 'none');
 
     figure;
-    polarhistogram(deg2rad(prefOrientationDeg(~isnan(prefOrientationDeg))) * 2, 16);
-    title('Preferred orientation distribution (vector method, doubled for display)');
+    polarhistogram(deg2rad(prefOrientationDeg_simple(~isnan(prefOrientationDeg_simple))) * 2, 16);
+    title('Preferred orientation distribution (simple-ratio method, doubled for display)');
+
+    % vector-method plots (histogram, method-agreement scatter,
+    % preferred-orientation polar histogram) -- commented out along with
+    % the vector method itself, above
+%     figure('Position', [100 100 1300 400]);
+%     subplot(1,3,1);
+%     histogram(OSI(~isnan(OSI)), 20);
+%     xlabel('OSI (vector method / gOSI)'); ylabel('Number of boutons');
+%     title(sprintf('Vector-method OSI (n=%d)', nValidOSI));
+%
+%     subplot(1,3,2);
+%     histogram(OSI_simple(~isnan(OSI_simple)), 20);
+%     xlabel('OSI (simple ratio, N&S-style)'); ylabel('Number of boutons');
+%     title(sprintf('Simple-ratio OSI (n=%d)', nValidSimple));
+%
+%     subplot(1,3,3);
+%     bothValid = ~isnan(OSI) & ~isnan(OSI_simple);
+%     scatter(OSI_simple(bothValid), OSI(bothValid), 15, 'filled', 'MarkerFaceAlpha', 0.5);
+%     hold on;
+%     plot([0 1], [0 1], 'k--');
+%     xlabel('OSI (simple ratio)'); ylabel('OSI (vector method)');
+%     title(sprintf('Method agreement (n=%d)', sum(bothValid)));
+%     axis square; xlim([0 1]); ylim([0 1]);
+%
+%     sgtitle(sprintf('OSI: vector method vs simple ratio (criterion: %s)', responsivenessField), ...
+%         'Interpreter', 'none');
+%
+%     figure;
+%     polarhistogram(deg2rad(prefOrientationDeg(~isnan(prefOrientationDeg))) * 2, 16);
+%     title('Preferred orientation distribution (vector method, doubled for display)');
 end
 
 end

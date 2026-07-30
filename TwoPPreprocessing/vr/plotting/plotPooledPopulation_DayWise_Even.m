@@ -182,5 +182,5 @@ function figHandle = plotPooledPopulation_DayWise_Even(allData, targetArea, vara
     
 
     if ~exist(p.Results.SavePath, 'dir'), mkdir(p.Results.SavePath); end
-    saveFigureFormats(figHandle, fullfile(p.Results.SavePath, 'peakbin_halves_within_lap_rsp_visp'));
+    saveFigureFormats(figHandle, fullfile(p.Results.SavePath, 'tuningcurves_acrossdays'));
 end

@@ -69,7 +69,7 @@ signalNames = {'dFF', 'dFFNeuropilCorrected', 'spks'};
 numSignals = length(signalNames);
 
 if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
-    numBins = 200;
+    numBins = 200; % was 200 when the previous version was shifted forward.. 
 elseif contains(VRStimName, 'VRCorr')
     numBins = 140;
 end

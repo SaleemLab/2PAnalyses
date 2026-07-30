@@ -31,7 +31,7 @@ end
     xlabel(ax, 'Speed (cm/s)');
     ylabel(ax, 'dFF (Neuropil Corr)');
     
-    %defaultAxesProperties(gca, true);
+    defaultAxesProperties(gca, true);
     
     allY = [yStat, yMove];
     allErr = [errStat, errMove];

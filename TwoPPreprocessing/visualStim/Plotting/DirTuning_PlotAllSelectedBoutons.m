@@ -16,21 +16,22 @@
 %%
 getFieldSafe = @(s, f) isfield(s, f) && s.(f) == 1;
 
-isSelectedAny = arrayfun(@(s) getFieldSafe(s, 'isResponsive') || ...
-                              getFieldSafe(s, 'isResponsive_ttest') || ...
-                              getFieldSafe(s, 'isResponsive_ranksum'), ...
-                          allDirTuning);
+% isSelectedAny = arrayfun(@(s) getFieldSafe(s, 'isResponsive') || ...
+%                               getFieldSafe(s, 'isResponsive_ttest') || ...
+%                               getFieldSafe(s, 'isResponsive_ranksum'), ...
+%                           allDirTuning);
 % NOTE: cross-val R^2 (isTunedCV) deliberately excluded -- too many
 % boutons pass it with only a marginal, non-substantive effect size
 % (no minimum R^2 magnitude requirement, only a p-value), producing
 % low-quality example pages.
 
-for b = 1:numel(allDirTuning)
-    allDirTuning(b).isSelectedAny = isSelectedAny(b);
-end
 
-selectedIdx = find(isSelectedAny);
-fprintf('%d / %d boutons pass at least one criterion (SD-heuristic OR t-test OR Wilcoxon).\n', ...
+% for b = 1:numel(allDirTuning)
+%     allDirTuning(b).isTunedCVR2 = isSelectedAny(b);
+% end
+
+selectedIdx = find([allDirTuning.isTunedCVR2_run]);
+fprintf('%d / %d boutons pass the cross validated r2).\n', ...
     numel(selectedIdx), numel(allDirTuning));
 
 if isempty(selectedIdx)
@@ -41,11 +42,11 @@ end
 % Uses isSelectedAny (not just one specific criterion) so every bouton
 % in the PDF has a valid, non-NaN OSI/DSI to display, regardless of
 % which specific criterion it passed.
-allDirTuning = computeDirTuningOSI(allDirTuning, 'isSelectedAny', false);
-allDirTuning = computeDirTuningDSI(allDirTuning, 'isSelectedAny', false);
+allDirTuning = computeDirTuningOSI(allDirTuning, 'isTunedCVR2_run', false);
+allDirTuning = computeDirTuningDSI(allDirTuning, 'isTunedCVR2_run', false);
 
 %% 
-outputFolder = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section2_Fig4_2\selectedBoutons'; 
+outputFolder = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section2_Fig4_2\isTunedBoutonsOnly'; 
 pdfPath = fullfile(outputFolder, 'DirTuning_SelectedBoutons.pdf');
 if exist(pdfPath, 'file')
     delete(pdfPath);
@@ -57,7 +58,7 @@ nSuccess = 0;
 for i = 1:numel(selectedIdx)
     b = selectedIdx(i);
 
-    % self-healing: if hFig got deleted/corrupted by a previous error,
+    %  if hFig got deleted/corrupted by a previous error,
     % recreate it rather than letting every subsequent iteration fail
     % against the same broken handle
     if ~isvalid(hFig)
@@ -73,6 +74,8 @@ for i = 1:numel(selectedIdx)
         if getFieldSafe(allDirTuning(b), 'isResponsive'),         critStr{end+1} = 'SD-heuristic'; end 
         if getFieldSafe(allDirTuning(b), 'isResponsive_ttest'),   critStr{end+1} = 't-test';        end 
         if getFieldSafe(allDirTuning(b), 'isResponsive_ranksum'), critStr{end+1} = 'Wilcoxon';       end 
+        if getFieldSafe(allDirTuning(b), 'isTunedCVR2'), critStr{end+1} = 'CV_r2'; end 
+        if getFieldSafe(allDirTuning(b), 'isTunedCVR2_run'), critStr{end+1} = 'CV_r2_run'; end 
         annotation(hFig, 'textbox', [0.05 0.95 0.9 0.04], 'String', ...
             sprintf('Passed: %s', strjoin(critStr, ', ')), ...
             'EdgeColor', 'none', 'FontSize', 8, 'Interpreter', 'none');

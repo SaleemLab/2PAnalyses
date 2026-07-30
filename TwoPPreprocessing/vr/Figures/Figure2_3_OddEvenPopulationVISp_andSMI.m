@@ -1,0 +1,129 @@
+pairs=struct;
+pairs.M26005 = ['20260305', '20260306', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs
+pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322']; % unique fovs 
+pairs.M25126 = ['20260311', '20260312', '20260313']; % unique fovs 
+% pairs.M26005 = [ '20260318', '20260321', '20260322']; % unique fovs  '20260305', '20260306',
+% pairs.M26004 = [ '20260318', '20260321', '20260322']; % unique fovs '20260305', '20260307', '20260312', '20260313', '20260314',
+% pairs.M25131 = ['20260318', '20260321', '20260322']; % unique fovs  these sessions were excluded from juline's analyses['20260312', '20260313', '20260314', 
+% pairs.M25126 = ['20260311', '20260312', '20260313']; % unique fovs 
+ 
+VISpSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+%% spikes 
+VISpDataSpks = getTuningDataByCondition(VISpSessions, 'signalToUse', 'spks');
+
+VISpDataSpks = appendFilteredROIs(VISpDataSpks, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', false);
+
+plotPooledPopulation_OddEven(VISpDataSpks, 'V1', ...
+    'TypeToPlot', 'Somas', ...
+    'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\OddEvenPop\odd_even_stableSomas_spks');
+
+
+%% dff 
+
+VISpData = getTuningDataByCondition(VISpSessions);
+
+
+% Filter rois based on critera defined 
+VISpData = appendFilteredROIs(VISpData,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
+
+% plotPooledPopulation_OddEven(VISpData, 'V1', ...
+%     'TypeToPlot', 'Somas', ...
+%     'SavePath', 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\OddEvenPop\odd_even_stableSomas_dffNeu');
+% 
+
+
+
+
+%%
+
+pooledSMIs = [];
+pooledROIs = [];
+pooledMice = {};
+pooledSessions = {};
+pooledSessIndices = []; % 
+
+for iSess = 1:length(VISpDataSpks)
+    thisSession = VISpDataSpks(iSess);
+    if isempty(thisSession.FilteredROIs), continue; end
+    
+    keptROIs = thisSession.FilteredROIs(:);
+    smiValues = thisSession.SMI.SMI(keptROIs);
+    
+    validMask = ~isnan(smiValues);
+    if ~any(validMask), continue; end
+    
+    pooledSMIs        = [pooledSMIs; smiValues(validMask)];
+    pooledROIs        = [pooledROIs; keptROIs(validMask)];
+    pooledMice        = [pooledMice; repmat({thisSession.MouseID}, sum(validMask), 1)];
+    pooledSessions    = [pooledSessions; repmat({thisSession.Session}, sum(validMask), 1)];
+    pooledSessIndices = [pooledSessIndices; repmat(iSess, sum(validMask), 1)]; % NEW
+end
+
+if ~isempty(pooledSMIs)
+    sortedSMIs = sort(pooledSMIs);
+    N = length(sortedSMIs);
+    
+    idx25 = max(1, round(0.25 * N));
+    idx50 = max(1, round(0.50 * N));
+    idx75 = max(1, round(0.80 * N));
+    
+    qVals = [sortedSMIs(idx25), sortedSMIs(idx50), sortedSMIs(idx75)];
+    quantLabels = {'25th Pct (Low SMI)', '50th Pct (Mid SMI)', '75th Pct (High SMI)'};
+    
+    % Define how close an alternative SMI must be to the exact target value
+    smiTolerance = 0.01; 
+    
+    fprintf('=== QUANTILE TARGET CANDIDATES ===\n\n');
+    for q = 1:3
+        targetSMI = qVals(q);
+        
+        % Find all indices within the tolerance window
+        candidateIndices = find(abs(pooledSMIs - targetSMI) <= smiTolerance);
+        
+        % Sort candidates so the ones closest to the true quantile value appear first
+        [~, sortOrder] = sort(abs(pooledSMIs(candidateIndices) - targetSMI));
+        candidateIndices = candidateIndices(sortOrder);
+        
+        fprintf('=========================================\n');
+        fprintf('  %s (Target SMI: %.3f)\n', quantLabels{q}, targetSMI);
+
+        
+        % Display up to 10 alternative options for you to inspect
+        numOptionsToDisplay = min(10, length(candidateIndices));
+        for iOpt = 1:numOptionsToDisplay
+            idx = candidateIndices(iOpt);
+            
+            fprintf('  Option %d [SMI: %.3f]:\n', iOpt, pooledSMIs(idx));
+            fprintf('     Session Index: %d\n', pooledSessIndices(idx));
+            fprintf('     ROI Number:    %d\n', pooledROIs(idx));
+            fprintf('     Mouse | Sess:  %s | %s\n\n', pooledMice{idx}, pooledSessions{idx});
+        end
+    end
+else
+    warning('No valid filtered SMI values found across any loaded sessions.');
+end
+%% plot them 
+
+figLow = plotRoiSpatialTuning(VISpDataSpks, 19, 107, 'Low_SMI');
+% figLow = plotRoiSpatialTuning(VISpDataSpks, 22, 11, 'Low_SMI');
+saveFigureFormats(figLow, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\exampleROIs\ExampleTuning_Low');
+
+figMid = plotRoiSpatialTuning(VISpDataSpks, 15, 32, 'Middle_Significant'); % good but slightly lower than the 50th
+% saveFigureFormats(figMid, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\exampleROIs\ExampleTuning_Middle');
+
+figHigh = plotRoiSpatialTuning(VISpDataSpks, 15, 17, 'High_Significant');
+saveFigureFormats(figHigh, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\exampleROIs\ExampleTuning_High');
+
+figHigh = plotRoiSpatialTuning(VISpDataSpks, 11, 329, 'High_Significant');
+saveFigureFormats(figHigh, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\exampleROIs\ExampleTuning_High');
+
+
+%% 
+% create copy and filer edge responsive rois for smi 
+spks = VISpDataSpks;
+spks = appendFilteredROIs(spks, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
+dff = appendFilteredROIs(VISpData, 'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
+
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_3_Section1\smi\smi_visp_dff_spks';
+compareAndPlot_SMI_RSP_vs_VISp(VISpDataSpks, VISpData, outputDir)

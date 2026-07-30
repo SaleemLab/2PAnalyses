@@ -212,6 +212,7 @@ function figHandle = plotPooledPopulation_OddEven(allData, targetArea, varargin)
     xPadding = 10; 
     xlim(heatmapAxes(1), [1 - xPadding, size(plotQueue(1).matrixToPlot, 2) + xPadding]);
     
+    
     if ~isempty(p.Results.SavePath)
         saveFigureFormats(figHandle, p.Results.SavePath);
     end
@@ -221,7 +222,7 @@ function renderHeatmap(ax, displayMatrix, numN, cellType, targetFont)
     imagesc(ax, displayMatrix);
     colormap(ax, flipud(gray)); 
     
-    set(ax, 'CLim', [0 1], 'YDir', 'normal', 'Box', 'off', 'TickDir', 'out');
+    set(ax, 'CLim', [0.25 0.75], 'YDir', 'normal', 'Box', 'off', 'TickDir', 'out');
     set(ax, 'YTick', [], 'FontName', targetFont, 'FontSize', 12, 'YColor', 'none');
     set(ax, 'XTick', [], 'XTickLabel', [], 'XColor', 'none'); 
     

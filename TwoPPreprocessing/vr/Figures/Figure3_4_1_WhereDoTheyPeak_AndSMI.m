@@ -42,12 +42,17 @@ alignToPeakTuningCurvePosition_Pooled(RSPData, 'RSP');
 alignToPeakTuningCurvePosition_Pooled(VISpData, 'VISp');
 
 % Plot smi cumulative probablity and histograms 
-compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\smi_RSP_VISP_dff';
+compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData, outputDir)
+
+% plot smr cumulative and histogram 
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\smr_RSP_VISP_dffNeu';
+compareAndPlot_SMR_RSP_vs_VISp(RSPData, VISpData, outputDir)
 
 % plot peak smis for boutons and somas 
 % this analysis splits boutons/somas into two smi categories 
 % and plots the position of the peak responses as histograms 
-plotSMI_PeakDistributions_VISP_RSP(RSPData, VISpData)
+plotSMI_PeakDistributions_VISP_RSP(RSPData, 'RSP')
 
 
 % Splits corridor into two segments (30-100; 101-170) and finds the

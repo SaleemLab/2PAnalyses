@@ -1,4 +1,4 @@
-function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
+function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData, outputDir)
     
     pooledSMI_RSP = [];
     for s = 1:length(RSPData)
@@ -126,7 +126,7 @@ function compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData)
     
     
     %% --- Save Block ---
-    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4\smi_RSP_VISP_spks';
+   
     if ~exist(outputDir, 'dir')
         mkdir(outputDir);
     end

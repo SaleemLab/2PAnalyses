@@ -1,0 +1,725 @@
+% visual speed tuning - behaviour split 
+
+%% run this to load the appropriate data into workspace 
+DotFields_TuningCurveAnalysis_compareStatesV2_2PData
+
+%% Post-hoc session exclusion (FAST does NOT rerun R^2/ANOVA/Gaussian fits)
+
+
+sessionLabels_all = {allDotUnits.sessionLabel}';
+uniqueSessionsAll  = unique(sessionLabels_all, 'stable');
+
+fprintf('\n--- Per-session joint minTrial (across all 12 speed x state cells) ---\n');
+for s = 1:numel(uniqueSessionsAll)
+    thisSession    = uniqueSessionsAll{s};
+    firstBoutonIdx = find(strcmp(sessionLabels_all, thisSession), 1);
+    alltraces_ref  = allDotUnits(firstBoutonIdx).alltraces;
+    thisMin = min(min(cellfun(@numel, alltraces_ref)));
+    fprintf('%-25s %6d\n', thisSession, thisMin);
+end
+
+% EDIT THIS LIST to exclude sessions from all panels below.
+% Leave empty {} to keep all sessions (current default -- no exclusion).
+sessionsToExclude = {'M25133_20260224', 'M25132_20260313'};
+
+excludeBoutonMask = ismember(sessionLabels_all, sessionsToExclude);
+if any(excludeBoutonMask)
+    fprintf('\nExcluding %d boutons from %d session(s): %s\n', ...
+        sum(excludeBoutonMask), numel(sessionsToExclude), strjoin(sessionsToExclude, ', '));
+else
+    fprintf('\nNo sessions excluded -- using all %d boutons.\n', numel(allDotUnits));
+end
+
+% Mask everything downstream panels rely on. NaN/false for excluded
+% boutons is equivalent to "this bouton was never computed" -- identical
+% to how boutons that failed the trial-count check already look.
+statR2(excludeBoutonMask)       = NaN;
+runR2(excludeBoutonMask)        = NaN;
+statR2_pval(excludeBoutonMask)  = NaN;
+runR2_pval(excludeBoutonMask)   = NaN;
+isTunedStat(excludeBoutonMask)  = false;
+isTunedRun(excludeBoutonMask)   = false;
+
+excludedIdx   = find(excludeBoutonMask);
+validIdx_stat = validIdx_stat(~ismember(validIdx_stat, excludedIdx));
+validIdx_run  = validIdx_run(~ismember(validIdx_run, excludedIdx));
+validIdx_both = validIdx_both(~ismember(validIdx_both, excludedIdx));
+
+ 
+%% r2 for running vs stationary
+% - This is per ROI/bouton (one cross-validated R^2 per bouton per state),
+%   not per trial.
+% - Downsampling: Edd's joint per-session logic (one minTrial per session,
+%   across all 12 speed x state cells, raw trial columns, no NaN
+%   filtering).
+ 
+r2_thresh = 0.1;
+ 
+allStatR2 = statR2(~isnan(statR2));
+allRunR2  = runR2(~isnan(runR2));
+nStat = numel(allStatR2);
+nRun  = numel(allRunR2);
+ 
+% Same boutons contribute both values (joint downsample -> equal n,
+% matched pairs), so the correct test is a PAIRED Wilcoxon signed-rank,
+% not a two-sample test like KS -- computed here and shown directly on
+% the plot.
+validPairIdx_cdf = ~isnan(statR2) & ~isnan(runR2);
+pval_r2_cdf = signrank(statR2(validPairIdx_cdf), runR2(validPairIdx_cdf));
+ 
+if pval_r2_cdf < 0.001
+    sigStr_cdf = '***';
+elseif pval_r2_cdf < 0.01
+    sigStr_cdf = '**';
+elseif pval_r2_cdf < 0.05
+    sigStr_cdf = '*';
+else
+    sigStr_cdf = 'n.s.';
+end
+ 
+figA = figure('Color', 'w', 'Name', 'Population Tuning (pooled)', 'Position', [200, 200, 500, 550]);
+hold on;
+[fStat, xStat] = ecdf(allStatR2);
+[fRun,  xRun]  = ecdf(allRunR2);
+ 
+plot(xStat, fStat, 'Color', 'k', 'LineWidth', 2.5, 'DisplayName', sprintf('Stationary (n=%d)', nStat));
+plot(xRun,  fRun,  'Color', 'r', 'LineWidth', 2.5, 'DisplayName', sprintf('Locomotion (n=%d)', nRun));
+ 
+xline(r2_thresh, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 1, 'HandleVisibility', 'off');
+yline(0.5, ':', 'Color', [0.7 0.7 0.7], 'HandleVisibility', 'off');
+text(r2_thresh, 1.02, 'tuning threshold', 'FontSize', 8, 'Color', [0.5 0.5 0.5], ...
+    'HorizontalAlignment', 'center');
+ 
+title(sprintf('Cross-validated R^2 distribution (n=%d boutons, %d sessions) %s', nStat, numel(unique({allDotUnits.sessionLabel})), sigStr_cdf), ...
+    'FontSize', 12, 'FontWeight', 'bold');
+subtitle(sprintf('Wilcoxon signed-rank (paired, n=%d): p=%.3g', sum(validPairIdx_cdf), pval_r2_cdf), ...
+    'FontSize', 9, 'FontAngle', 'italic');
+xlabel('Cross-validated R^2 score', 'FontSize', 11);
+ylabel('Cumulative probability', 'FontSize', 11);
+ylim([0, 1.05]);
+legend('Location', 'southeast');
+
+text(0.70, 0.60, sigStr_cdf, 'Units', 'normalized', 'FontSize', 16, 'FontWeight', 'bold', ...
+    'Color', 'k', 'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom');
+defaultAxesProperties(gca, true);
+% grid on; 
+hold off;
+
+
+baseFileName = 'r2_cgf_run_stat';
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section3_Fig4_5\r2_cgf_run_stat';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+
+fullSavePath = fullfile(outputDir, baseFileName);
+saveFigureFormats(figA, fullSavePath);
+
+
+%% PANEL: R^2 paired comparison (signrank + scatter): Does locomotion increase tuning reliability? 
+validPairIdx = ~isnan(statR2) & ~isnan(runR2);
+statR2_paired = statR2(validPairIdx);
+runR2_paired  = runR2(validPairIdx);
+
+global_idx_scatter = find(validPairIdx); % global bouton indices, same order as statR2_paired/runR2_paired
+isBothMask = ismember(global_idx_scatter, validIdx_both);
+
+pval_r2 = signrank(statR2_paired, runR2_paired);
+if pval_r2 < 0.001
+    sigStr_r2 = '***';
+elseif pval_r2 < 0.01
+    sigStr_r2 = '**';
+elseif pval_r2 < 0.05
+    sigStr_r2 = '*';
+else
+    sigStr_r2 = 'n.s.';
+end
+
+figB=figure('Color', 'w', 'Name', 'R^2 paired comparison', 'Position', [200, 200, 450, 450]);
+scatter(statR2_paired(~isBothMask), runR2_paired(~isBothMask), 16, [0.75 0.75 0.75], ...
+    'filled', 'MarkerFaceAlpha', 0.3, 'DisplayName', 'Other');
+hold on;
+scatter(statR2_paired(isBothMask), runR2_paired(isBothMask), 25, [0.85 0.33 0.10], ...
+    'filled', 'MarkerFaceAlpha', 0.85, 'DisplayName', sprintf('Reliable in both (n=%d)', sum(isBothMask)));
+
+minVal = min([statR2_paired; runR2_paired]); maxVal = max([statR2_paired; runR2_paired]);
+plot([minVal maxVal], [minVal maxVal], 'r--', 'LineWidth', 1.2, 'HandleVisibility', 'off');
+xline(r2_thresh, '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 1, 'HandleVisibility', 'off');
+yline(r2_thresh, '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 1, 'HandleVisibility', 'off');
+
+xlabel('Stationary R^2'); ylabel('Locomotion R^2');
+title(sprintf('R^2, paired per bouton (n=%d) %s', numel(statR2_paired), sigStr_r2), ...
+    'FontSize', 12, 'FontWeight', 'bold');
+
+if numel(validIdx_both) >= 1
+    statR2_both = cat(1, allDotUnits(validIdx_both).statR2);
+    runR2_both  = cat(1, allDotUnits(validIdx_both).runR2);
+    pval_r2_both = signrank(statR2_both, runR2_both);
+    subtitle(sprintf('All: p=%.3g (n=%d)  |  Reliable-in-both: p=%.3g (n=%d)', ...
+        pval_r2, numel(statR2_paired), pval_r2_both, numel(validIdx_both)), ...
+        'FontSize', 9, 'FontAngle', 'italic');
+else
+    subtitle(sprintf('Wilcoxon signed-rank p=%.3g', pval_r2), 'FontSize', 9, 'FontAngle', 'italic');
+end
+% legend('Location', 'best');
+
+xlim([minVal maxVal]);
+ylim([minVal maxVal]);
+
+axis square; box off;
+defaultAxesProperties(gca, true);
+
+% add quadrant counts as text annotations on the existing R^2 scatter
+validPair = ~isnan(statR2) & ~isnan(runR2);
+nValidPair = sum(validPair);
+
+nStatOnly = sum(statR2 > r2_thresh & statR2_pval < r2p_thresh & ...
+                ~(runR2 > r2_thresh & runR2_pval < r2p_thresh) & validPair);
+nRunOnly  = sum(runR2  > r2_thresh & runR2_pval  < r2p_thresh & ...
+                ~(statR2 > r2_thresh & statR2_pval < r2p_thresh) & validPair);
+nBoth     = numel(validIdx_both);
+nNeither  = nValidPair - nStatOnly - nRunOnly - nBoth;
+
+xl = xlim; yl = ylim;
+text(xl(1)+0.02, yl(2)-0.02, sprintf('Run only: n=%d', nRunOnly), ...
+    'Color', [0.8 0.3 0.1], 'FontWeight', 'bold', 'VerticalAlignment', 'top');
+text(xl(2)-0.02, yl(1)+0.02, sprintf('Stat only: n=%d', nStatOnly), ...
+    'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom');
+text(xl(2)-0.02, yl(2)-0.02, sprintf('Both: n=%d', nBoth), ...
+    'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', 'FontWeight', 'bold');
+text(xl(1)+0.02, yl(1)+0.02, sprintf('Neither: n=%d', nNeither), ...
+    'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', 'Color', [0.5 0.5 0.5]);
+
+% title(sprintf('R^2, paired per bouton (n=%d valid pairs)', nValidPair));
+
+hold off;
+
+
+baseFileName = 'r2_scatter_run_stat';
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section3_Fig4_5\r2_scatter_run_stat';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+
+fullSavePath = fullfile(outputDir, baseFileName);
+saveFigureFormats(figB, fullSavePath);
+
+numel(unique({allDotUnits(validIdx_both).mouseID}))
+mouseID_both = {allDotUnits(validIdx_both).mouseID}';
+tabulate(mouseID_both)
+
+
+categoryNames = {'Lowpass', 'Highpass', 'Bandpass', 'Trough'};
+shapeStat = cat(1, allDotUnits(validIdx_both).gaussChar_stat);
+shapeRun  = cat(1, allDotUnits(validIdx_both).gaussChar_run);
+
+confMat = zeros(4,4); % rows = stationary, cols = locomotion
+for r = 1:4
+    for c = 1:4
+        confMat(r,c) = sum(shapeStat == r & shapeRun == c);
+    end
+end
+
+figJ = figure('Color', 'w', 'Position', [200 200 480 420]);
+imagesc(confMat);
+colormap(flipud(gray)); % or any single-hue ramp -- darker = more boutons
+colorbar;
+axis square;
+set(gca, 'XTick', 1:4, 'XTickLabel', categoryNames, ...
+         'YTick', 1:4, 'YTickLabel', categoryNames);
+xlabel('Locomotion category');
+ylabel('Stationary category');
+title(sprintf('Shape stability, dual-tuned boutons (n=%d)', numel(validIdx_both)));
+
+% overlay counts as text
+for r = 1:4
+    for c = 1:4
+        textColor = 'k';
+        if confMat(r,c) > max(confMat(:))/2, textColor = 'w'; end
+        text(c, r, num2str(confMat(r,c)), 'HorizontalAlignment', 'center', ...
+            'Color', textColor, 'FontWeight', 'bold');
+    end
+end
+
+pctMatch = 100 * sum(diag(confMat)) / numel(validIdx_both);
+fprintf('Shape match: %.1f%% (chance = 25%%), n=%d\n', pctMatch, numel(validIdx_both));
+
+% baseFileName = 'shape_transition_matrix';
+% fullSavePath = fullfile(outputDir, baseFileName);
+% saveFigureFormats(figJ, fullSavePath);
+%% PANEL: Tuning category proportions, stationary vs locomotion (grouped bar)
+% Uses validIdx_stat/validIdx_run (already built in the loading script
+% from the R^2 filter) -- each state's proportions computed from its own
+% reliably-tuned population, not restricted to validIdx_both.
+% categoryNames = {'Lowpass', 'Highpass', 'Bandpass', 'Trough'};
+% 
+% gaussChar_stat_valid = cat(1, allDotUnits(validIdx_stat).gaussChar_stat);
+% gaussChar_run_valid  = cat(1, allDotUnits(validIdx_run).gaussChar_run);
+% 
+% catCountsStat = histcounts(gaussChar_stat_valid, 0.5:1:4.5);
+% catCountsRun  = histcounts(gaussChar_run_valid, 0.5:1:4.5);
+% catPropsStat  = catCountsStat / sum(catCountsStat);
+% catPropsRun   = catCountsRun  / sum(catCountsRun);
+% 
+% figC=figure('Color', 'w', 'Name', 'Tuning category proportions, stat vs run', 'Position', [200, 200, 500, 400]);
+% b = bar([catPropsStat; catPropsRun]', 'grouped');
+% b(1).FaceColor = [0.15 0.15 0.15];
+% b(2).FaceColor = [0.80 0.20 0.20];
+% set(gca, 'XTick', 1:4, 'XTickLabel', categoryNames);
+% ylabel('Proportion of tuned boutons');
+% legend({sprintf('Stationary (n=%d)', numel(validIdx_stat)), sprintf('Locomotion (n=%d)', numel(validIdx_run))}, ...
+%     'Location', 'best');
+% title('Tuning shape category, by behavioural state');
+% box off;
+% defaultAxesProperties(gca, true);
+% baseFileName = 'proptuned_run_stat_perGausFitCategory';
+% outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section3_Fig4_5\proptuned_run_stat_perGausFitCategory';
+% if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+% 
+% fullSavePath = fullfile(outputDir, baseFileName);
+% saveFigureFormats(figC, fullSavePath);
+
+
+% Uses validIdx_stat/validIdx_run (already built in the loading script
+% from the R^2 filter) -- each state's proportions computed from its own
+% reliably-tuned population, not restricted to validIdx_both.
+categoryNames = {'Lowpass', 'Highpass', 'Bandpass', 'Trough'};
+gaussChar_stat_valid = cat(1, allDotUnits(validIdx_stat).gaussChar_stat);
+gaussChar_run_valid  = cat(1, allDotUnits(validIdx_run).gaussChar_run);
+catCountsStat = histcounts(gaussChar_stat_valid, 0.5:1:4.5);
+catCountsRun  = histcounts(gaussChar_run_valid, 0.5:1:4.5);
+catPropsStat  = catCountsStat / sum(catCountsStat);
+catPropsRun   = catCountsRun  / sum(catCountsRun);
+figC=figure('Color', 'w', 'Name', 'Tuning category proportions, stat vs run', 'Position', [200, 200, 500, 400]);
+b = bar([catPropsStat; catPropsRun]', 'grouped');
+b(1).FaceColor = [0.15 0.15 0.15];
+b(2).FaceColor = [0.80 0.20 0.20];
+set(gca, 'XTick', 1:4, 'XTickLabel', categoryNames);
+ylabel('Proportion of tuned boutons');
+legend({sprintf('Stationary (n=%d)', numel(validIdx_stat)), sprintf('Locomotion (n=%d)', numel(validIdx_run))}, ...
+'Location', 'best');
+title('Tuning shape category, by behavioural state');
+box off;
+
+% --- session scatter points + mean/SEM overlay, per condition ---
+hold on;
+sessionLabels_stat = {allDotUnits(validIdx_stat).sessionLabel}';
+sessionLabels_run  = {allDotUnits(validIdx_run).sessionLabel}';
+uniqueSessions_stat = unique(sessionLabels_stat);
+uniqueSessions_run  = unique(sessionLabels_run);
+
+xStat = b(1).XEndPoints; % exact x-position of each stationary bar
+xRun  = b(2).XEndPoints; % exact x-position of each locomotion bar
+
+for i = 1:4
+    % Stationary
+    perSessionProp_stat = nan(numel(uniqueSessions_stat), 1);
+    for s = 1:numel(uniqueSessions_stat)
+        thisSessionMask = strcmp(sessionLabels_stat, uniqueSessions_stat{s});
+        nThisSession = sum(thisSessionMask);
+        if nThisSession == 0, continue; end
+        perSessionProp_stat(s) = sum(gaussChar_stat_valid(thisSessionMask) == i) / nThisSession;
+    end
+    perSessionProp_stat = perSessionProp_stat(~isnan(perSessionProp_stat));
+    jitterX_stat = xStat(i) + (rand(size(perSessionProp_stat)) - 0.5) * 0.15;
+    scatter(jitterX_stat, perSessionProp_stat, 25, [0.3 0.3 0.3], 'filled', 'MarkerFaceAlpha', 0.6);
+    meanProp_stat = mean(perSessionProp_stat);
+    semProp_stat  = std(perSessionProp_stat) / sqrt(numel(perSessionProp_stat));
+    errorbar(xStat(i), meanProp_stat, semProp_stat, 'k', 'LineWidth', 1.5, 'MarkerSize', 12, 'CapSize', 8);
+
+    % Locomotion
+    perSessionProp_run = nan(numel(uniqueSessions_run), 1);
+    for s = 1:numel(uniqueSessions_run)
+        thisSessionMask = strcmp(sessionLabels_run, uniqueSessions_run{s});
+        nThisSession = sum(thisSessionMask);
+        if nThisSession == 0, continue; end
+        perSessionProp_run(s) = sum(gaussChar_run_valid(thisSessionMask) == i) / nThisSession;
+    end
+    perSessionProp_run = perSessionProp_run(~isnan(perSessionProp_run));
+    jitterX_run = xRun(i) + (rand(size(perSessionProp_run)) - 0.5) * 0.15;
+    scatter(jitterX_run, perSessionProp_run, 25, [0.3 0.3 0.3], 'filled', 'MarkerFaceAlpha', 0.6);
+    meanProp_run = mean(perSessionProp_run);
+    semProp_run  = std(perSessionProp_run) / sqrt(numel(perSessionProp_run));
+    errorbar(xRun(i), meanProp_run, semProp_run, 'k', 'LineWidth', 1.5, 'MarkerSize', 12, 'CapSize', 8);
+end
+hold off;
+legend off
+
+defaultAxesProperties(gca, true);
+baseFileName = 'proptuned_run_stat_perGausFitCategory';
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section3_Fig4_5\proptuned_run_stat_perGausFitCategory';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+fullSavePath = fullfile(outputDir, baseFileName);
+saveFigureFormats(figC, fullSavePath);
+
+%% plot all tuning curves
+categoryNames = {'Lowpass', 'Highpass', 'Bandpass', 'Trough'};
+nCategories = numel(categoryNames);
+exampleBoutons = cell(nCategories,1);
+
+if ~isempty(validIdx_both)
+    gaussChar_stat_both = cat(1, allDotUnits(validIdx_both).gaussChar_stat);
+    gaussChar_run_both  = cat(1, allDotUnits(validIdx_both).gaussChar_run);
+    statR2_both = cat(1, allDotUnits(validIdx_both).statR2);
+    runR2_both  = cat(1, allDotUnits(validIdx_both).runR2);
+    sessionKey_both = {allDotUnits(validIdx_both).sessionLabel}';
+    combinedR2 = min(statR2_both, runR2_both);
+
+    for c = 1:nCategories
+        % Grouped by STATIONARY's shape category only -- running's shape
+        % for these boutons may differ, and that's fine/expected now.
+        catIdx = find(gaussChar_stat_both == c);
+        [~, order] = sort(combinedR2(catIdx), 'descend');
+        catIdx = catIdx(order);
+
+%         used = {}; picked = [];
+%         for k = 1:numel(catIdx)
+%             key = sessionKey_both{catIdx(k)};
+%             if ismember(key, used), continue; end
+%             picked(end+1) = validIdx_both(catIdx(k));
+%             used{end+1} = key;
+%             % no cap -- keep every unique-session bouton in this category
+%         end
+        picked = validIdx_both(catIdx);
+        exampleBoutons{c} = picked;
+    end
+
+    fprintf('\n--- Example boutons per category (dual-tuned; shapes need not match) ---\n');
+    for c = 1:nCategories
+        fprintf('%-10s: %d examples found\n', categoryNames{c}, numel(exampleBoutons{c}));
+    end
+end
+
+
+speeds = [0 16 32 64 128 256];
+xDense = linspace(1, 6, 100);
+
+% Determine grid size: rows = categories, cols = max examples in any category
+maxPerCategory = max(cellfun(@numel, exampleBoutons));
+if isempty(maxPerCategory) || maxPerCategory == 0
+    maxPerCategory = 1; % avoid subplot(x,0,...) errors if everything is empty
+end
+
+figure('Color', 'w', 'Name', 'Example tuning curves, stat vs run', ...
+    'Position', [50, 50, max(1200, 200*maxPerCategory), 900]);
+
+for c = 1:nCategories
+    picked = exampleBoutons{c};
+    for k = 1:numel(picked)
+        subplot(nCategories, maxPerCategory, (c-1)*maxPerCategory + k); hold on;
+        thisBouton = picked(k);
+
+        y_data_stat = allDotUnits(thisBouton).tuning(:,1);
+        y_data_run  = allDotUnits(thisBouton).tuning(:,2);
+        p_stat = allDotUnits(thisBouton).gaussParams_stat;
+        p_run  = allDotUnits(thisBouton).gaussParams_run;
+
+        y_fit_stat = p_stat(1) + p_stat(2)*exp(-((xDense-p_stat(3)).^2)/(2*p_stat(4)^2));
+        y_fit_run  = p_run(1)  + p_run(2)*exp(-((xDense-p_run(3)).^2)/(2*p_run(4)^2));
+
+        plot(1:6, y_data_stat, 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 5);
+        plot(xDense, y_fit_stat, 'k-', 'LineWidth', 1.8, 'DisplayName', 'Stationary');
+        plot(1:6, y_data_run, 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 5);
+        plot(xDense, y_fit_run, 'r-', 'LineWidth', 1.8, 'DisplayName', 'Locomotion');
+
+        xlim([0.5 6.5]); xticks(1:6);
+        xticklabels(arrayfun(@(v) sprintf('%g', v), speeds, 'UniformOutput', false));
+        ylabel('\DeltaF/F'); xlabel('Visual speed (\circ/s)');
+        title(sprintf('%s (bouton %d)\nR^2: stat=%.2f, run=%.2f | shape: stat=%s, run=%s', ...
+            categoryNames{c}, thisBouton, allDotUnits(thisBouton).statR2, allDotUnits(thisBouton).runR2, ...
+            categoryNames{allDotUnits(thisBouton).gaussChar_stat}, categoryNames{allDotUnits(thisBouton).gaussChar_run}), ...
+            'FontSize', 8);
+        if c == 1 && k == 1, legend('Location', 'best'); end
+        box off;
+    end
+end
+
+sgtitle('Representative dual-tuned boutons: Stationary (black) vs Locomotion (red)', ...
+    'FontSize', 13, 'FontWeight', 'bold');
+
+
+
+
+%% population average tuning curves 
+meanStat = mean(tuningMat_stat, 1, 'omitnan');
+semStat  = std(tuningMat_stat, 0, 1, 'omitnan') / sqrt(size(tuningMat_stat,1));
+meanRun  = mean(tuningMat_run, 1, 'omitnan');
+semRun   = std(tuningMat_run, 0, 1, 'omitnan') / sqrt(size(tuningMat_run,1));
+
+figP = figure('Color', 'w', 'Position', [200 200 450 400]);
+hold on;
+errorbar(1:nSpeeds, meanStat, semStat, '-o', 'Color', 'k', ...
+    'MarkerFaceColor', 'k', 'LineWidth', 2, 'CapSize', 0);
+errorbar(1:nSpeeds, meanRun, semRun, '-o', 'Color', 'r', ...
+    'MarkerFaceColor', 'r', 'LineWidth', 2, 'CapSize', 0);
+xlim([0.5 nSpeeds+0.5]); xticks(1:nSpeeds);
+xticklabels(arrayfun(@(v) sprintf('%g', v), speeds, 'UniformOutput', false));
+xlabel('Visual speed (\circ/s)');
+ylabel('Normalized \DeltaF/F (peak = 1)');
+legend({sprintf('Stationary (n=%d)', numel(validIdx_both)), ...
+        sprintf('Locomotion (n=%d)', numel(validIdx_both))}, 'Location', 'best');
+title(sprintf('Population-average tuning curve, same boutons (n=%d)', numel(validIdx_both)));
+box off;
+defaultAxesProperties(gca, true);
+
+% baseFileName = 'population_avg_tuning_normalized_pairedOnly';
+% fullSavePath = fullfile(outputDir, baseFileName);
+% saveFigureFormats(figP, fullSavePath);
+%%
+
+boutonsToPlot = [1660 2073 566 1847 932];
+speeds = [0 16 32 64 128 256];
+figA = figure('Color', 'w', 'Position', [100 100 250*numel(boutonsToPlot) 300]);
+for k = 1:numel(boutonsToPlot)
+    thisBouton = boutonsToPlot(k);
+    unit = allDotUnits(thisBouton);
+    meanVals_stat = unit.tuning(:,1);
+    meanVals_run  = unit.tuning(:,2);
+    semVals = cellfun(@(x) std(x(~isnan(x)))/sqrt(sum(~isnan(x))), unit.alltraces);
+    % assumes semVals is Nx2 (stat, run) -- split if it's structured differently
+    semVals_stat = semVals(:,1);
+    semVals_run  = semVals(:,2);
+    ax = subplot(1, numel(boutonsToPlot), k);
+    plotSpeedTuningGaussianFit_dual(speeds, meanVals_stat, meanVals_run, ...
+        semVals_stat, semVals_run, ...
+        unit.gaussParams_stat, unit.gaussParams_run, ...
+        unit.gaussChar_stat, unit.gaussChar_run, ...
+        unit.statR2, unit.runR2, ...
+        unit.statR2_pval, unit.runR2_pval, ...
+        unit.gaussR2_stat, unit.gaussR2_run, ...
+        unit.preStimBaselineMean_stat, unit.preStimBaselineMean_run, ax);
+end
+
+
+sgtitle('Selected example boutons: Stationary vs Locomotion', 'FontSize', 13, 'FontWeight', 'bold');
+
+baseFileName = 'visSpeedGaussianFits_run_stat';
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section3_Fig4_5\run_stat_gaussianfits';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+
+fullSavePath = fullfile(outputDir, baseFileName);
+saveFigureFormats(figA, fullSavePath);
+
+
+
+%%
+% Paired test: does preferred speed shift with locomotion, in the same
+% boutons that are reliably tuned in BOTH states (n=28)?
+prefSpeed_stat_both = cat(1, allDotUnits(validIdx_both).prefSpeed_stat);
+prefSpeed_run_both  = cat(1, allDotUnits(validIdx_both).prefSpeed_run);
+
+speedShift = prefSpeed_run_both - prefSpeed_stat_both; % positive = shifted toward faster speeds under locomotion
+
+pSign = signtest(prefSpeed_stat_both, prefSpeed_run_both);
+pSR   = signrank(prefSpeed_stat_both, prefSpeed_run_both);
+
+fprintf('\n--- Preferred speed shift, dual-tuned boutons (n=%d) ---\n', numel(validIdx_both));
+fprintf('Median preferred speed index -- stat: %.1f, run: %.1f\n', ...
+    median(prefSpeed_stat_both), median(prefSpeed_run_both));
+fprintf('Median shift (run - stat): %.1f speed-index steps\n', median(speedShift));
+fprintf('%d/%d (%.1f%%) shifted toward faster speeds, %d/%d (%.1f%%) shifted slower, %d/%d unchanged\n', ...
+    sum(speedShift > 0), numel(speedShift), 100*mean(speedShift > 0), ...
+    sum(speedShift < 0), numel(speedShift), 100*mean(speedShift < 0), ...
+    sum(speedShift == 0), numel(speedShift));
+fprintf('Sign test p=%.4g | signrank p=%.4g\n', pSign, pSR);
+
+% quick paired dot-and-line visual
+figQ = figure('Color', 'w', 'Position', [200 200 350 420]);
+hold on;
+for i = 1:numel(validIdx_both)
+    plot([1 2], [prefSpeed_stat_both(i) prefSpeed_run_both(i)], '-o', ...
+        'Color', [0.6 0.6 0.6], 'MarkerFaceColor', [0.3 0.3 0.3], 'MarkerSize', 5);
+end
+xlim([0.5 2.5]);
+set(gca, 'XTick', [1 2], 'XTickLabel', {'Stationary', 'Locomotion'});
+ylabel('Preferred speed index');
+title(sprintf('Preferred speed shift, dual-tuned boutons (n=%d)\nSign test p=%.3g | signrank p=%.3g', ...
+    numel(validIdx_both), pSign, pSR), 'FontSize', 10);
+box off; hold off;
+defaultAxesProperties(gca, true);
+
+% baseFileName = 'prefSpeed_shift_dualTuned';
+% fullSavePath = fullfile(outputDir, baseFileName);
+% saveFigureFormats(figQ, fullSavePath);
+
+%%
+speeds = [0 16 32 64 128 256];
+mu_stat_both = cellfun(@(p) p(3), {allDotUnits(validIdx_both).gaussParams_stat})';
+mu_run_both  = cellfun(@(p) p(3), {allDotUnits(validIdx_both).gaussParams_run})';
+
+pSign = signtest(mu_stat_both, mu_run_both);
+pSR   = signrank(mu_stat_both, mu_run_both);
+
+figT = figure('Color', 'w', 'Position', [200 200 350 420]);
+hold on;
+
+% shade the tested range so out-of-range mu values are visually obvious
+yline(1, ':', 'Color', [0.7 0.7 0.7]);
+yline(6, ':', 'Color', [0.7 0.7 0.7]);
+
+for i = 1:numel(mu_stat_both)
+    plot([1 2], [mu_stat_both(i) mu_run_both(i)], '-', 'Color', [0.75 0.75 0.75], 'LineWidth', 1);
+    plot(1, mu_stat_both(i), 'o', 'Color', 'k', 'MarkerFaceColor', 'k', 'MarkerSize', 6);
+    plot(2, mu_run_both(i),  'o', 'Color', 'r', 'MarkerFaceColor', 'r', 'MarkerSize', 6);
+end
+
+xlim([0.5 2.5]);
+set(gca, 'XTick', [1 2], 'XTickLabel', {'Stationary', 'Locomotion'});
+
+yl = ylim;
+set(gca, 'YTick', 1:6, 'YTickLabel', arrayfun(@(v) sprintf('%g', v), speeds, 'UniformOutput', false));
+ylim(yl); % restore full range so out-of-range points still show
+
+ylabel('Gaussian fit \mu (preferred speed, \circ/s)');
+title(sprintf('\\mu shift, all dual-tuned boutons (n=%d)\nSign test p=%.3g | signrank p=%.3g', ...
+    numel(validIdx_both), pSign, pSR), 'FontSize', 10);
+box off; hold off;
+defaultAxesProperties(gca, true);
+
+
+%%
+speeds = [0 16 32 64 128 256];
+prefSpeed_stat_both = cat(1, allDotUnits(validIdx_both).prefSpeed_stat);
+prefSpeed_run_both  = cat(1, allDotUnits(validIdx_both).prefSpeed_run);
+
+pSign = signtest(prefSpeed_stat_both, prefSpeed_run_both);
+pSR   = signrank(prefSpeed_stat_both, prefSpeed_run_both);
+
+fprintf('\n--- Preferred speed shift (argmax), dual-tuned boutons (n=%d) ---\n', numel(validIdx_both));
+fprintf('Median preferred speed index -- stat: %.1f, run: %.1f\n', ...
+    median(prefSpeed_stat_both), median(prefSpeed_run_both));
+fprintf('Sign test p=%.4g | signrank p=%.4g\n', pSign, pSR);
+
+figU = figure('Color', 'w', 'Position', [200 200 350 420]);
+hold on;
+for i = 1:numel(prefSpeed_stat_both)
+    % small jitter so overlapping integer values are visible as distinct lines
+    jit = (rand-0.5)*0.15;
+    plot([1 2]+jit, [prefSpeed_stat_both(i) prefSpeed_run_both(i)], '-', ...
+        'Color', [0.75 0.75 0.75], 'LineWidth', 1);
+    plot(1+jit, prefSpeed_stat_both(i), 'o', 'Color', 'k', 'MarkerFaceColor', 'k', 'MarkerSize', 6);
+    plot(2+jit, prefSpeed_run_both(i),  'o', 'Color', 'r', 'MarkerFaceColor', 'r', 'MarkerSize', 6);
+end
+
+xlim([0.5 2.5]);
+set(gca, 'XTick', [1 2], 'XTickLabel', {'Stationary', 'Locomotion'});
+set(gca, 'YTick', 1:6, 'YTickLabel', arrayfun(@(v) sprintf('%g', v), speeds, 'UniformOutput', false));
+ylabel('Preferred speed (\circ/s)');
+title(sprintf('Preferred speed shift, dual-tuned boutons (n=%d)\nSign test p=%.3g | signrank p=%.3g', ...
+    numel(validIdx_both), pSign, pSR), 'FontSize', 10);
+box off; hold off;
+defaultAxesProperties(gca, true);
+
+% baseFileName = 'prefSpeed_shift_dualTuned';
+% fullSavePath = fullfile(outputDir, baseFileName);
+% saveFigureFormats(figU, fullSavePath);
+
+
+%%
+%% PANEL: Preferred speed agreement, paired (all shape categories, not just bandpass)
+% if ~isempty(validIdx_both)
+%     prefSpeed_stat_both = cat(1, allDotUnits(validIdx_both).prefSpeed_stat);
+%     prefSpeed_run_both  = cat(1, allDotUnits(validIdx_both).prefSpeed_run);
+% 
+%     pval_prefSpeed = signrank(prefSpeed_stat_both, prefSpeed_run_both);
+%     pctAgree = 100 * mean(prefSpeed_stat_both == prefSpeed_run_both);
+% 
+%     figure('Color', 'w', 'Name', 'Preferred speed agreement', 'Position', [200, 200, 450, 400]);
+%     vals = histcounts2(prefSpeed_stat_both, prefSpeed_run_both, 0.5:1:6.5, 0.5:1:6.5);
+%     imagesc(vals'); axis xy; colorbar;
+%     hold on; plot([0.5 6.5], [0.5 6.5], 'r');
+%     xlabel('Preferred speed index (stationary)'); ylabel('Preferred speed index (locomotion)');
+%     title(sprintf('Preferred speed agreement (n=%d)\n%.1f%% exact match, signrank p=%.3g', ...
+%         numel(validIdx_both), pctAgree, pval_prefSpeed), 'FontSize', 11);
+% end
+% 
+% 
+% figure('Color', 'w', 'Name', 'Preferred speed agreement', 'Position', [200, 200, 450, 400]);
+% jitterAmount = 0.15;
+% jitterX = prefSpeed_stat_both + (rand(size(prefSpeed_stat_both))-0.5)*jitterAmount*2;
+% jitterY = prefSpeed_run_both  + (rand(size(prefSpeed_run_both))-0.5)*jitterAmount*2;
+% 
+% plot([0.5 6.5], [0.5 6.5], 'r--', 'LineWidth', 1);
+% hold on;
+% scatter(jitterX, jitterY, 45, [0.2 0.2 0.2], 'filled', 'MarkerFaceAlpha', 0.6);
+% xlim([0.5 6.5]); ylim([0.5 6.5]);
+% xticks(1:6); yticks(1:6);
+% xlabel('Preferred speed index (stationary)'); ylabel('Preferred speed index (locomotion)');
+% title(sprintf('Preferred speed agreement (n=%d)\n%.1f%% exact match, signrank p=%.3g', ...
+%     numel(validIdx_both), pctAgree, pval_prefSpeed), 'FontSize', 11);
+% axis square; box off; hold off;
+%% PANEL: Tuning shape stability, paired (confusion matrix, category 1-4)
+% if ~isempty(validIdx_both)
+%     gaussChar_stat_both = cat(1, allDotUnits(validIdx_both).gaussChar_stat);
+%     gaussChar_run_both  = cat(1, allDotUnits(validIdx_both).gaussChar_run);
+% 
+%     validShapeIdx = ~isnan(gaussChar_stat_both) & ~isnan(gaussChar_run_both);
+%     gcs = gaussChar_stat_both(validShapeIdx);
+%     gcr = gaussChar_run_both(validShapeIdx);
+% 
+%     shapeConfusion = histcounts2(gcs, gcr, 0.5:1:4.5, 0.5:1:4.5);
+%     pctShapeAgree = 100 * sum(diag(shapeConfusion)) / sum(shapeConfusion(:));
+% 
+%     categoryNames = {'Lowpass', 'Highpass', 'Bandpass', 'Trough'};
+%     figure('Color', 'w', 'Name', 'Tuning shape stability', 'Position', [200, 200, 450, 400]);
+%     imagesc(shapeConfusion');
+%     axis xy; colorbar;
+%     set(gca, 'XTick', 1:4, 'XTickLabel', categoryNames, 'YTick', 1:4, 'YTickLabel', categoryNames);
+%     xlabel('Tuning shape (stationary)'); ylabel('Tuning shape (locomotion)');
+%     title(sprintf('Tuning shape stability (n=%d)\n%.1f%% same shape in both states', ...
+%         numel(gcs), pctShapeAgree), 'FontSize', 11);
+%     for r = 1:4
+%         for c = 1:4
+%             text(r, c, num2str(shapeConfusion(r,c)), 'HorizontalAlignment', 'center', 'Color', 'w', 'FontWeight', 'bold');
+%         end
+%     end
+% end
+
+
+% %% preferred speed - locmotion vs stationary 
+% gaussChar_stat = cat(1, allDotUnits.gaussChar_stat); % not needed here, but harmless if reused elsewhere
+% prefSpeed_stat = cat(1, allDotUnits.prefSpeed_stat);
+% prefSpeed_run  = cat(1, allDotUnits.prefSpeed_run);
+% 
+% nSpeedsTotal = numel(speeds);
+% 
+% countsStat = histcounts(prefSpeed_stat(validIdx_stat), 0.5:1:(nSpeedsTotal+0.5));
+% countsRun  = histcounts(prefSpeed_run(validIdx_run),   0.5:1:(nSpeedsTotal+0.5));
+% 
+% propsStat = countsStat / numel(validIdx_stat);
+% propsRun  = countsRun  / numel(validIdx_run);
+% 
+% figI = figure('Color', 'w', 'Name', 'Preferred speed, stat vs run', 'Position', [200 200 500 400]);
+% b = bar([propsStat; propsRun]', 'grouped');
+% b(1).FaceColor = [0.15 0.15 0.15]; % Stationary - black
+% b(2).FaceColor = [0.80 0.20 0.20]; % Locomotion - red
+% 
+% set(gca, 'XTick', 1:nSpeedsTotal, 'XTickLabel', arrayfun(@(v) sprintf('%g', v), speeds, 'UniformOutput', false));
+% xlabel('Preferred visual speed (\circ/s)');
+% ylabel('Proportion of boutons');
+% legend({sprintf('Stationary (n=%d)', numel(validIdx_stat)), sprintf('Locomotion (n=%d)', numel(validIdx_run))}, ...
+%     'Location', 'best');
+% title('Preferred speed distribution, by behavioural state');
+% box off;
+% defaultAxesProperties(gca, true);
+% 
+% baseFileName = 'prefSpeed_stat_vs_run';
+% % fullSavePath = fullfile(outputDir, baseFileName);
+% % saveFigureFormats(figI, fullSavePath);
+% 
+% 
+% speeds = [0 16 32 64 128 256];
+% nSpeeds = numel(speeds);
+% 
+% tuningMat_stat = nan(numel(validIdx_both), nSpeeds);
+% tuningMat_run  = nan(numel(validIdx_both), nSpeeds);
+% 
+% for i = 1:numel(validIdx_both)
+%     thisBouton = validIdx_both(i);
+% 
+%     y_stat = allDotUnits(thisBouton).tuning(:,1)';
+%     y_stat = y_stat - min(y_stat);
+%     y_stat = y_stat / max(y_stat);
+%     tuningMat_stat(i,:) = y_stat;
+% 
+%     y_run = allDotUnits(thisBouton).tuning(:,2)';
+%     y_run = y_run - min(y_run);
+%     y_run = y_run / max(y_run);
+%     tuningMat_run(i,:) = y_run;
+% end

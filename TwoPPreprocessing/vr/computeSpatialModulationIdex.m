@@ -11,7 +11,7 @@ response = load(sessionFileInfo.stimFiles(stimIdx).Response, 'lapPositionActivit
 partnerLandmarkPosition = 80;
 excludeStart = 30; excludeEnd = 30;  
 landmarkCentres = [40, 80, 120, 160];
-tolerance = 15; % +/- 15cm search window around landmarks
+tolerance = 10; % +/- 10cm search window around landmarks
 
 signalNames = fieldnames(response.lapPositionActivity);
 disp('Computing Landmark-Restricted SMI for this session...\n');
@@ -30,13 +30,12 @@ for iSignal = 1:length(signalNames)
     baseLapActivity = lapActivity(:, baseTrials, :);
     [numROIs, numLaps, numBins] = size(baseLapActivity);
     
-    % --- Define Landmark Search Windows Upfront ---
+    % landmark search window
     allowedLandmarkBins = [];
     for c = landmarkCentres
         allowedLandmarkBins = [allowedLandmarkBins, (c - tolerance):(c + tolerance)];
     end
     allowedLandmarkBins = unique(allowedLandmarkBins);
-    % Filter to make sure it respects absolute 30cm edge limits too
     validInnerRange = (excludeStart + 1) : (numBins - excludeEnd);
     allowedSearchBins = intersect(allowedLandmarkBins, validInnerRange);
     
@@ -66,27 +65,17 @@ for iSignal = 1:length(signalNames)
         trainTrace = meanOdd(thsROI, :);
         testTrace  = meanEven(thsROI, :);
         if all(isnan(trainTrace)) || all(isnan(testTrace)), continue; end
-        
-        % --- CROSS-NORMALIZATION ---
-        % minOdd = min(trainTrace, [], 'omitnan'); 
-        % maxOdd = max(trainTrace, [], 'omitnan');
-        % rangeOdd = maxOdd - minOdd; if rangeOdd == 0, rangeOdd = 1; end
-        % 
-        % normTrain = (trainTrace - minOdd) ./ rangeOdd; 
-        % normTest  = (testTrace - minOdd) ./ rangeOdd;   
-        
-                % --- SEPARATE NORMALIZATION ---
-        minOdd = min(trainTrace, [], 'omitnan');
+
+
+        % CROSS-NORMALIZATION (@changed aman)
+        minOdd = min(trainTrace, [], 'omitnan'); 
         maxOdd = max(trainTrace, [], 'omitnan');
         rangeOdd = maxOdd - minOdd; if rangeOdd == 0, rangeOdd = 1; end
-        normTrain = (trainTrace - minOdd) ./ rangeOdd;  % 0-1 scaled to itself
         
-        minEven = min(testTrace, [], 'omitnan');
-        maxEven = max(testTrace, [], 'omitnan');
-        rangeEven = maxEven - minEven; if rangeEven == 0, rangeEven = 1; end
-        normTest = (testTrace - minEven) ./ rangeEven;  % 0-1 scaled to itself
+        normTrain = (trainTrace - minOdd) ./ rangeOdd; 
+        normTest  = (testTrace - minOdd) ./ rangeOdd;  
         
-        % 1. Find Global Peak across the entire track for the edge-check flag
+        % Find Global Peak across the entire track for the edge-check flag
         [globalMaxPk, globalPrefBin] = max(normTrain);
         globalPeakBins(thsROI) = globalPrefBin;
         allPks{thsROI} = globalMaxPk; allLocs{thsROI} = globalPrefBin;
@@ -95,13 +84,13 @@ for iSignal = 1:length(signalNames)
             excludeEdgePeakCells(thsROI) = true;
         end
         
-        % 2. RESTRICTED PEAK SEARCH: Look ONLY inside the landmark search windows
+        % RESTRICTED PEAK SEARCH: Look ONLY inside the landmark search windows
         [~, maxIdxInSearch] = max(normTrain(allowedSearchBins));
         prefBin = allowedSearchBins(maxIdxInSearch); 
         peakBins(thsROI) = prefBin;
         
         % Extract peak magnitude from independent Test Set (Evens)
-        Rp = max(0, normTest(prefBin));
+        Rp = normTest(prefBin);
         rpValues(thsROI) = Rp;
         
         % Calculate spatial partner location (+/- 80 cm)
@@ -114,13 +103,15 @@ for iSignal = 1:length(signalNames)
         if targetPartner >= 1 && targetPartner <= numBins
             matchingBin = targetPartner;
             rnBins(thsROI) = matchingBin;
-            Rn = max(0, normTest(matchingBin));
+            %raw (possibly negative) normalised value used directly.
+            Rn = normTest(matchingBin);
             rnValues(thsROI) = Rn;
         else
             continue;
         end
         
-        if (Rp + Rn) > 0
+        % Only guard against exact division by zero (Rp + Rn == 0); no flooring applied.
+        if (Rp + Rn) ~= 0
             smiValues(thsROI) = (Rp - Rn) / (Rp + Rn);
         end
     end
@@ -178,4 +169,3 @@ if doPlot
     drawnow;
 end
 end
-

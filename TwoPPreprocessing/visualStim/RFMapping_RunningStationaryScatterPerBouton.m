@@ -24,7 +24,7 @@
 runSpeedThresh       = 3;        
 statSpeedThresh      = 0.5;      
 propThresh           = 0.75;     
-stimFramesMask_range = [0 2.0];  
+stimFramesMask_range = [-0.2 2.8];  
                                   
                                   
 minTrialsPerState    = 3;        

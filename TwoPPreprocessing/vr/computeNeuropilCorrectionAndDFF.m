@@ -190,7 +190,7 @@ processedTwoPData.F = F;
 processedTwoPData.ops = ops;
 processedTwoPData.absoluteZeroValue = absoluteZeroValue; 
 
-disp('Saving processed data...');
 save(sessionFileInfo.stimFiles(stimIdx).processedMergedBonsaiSuite2pData, ...
-    'processedSignals', 'zScoredProcessedSignals', 'absoluteZeroValue', '-append');
+    'processedSignals', 'zScoredProcessedSignals', 'absoluteZeroValue', ...
+    'regPars', 'F', '-append');
 end

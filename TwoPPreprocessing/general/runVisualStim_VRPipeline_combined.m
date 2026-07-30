@@ -16,16 +16,6 @@ doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 
 %     'MouseID', {'M26003', 'M25132', 'M25133'}, ...
 %     'DayOfExperience', [1 2 3 4]);
 
-
-
-
-
-% pairs.M26005 = '20260318';
-% pairs.M26003 = '20260325';
-% pairs.M25132 = '20260326';
-% pairs.M25131 = '20260314';
-
-
 % pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
 % pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
 % pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
@@ -34,21 +24,12 @@ doNotCombine = {'M25040_VRCorr_20250507_00001', 'M25040_VRCorr_20250507_00002', 
 % pairs.M26003 = ['20260322', '20260324', '20260325'];
 % pairs.M25133 = '20260224';
 
-% pairs.M25132 = {'20260226'};
-
-
-
-%% additional rf mapping sitmuli to check if there is anything 
-pairs = struct;
-pairs.M25132 = {...
-                '20260214A','20260214B','20260214C','20260214D', ...
-                '20260216A','20260216B','20260216C'};
-pairs.M25133 = {'20260216A','20260216B','20260216C','20260216D'};
-pairs.M26003 = {'20260307A','20260307B', ...
-                '20260313A','20260313B','20260313C'};
+pairs=struct;
+%pairs.M25132 = ['20260313', '20260228']; 
+pairs.M26003 = ['20260324'];
 
 %%
-filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs);
 mouseInfo = sessionsToProcess(filteredTable);
 
 totalSessionsToProcess = 0;
@@ -257,7 +238,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                             % plotRFGrid_byPosition_ROIs(sessionFileInfo, thisName);
                             [sessionFileInfo, RFMapping, RFMappingMetadata, allCenters] = analyseRFMapping(sessionFileInfo, thisName);
                             [~] = getRunningAndPupilDataByTrials(sessionFileInfo, thisName);
-                            % plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,false)
+                            plotRFMapping(sessionFileInfo, RFMapping,RFMappingMetadata,false,true)
 
                         % elseif contains(thisName, 'DotMotion_RFMapping')
                         %     fprintf('  Running DotMotion RFMapping Analysis...\n');
@@ -339,14 +320,14 @@ for thisMouse = 1:size(mouseInfo, 1)
                         response = load(sessionFileInfo.stimFiles(stimIdx).Response);
                         % Compute Shuffle Matrix (Stitch to itself)
                         fprintf(' -> Computing shuffle matrix for run: %s\n', vrStimName);
-                        [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo,response,{vrStimName}, useZScoredProcessedSignals);
-                        [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
-                        [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
+                        % [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo,response,{vrStimName}, useZScoredProcessedSignals);
+                        % [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
+                        % [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
                         [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response); % Run on final response
                         [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response,signalName, applyTemporalSmoothing,true, false); % Run on final response
                         [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response, signalName, applyTemporalSmoothing, true, false);
-%                         [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response); 
-   
+                        % [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response); 
+                        % 
 
                         plotPopulationActivityAcrossConditions_HalvesStableROIsOnly(sessionFileInfo, response, signalName, applyTemporalSmoothing)
 
@@ -358,6 +339,7 @@ for thisMouse = 1:size(mouseInfo, 1)
                         % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, signalName)                       % Run checks
                         % plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, 'dFFNeuropilCorrected')
                         %plotAllNeuronConditionsSummaries_VR_and_RF(sessionFileInfo, response, applyTemporalSmoothing, 'dFF')
+                        %plotAllNeuronConditionsSummaries_VR_TwoSignals(sessionFileInfo, response, 1, 'dFFNeuropilCorrected', 'spks')
 
                         % For boutons specifically
                         if strcmpi(typeImaged, 'Boutons')
@@ -378,13 +360,13 @@ for thisMouse = 1:size(mouseInfo, 1)
 
                     % Compute Shuffle Matrix (Stitch ALL raw signals together)
                     fprintf('Computing shuffle matrix for COMBINED signals...\n')
-                    [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo, response, vrStimNames, useZScoredProcessedSignals);
-                    [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
-                    [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
+                    % [response, sessionFileInfo] = computeShuffleMatrixForSession(sessionFileInfo, response, vrStimNames, useZScoredProcessedSignals);
+                    % [~,~] = getRangeSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
+                    % [~, ~] = getPeakSignificance_fromShuffle(sessionFileInfo, response); % Run on final response
                     [~,~,~]= computeVarianceAcrossPositionBins(sessionFileInfo, response, signalName); % Run on final response
                     [~,~,~] = checkOddEvenCorrelation(sessionFileInfo, response, signalName); % Run on final response
                     [~,~,~] = checkHalvesCorrelation(sessionFileInfo, response, signalName);
-%                     [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response);
+                    % [~] = getCrossValidatedExplainedVariance(sessionFileInfo, response);
                    
                     
                     %% Additional plotting functions

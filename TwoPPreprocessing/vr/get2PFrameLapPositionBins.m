@@ -72,7 +72,7 @@ else
 end
 if contains(VRStimName, 'Baseline') || contains(VRStimName, 'LandManipCorridor')
     % Track [1 to 200], ITI is 201.
-    posBinEdges = 1:201; 
+    posBinEdges = 0:200;
 elseif contains(VRStimName, 'VRCorr')
     % Track [0 to 139], ITI is 140.
     posBinEdges = 0:140;
@@ -145,10 +145,23 @@ for thisLap = 1:nLaps
             thisLap, rawFirstFive(1), rawFirstFive(2), rawFirstFive(3), rawFirstFive(4), rawFirstFive(5),...
             lapPosition(1), lapPosition(2), lapPosition(3), lapPosition(4), lapPosition(5));
     end
+    
+
+     % Once the lap crosses into ITI (position >= 200), treat everything from
+    % that point onward as ITI, even if position jitters back below 200
+    % afterward. This prevents ITI frames from leaking into track bins.
+    itiOnsetIdx = find(lapPosition >= 200, 1, 'first');
+    if ~isempty(itiOnsetIdx)
+        lapPosition(itiOnsetIdx:end) = 200;
+    end
 
     % Assign each frame in the lap to a position bin
+   % Explicitly exclude clamped ITI frames (position == 200) from bin 200,
+    % since discretize's last bin [199,200] is closed on both ends and would
+    % otherwise merge them with real position ~199 data.
     positionIdx = discretize(lapPosition, posBinEdges);
     if size(positionIdx, 1) > size(positionIdx, 2), positionIdx = positionIdx'; end
+    positionIdx(lapPosition >= 200) = NaN; % this is not saved anywhere; neither is it going to affect any processing down stream
 
     for thisBin = 1:numPosBins
         % binMask captures all frames that  occurred in this position bin

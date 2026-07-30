@@ -69,3 +69,4 @@ for m = 1:numMice
 end
 
 exportgraphics(gcf, fileName, 'Resolution', 600);
+saveFigureFormats(fig_grid, fullfile(suite2p_dir, 'all_plane_mean_images'));

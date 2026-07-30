@@ -3,11 +3,11 @@ function plotRFMapping(sessionFileInfo, RFMapping, RFMappingMetadata, doSmooth, 
 % Overlays mean blank PSTH (white) and includes a colorbar.
 
 if nargin < 4; doSmooth = false; end
-if nargin < 5; onlyTuned = false; end 
+if nargin < 5; onlyTuned = true; end 
 
-% --- SETTINGS ---
+
 rasterTimeWin = [-1 2.5]; 
-% ----------------
+
 
 saveFolder = fullfile(sessionFileInfo.Directories.save_folder, 'Figures');
 if ~isfolder(saveFolder); mkdir(saveFolder); end

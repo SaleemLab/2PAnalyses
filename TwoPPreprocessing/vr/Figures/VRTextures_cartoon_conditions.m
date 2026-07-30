@@ -2,9 +2,9 @@
 corridorL = 200; 
 corridorH = 12; 
 texwidth = 0.04; 
-BG_contrast = 0.3; % Background dimming coefficient
+BG_contrast = 0.7; % Background dimming coefficient # previous version was 0.3
 basePath = '\\rdp.arc.ucl.ac.uk\ritd-ag-project-rd01ie-asale69\ibn-vision\USERS\Sonali\VRCorridorFinal-TextureCopyForSonali\';
-saveDir  = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\VRCartoonTextures-conditions\';
+saveDir  = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\VRCartoonTextures-conditions_higherBGContrast\';
 
 %%---------------------------LOAD BASE BACKGROUND 2--------------------
 imgBG = imread(fullfile(basePath, 'BG2.jpg'));

@@ -3,20 +3,18 @@
 % pairs.M25133 = '20260224';
 % pairs.M26003 = ['20260322', '20260324', '20260325'];
 
-pairs=struct; 
+
 %  % ran these sessions: on May 28th 
-% pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
-% pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
-% pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
-% pairs.M25126 = ['20260311', '20260312', '20260313'];
-% pairs.M25132 = ['20260226', '20260228', '20260313'];
-% pairs.M26003 = ['20260322', '20260324', '20260325'];
-% pairs.M25133 = '20260224';
-
-
-
-filteredTable = filterMasterTable_usingNameSessionPairs('MouseID', {'M26003'}, 'DayOfExperience',300,'Exclude', 0);
-
+pairs=struct;
+pairs.M26005 = ['20260305', '20260306', '20260311', '20260318', '20260321', '20260322'];
+pairs.M26004 = ['20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+pairs.M25131 = ['20260312', '20260313', '20260314', '20260318', '20260321', '20260322'];
+pairs.M25126 = ['20260311', '20260312', '20260313'];
+pairs.M25132 = ['20260219','20260220','20260221','20260223', '20260226''20260228', '20260313']
+pairs.M25133 = ['20260220','20260221','20260223''20260219','20260224'];
+pairs.M26003 = ['20260316','20260317', '20260320','20260321','20260322','20260324', '20260325']; %
+% filteredTable = filterMasterTable_usingNameSessionPairs('MouseID', {'M26003'}, 'DayOfExperience',300,'Exclude', 0);
+filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs,'Exclude', 0);
 mouseInfo = sessionsToProcess(filteredTable);
 
 
@@ -77,13 +75,15 @@ for thisMouse = 1:size(mouseInfo, 1)
 
         VRStimName = sessionFileInfo.stimFiles(targetIdx).name;
 
-        
 
 
-        crossValExpVar = getCrossValidatedExplainedVariance(sessionFileInfo, VRStimName);
-        [~, ~] = computeSpatialModulationIdex(sessionFileInfo, VRStimName,true,true); % exclude laps; apply smoothning 
-        % [~, ~, ~] = getPositionSpeedMatrix(sessionFileInfo, VRStimName);
-    end 
+
+        % crossValExpVar = getCrossValidatedExplainedVariance(sessionFileInfo, VRStimName);
+        % [~, ~] = computeSpatialModulationIdex(sessionFileInfo, VRStimName,true,true); % exclude laps; apply smoothning
+        [~, ~] = computeSpatialModulationRatio(sessionFileInfo, VRStimName,true,true);
+        %         [~] = getLowHighSpeedPositionMatrix(sessionFileInfo, VRStimName);
+        %         [ ~] = getPositionSpeedMatrix(sessionFileInfo, VRStimName);
+    end
 end
 
 

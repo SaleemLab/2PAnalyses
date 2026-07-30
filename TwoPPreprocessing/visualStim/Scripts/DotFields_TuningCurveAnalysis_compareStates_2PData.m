@@ -114,7 +114,7 @@ for thisROI = 1:nROIs
     end
     units(thisROI).tuning = cellfun(@nanmean, units(thisROI).allSpikes);
 end
-% --- end mapping
+%end mapping
 
 statTsd = temp_tsd([temp_tsd.runFlag]==0);
 runTsd = temp_tsd([temp_tsd.runFlag]==1);
@@ -461,3 +461,12 @@ for iPlot = 1:maxPlots
 end
 
 sgtitle('Verified Gaussian Model Fits Across States (Cross-Validated Cohort)', 'FontSize', 13, 'FontWeight', 'bold');
+
+
+sessionNames = keys(sessionMinTrial);
+sessionVals  = cell2mat(values(sessionMinTrial));
+figure('Color','w');
+bar(sessionVals);
+set(gca, 'XTick', 1:numel(sessionNames), 'XTickLabel', sessionNames, 'XTickLabelRotation', 45);
+ylabel('minTrial (this session)');
+title('Per-session trial-count floor used for R^2 downsampling');

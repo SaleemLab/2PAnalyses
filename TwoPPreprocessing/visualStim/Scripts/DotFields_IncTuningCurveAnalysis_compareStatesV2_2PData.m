@@ -26,9 +26,10 @@
 
 %%
 mouseList = {'M25132', 'M25133', 'M26003'};
+% mouseList = {'M25126', 'M26004', 'M26005', 'M25131'};
 
-stimWindowMask_range = [0.5 2];  % window for extracting per-trial calcium response
-stimFramesMask_range = [0 2.0];  % window for wheel-speed behavior classification
+stimWindowMask_range = [0.1 3];  % window for extracting per-trial calcium response
+stimFramesMask_range = [-0.2 2.8];  % window for wheel-speed behavior classification
 
 runSpeedThresh  = 3;    % mean speed above this =  "running"
 statSpeedThresh = 0.5;  % mean speed below this = candidate "stationary"
@@ -41,9 +42,9 @@ r2opts.kval       = 3;
 r2opts.nPerms     = 10;
 r2opts.randFlag   = 1;
 r2opts.validMeans = 1;
-r2opts.nShuffle   = 100;
+r2opts.nShuffle   = 500;
 
-options.binSpacing = 2.0; % matches 2s-on/2s-off stimulus timing
+options.binSpacing = 2.0; % matches 2s-on/2s-off stimulus timing (used for fano-factor)
 
 %%
 filteredTable = filterMasterTable('MouseID', mouseList, 'HasStimulus', 'DotMotion_SpeedTuning', ...
@@ -51,8 +52,12 @@ filteredTable = filterMasterTable('MouseID', mouseList, 'HasStimulus', 'DotMotio
 allMice    = filteredTable.MouseID;
 uniqueMice = unique(allMice, 'stable');
 
-allDotUnits = struct('alltraces', {}, 'blankTrials', {}, 'tuning', {}, 'sessionLabel', {}, ...
-    'mouseID', {}, 'sessionName', {}, 'roiIdx', {});
+allDotUnits = struct('alltraces', {}, 'preStimTrials', {}, 'blankTrials', {}, 'tuning', {}, ...
+    'preStimBaselineMean_stat', {}, 'preStimBaselineMean_run', {}, ...
+    'preStimBaselineSEM_stat', {}, 'preStimBaselineSEM_run', {}, ...
+    'evokedVals_ordered_stat', {}, 'evokedVals_ordered_run', {}, ...
+    'preStimVals_ordered_stat', {}, 'preStimVals_ordered_run', {}, ...
+    'sessionLabel', {}, 'mouseID', {}, 'sessionName', {}, 'roiIdx', {});
 haveWarnedShape = false;
 
 for iMouse = 1:length(uniqueMice)
@@ -158,24 +163,30 @@ for iMouse = 1:length(uniqueMice)
 
         timeVec = response.psthData(1).timeVector(:)';
         stimWindowMask = timeVec >= stimWindowMask_range(1) & timeVec <= stimWindowMask_range(2);
+        preStimWindow_range = [-0.75, -0.2]; % pre-stim baseline window, avoids previous-trial calcium decay
+        preStimMask = timeVec >= preStimWindow_range(1) & timeVec <= preStimWindow_range(2);
 
         %%  per-bouton, split responses by state (speeds AND blank) 
         for thisROI = 1:nBoutons
-            alltraces   = cell(nSpeeds, 2); % column 1 = stationary, column 2 = running
-            blankTrials = cell(1, 2); % same coloumn structure as above 
+            alltraces     = cell(nSpeeds, 2); % column 1 = stationary, column 2 = running
+            preStimTrials = cell(nSpeeds, 2); % same column structure as alltraces
+            blankTrials   = cell(1, 2); % same coloumn structure as above 
 
             for thisSpeed = 1:nSpeeds
                 for istate = 1:2
                     matchingTrials = find(abs([temp_tsd.VelX1]) == uniqueVelocities(thisSpeed) & ...
                                           [temp_tsd.runFlag] == (istate - 1));
-                    traceAccumulator = nan(1, numel(matchingTrials));
+                    traceAccumulator   = nan(1, numel(matchingTrials));
+                    preStimAccumulator = nan(1, numel(matchingTrials));
                     for mt = 1:numel(matchingTrials)
                         origGroup = temp_tsd(matchingTrials(mt)).origGroup;
                         origTi    = temp_tsd(matchingTrials(mt)).origTrialInGroup;
                         fullTrace = squeeze(response.psthData(origGroup).alignedResponses(thisROI, :, origTi));
-                        traceAccumulator(mt) = nanmean(fullTrace(stimWindowMask));
+                        traceAccumulator(mt)   = nanmean(fullTrace(stimWindowMask));
+                        preStimAccumulator(mt) = nanmean(fullTrace(preStimMask));
                     end
-                    alltraces{thisSpeed, istate} = traceAccumulator;
+                    alltraces{thisSpeed, istate}     = traceAccumulator;
+                    preStimTrials{thisSpeed, istate} = preStimAccumulator;
                 end
             end
 
@@ -191,10 +202,44 @@ for iMouse = 1:length(uniqueMice)
                 blankTrials{istate} = blankAccum;
             end
 
+            % ordered evoked/pre-stim values, PER STATE (mirrors RunningOnly's
+            % evokedVals_ordered/preStimVals_ordered, but split stat vs run)
+            evokedVals_ordered_stat  = nan(1, sum([temp_tsd.runFlag] == 0));
+            preStimVals_ordered_stat = nan(1, sum([temp_tsd.runFlag] == 0));
+            statTrialIdx = find([temp_tsd.runFlag] == 0);
+            for i = 1:numel(statTrialIdx)
+                fullTraceOrdered = squeeze(response.psthData(temp_tsd(statTrialIdx(i)).origGroup).alignedResponses( ...
+                    thisROI, :, temp_tsd(statTrialIdx(i)).origTrialInGroup));
+                evokedVals_ordered_stat(i)  = nanmean(fullTraceOrdered(stimWindowMask));
+                preStimVals_ordered_stat(i) = nanmean(fullTraceOrdered(preStimMask));
+            end
+
+            evokedVals_ordered_run  = nan(1, sum([temp_tsd.runFlag] == 1));
+            preStimVals_ordered_run = nan(1, sum([temp_tsd.runFlag] == 1));
+            runTrialIdx = find([temp_tsd.runFlag] == 1);
+            for i = 1:numel(runTrialIdx)
+                fullTraceOrdered = squeeze(response.psthData(temp_tsd(runTrialIdx(i)).origGroup).alignedResponses( ...
+                    thisROI, :, temp_tsd(runTrialIdx(i)).origTrialInGroup));
+                evokedVals_ordered_run(i)  = nanmean(fullTraceOrdered(stimWindowMask));
+                preStimVals_ordered_run(i) = nanmean(fullTraceOrdered(preStimMask));
+            end
+
+            preStimTrials_stat = preStimTrials(:, 1);
+            preStimTrials_run  = preStimTrials(:, 2);
+
             allDotUnits(end+1) = struct( ...
                 'alltraces',    {alltraces}, ...
+                'preStimTrials', {preStimTrials}, ...
                 'blankTrials',  {blankTrials}, ...
                 'tuning',       cellfun(@nanmean, alltraces), ...
+                'preStimBaselineMean_stat', nanmean([preStimTrials_stat{:}]), ...
+                'preStimBaselineMean_run',  nanmean([preStimTrials_run{:}]), ...
+                'preStimBaselineSEM_stat',  nanstd([preStimTrials_stat{:}]) / sqrt(sum(~isnan([preStimTrials_stat{:}]))), ...
+                'preStimBaselineSEM_run',   nanstd([preStimTrials_run{:}])  / sqrt(sum(~isnan([preStimTrials_run{:}]))), ...
+                'evokedVals_ordered_stat',  evokedVals_ordered_stat, ...
+                'evokedVals_ordered_run',   evokedVals_ordered_run, ...
+                'preStimVals_ordered_stat', preStimVals_ordered_stat, ...
+                'preStimVals_ordered_run',  preStimVals_ordered_run, ...
                 'sessionLabel', sprintf('%s_%s', thisMouse, thisSessionName), ...
                 'mouseID',      thisMouse, ...
                 'sessionName',  thisSessionName, ...
@@ -267,9 +312,10 @@ for si = 1:2
 end
 
 
-%% 
+%% check trial counts by states
 %DotFields_CheckTrialCountsByState
-
+%% are boutons responsive during locmotion also responsive during stationary
+DotFields_ResponsiveOverlapCheck
 %%  ANOVA-protected t-test / Wilcoxon vs blank, PER STATE 
 for si = 1:2
     thisState = stateNames{si};
@@ -339,26 +385,59 @@ end
 figure('Color','w');
 subplot(1,2,1); histogram(reliability_stat, 30); xlabel('Reliability'); title('Dot Fields - Stationary');
 subplot(1,2,2); histogram(reliability_run, 30); xlabel('Reliability'); title('Dot Fields - Locomotion');
-%% cross-validated R^2, PER STATE (downsample across BOTH states together, matching Edd's script)
+%% cross-validated R^2, PER STATE - matching Edd's original script exactly
+% Edd's original (DotFields_TuningCurveAnalysis_compareStates_2PData.m,
+% run once per session) computes ONE minTrial per session:
+%   minTrial = min(min(cellfun(@(x) size(x,2), units(1).allSpikes)));
+% This is a single value taken jointly across ALL speeds AND BOTH states
+% (not independent per state), using ROI 1 as a stand-in for the whole
+% session -- valid because matchingTrials is built purely from session
+% trial metadata (temp_tsd), identically for every ROI, so every ROI in a
+% session has exactly the same trial COUNT per condition (individual
+% values can still be NaN, but the array length can't differ). He then
+% truncates every ROI's raw trial columns with x(:,1:minTrial) -- no NaN
+% filtering, just the first minTrial trials as recorded.
+%
+% replicate this across pooled multi-session dataset:
+% one minTrial computed per session (using the first bouton in that
+% session as the reference, same logic as his units(1)), then applied by
+% simple raw truncation to every bouton belonging to that session, for
+% every speed AND both states jointly. Because the truncation is joint,
+% statR2 and runR2 are gated together again (same as Edd) -- nStat and
+% nRun will come out equal, unlike the independent-per-state version we
+% tried earlier to match the paper's prose.
+
+sessionLabels_all = {allDotUnits.sessionLabel}';
+uniqueSessionsAll  = unique(sessionLabels_all, 'stable');
+sessionMinTrial    = containers.Map('KeyType', 'char', 'ValueType', 'double');
+
+for s = 1:numel(uniqueSessionsAll)
+    thisSession     = uniqueSessionsAll{s};
+    firstBoutonIdx  = find(strcmp(sessionLabels_all, thisSession), 1);
+    alltraces_ref   = allDotUnits(firstBoutonIdx).alltraces; % nSpeeds x 2, raw (unfiltered) trial counts
+    sessionMinTrial(thisSession) = min(min(cellfun(@numel, alltraces_ref)));
+end
+
 statR2 = nan(nBoutonsTotal, 1); statR2_pval = nan(nBoutonsTotal, 1);
 runR2  = nan(nBoutonsTotal, 1); runR2_pval  = nan(nBoutonsTotal, 1);
-
+seed = 1;
 for thisBouton = 1:nBoutonsTotal
     alltraces = allDotUnits(thisBouton).alltraces; % nSpeeds x 2
+    minTrial  = sessionMinTrial(allDotUnits(thisBouton).sessionLabel);
 
-    minTrial = min(min(cellfun(@(x) sum(~isnan(x)), alltraces)));
     if minTrial < r2opts.kval
-        continue;
+        continue; % not enough trials in this session to run k-fold CV at all
     end
-    alltracesDownsampled = cellfun(@(x) x(find(~isnan(x), minTrial)), alltraces, 'UniformOutput', false);
 
-    gca_stat = alltracesDownsampled(:, 1)';
+    alltracesDS = cellfun(@(x) x(:, 1:minTrial), alltraces, 'UniformOutput', false);
+
+    gca_stat = alltracesDS(:, 1)';
     [statR2(thisBouton), statR2_pval(thisBouton)] = calc_kfold_R2(gca_stat, r2opts.kval, r2opts.nPerms, ...
-        r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle);
+        r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
 
-    gca_run = alltracesDownsampled(:, 2)';
+    gca_run = alltracesDS(:, 2)';
     [runR2(thisBouton), runR2_pval(thisBouton)] = calc_kfold_R2(gca_run, r2opts.kval, r2opts.nPerms, ...
-        r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle);
+        r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
 
     if mod(thisBouton, 100) == 0
         fprintf('Cross-val R^2: %d / %d boutons...\n', thisBouton, nBoutonsTotal);
@@ -366,11 +445,27 @@ for thisBouton = 1:nBoutonsTotal
 end
 
 isTunedStat = statR2_pval < ALPHA;
-isTunedRun  = runR2_pval < ALPHA;
+isTunedRun  = runR2_pval  < ALPHA;
+
+nStatValid = sum(~isnan(statR2_pval));
+nRunValid  = sum(~isnan(runR2_pval));
+
 fprintf('\n[Stationary] %d / %d boutons show significant cross-validated tuning (p<%.2f).\n', ...
     sum(isTunedStat, 'omitnan'), nBoutonsTotal, ALPHA);
 fprintf('[Locomotion] %d / %d boutons show significant cross-validated tuning (p<%.2f).\n', ...
     sum(isTunedRun, 'omitnan'), nBoutonsTotal, ALPHA);
+
+% Real proportions: out of boutons that had enough trials to get an R^2
+% in that state at all, what fraction were tuned. With the joint
+% per-session downsample (matching Edd's method), nStatValid and
+% nRunValid will be equal -- this is still worth checking so you report
+% percentages relative to the actual included pool, not nBoutonsTotal.
+fprintf('[Stationary] %d / %d boutons WITH VALID R^2 were tuned (%.1f%%).\n', ...
+    sum(isTunedStat, 'omitnan'), nStatValid, 100*sum(isTunedStat,'omitnan')/nStatValid);
+fprintf('[Locomotion] %d / %d boutons WITH VALID R^2 were tuned (%.1f%%).\n', ...
+    sum(isTunedRun, 'omitnan'), nRunValid, 100*sum(isTunedRun,'omitnan')/nRunValid);
+
+
 
 for thisBouton = 1:nBoutonsTotal
     allDotUnits(thisBouton).statR2      = statR2(thisBouton);
@@ -381,16 +476,103 @@ for thisBouton = 1:nBoutonsTotal
     allDotUnits(thisBouton).isTunedRun  = isTunedRun(thisBouton);
 end
 
+
+
+%% cross-validated R^2, PER STATE (downsample WITHIN each state only)
+% statR2 = nan(nBoutonsTotal, 1); statR2_pval = nan(nBoutonsTotal, 1);
+% runR2  = nan(nBoutonsTotal, 1); runR2_pval  = nan(nBoutonsTotal, 1);
+% seed = 1;
+% for thisBouton = 1:nBoutonsTotal
+%     alltraces = allDotUnits(thisBouton).alltraces; % nSpeeds x 2
+% 
+%     %  stationary: downsample using ONLY stationary's own 6 speed cells 
+%     minTrial_stat = min(cellfun(@(x) sum(~isnan(x)), alltraces(:,1)));
+%     if minTrial_stat >= r2opts.kval
+%         gca_stat = cellfun(@(x) x(find(~isnan(x), minTrial_stat)), alltraces(:,1), 'UniformOutput', false)';
+%         [statR2(thisBouton), statR2_pval(thisBouton)] = calc_kfold_R2(gca_stat, r2opts.kval, r2opts.nPerms, ...
+%             r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
+%     end
+% 
+%     % locomotion: downsample using ONLY locomotion's own 6 speed cells
+%     minTrial_run = min(cellfun(@(x) sum(~isnan(x)), alltraces(:,2)));
+%     if minTrial_run >= r2opts.kval
+%         gca_run = cellfun(@(x) x(find(~isnan(x), minTrial_run)), alltraces(:,2), 'UniformOutput', false)';
+%         [runR2(thisBouton), runR2_pval(thisBouton)] = calc_kfold_R2(gca_run, r2opts.kval, r2opts.nPerms, ...
+%             r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
+%     end
+% 
+%     if mod(thisBouton, 100) == 0
+%         fprintf('Cross-val R^2: %d / %d boutons...\n', thisBouton, nBoutonsTotal);
+%     end
+% end
+% 
+% 
+% 
+% isTunedStat = statR2_pval < ALPHA;
+% isTunedRun  = runR2_pval < ALPHA;
+% fprintf('\n[Stationary] %d / %d boutons show significant cross-validated tuning (p<%.2f).\n', ...
+%     sum(isTunedStat, 'omitnan'), nBoutonsTotal, ALPHA);
+% fprintf('[Locomotion] %d / %d boutons show significant cross-validated tuning (p<%.2f).\n', ...
+%     sum(isTunedRun, 'omitnan'), nBoutonsTotal, ALPHA);
+% 
+% for thisBouton = 1:nBoutonsTotal
+%     allDotUnits(thisBouton).statR2      = statR2(thisBouton);
+%     allDotUnits(thisBouton).statR2_pval = statR2_pval(thisBouton);
+%     allDotUnits(thisBouton).runR2       = runR2(thisBouton);
+%     allDotUnits(thisBouton).runR2_pval  = runR2_pval(thisBouton);
+%     allDotUnits(thisBouton).isTunedStat = isTunedStat(thisBouton);
+%     allDotUnits(thisBouton).isTunedRun  = isTunedRun(thisBouton);
+% end
+% 
+% r2_thresh  = 0.0;
+% r2p_thresh = 0.05;
+% 
+% validIdx_stat = find(cat(1,allDotUnits.statR2) > r2_thresh & cat(1,allDotUnits.statR2_pval) < r2p_thresh);
+% validIdx_run  = find(cat(1,allDotUnits.runR2)  > r2_thresh & cat(1,allDotUnits.runR2_pval)  < r2p_thresh);
+% validIdx_both = validIdx_stat(ismember(validIdx_stat, validIdx_run));
+% 
+% nStatOnly = numel(setdiff(validIdx_stat, validIdx_run));
+% nRunOnly  = numel(setdiff(validIdx_run, validIdx_stat));
+% nBoth     = numel(validIdx_both);
+% nStatTotal = numel(validIdx_stat);
+% nRunTotal  = numel(validIdx_run);
+% nBoutonsTotal = numel(allDotUnits);
+% nNeither  = nBoutonsTotal - numel(union(validIdx_stat, validIdx_run));
+% 
+% fprintf('\n--- R^2 filter breakdown (R^2>%.2f, p<%.2f) ---\n', r2_thresh, r2p_thresh);
+% fprintf('%-30s %6d\n', 'Total boutons',            nBoutonsTotal);
+% fprintf('%-30s %6d\n', 'Pass stationary only',      nStatOnly);
+% fprintf('%-30s %6d\n', 'Pass locomotion only',      nRunOnly);
+% fprintf('%-30s %6d\n', 'Pass BOTH (paired cohort)', nBoth);
+% fprintf('%-30s %6d\n', 'Pass neither',              nNeither);
+% fprintf('%-30s %6d\n', 'Total passing stationary',  nStatTotal);
+% fprintf('%-30s %6d\n', 'Total passing locomotion',  nRunTotal);
+
+%% check how many stationry vs running trials there rae
+statTrials = arrayfun(@(x) min(cellfun(@(y) sum(~isnan(y)), x.alltraces(:,1))), allDotUnits);
+runTrials  = arrayfun(@(x) min(cellfun(@(y) sum(~isnan(y)), x.alltraces(:,2))), allDotUnits);
+
+figure('Color','w');
+subplot(1,2,1); histogram(statTrials); title('Min trials/speed - Stationary'); xlabel('N trials');
+subplot(1,2,2); histogram(runTrials);  title('Min trials/speed - Locomotion'); xlabel('N trials');
+fprintf('Median min-trials: stationary=%.1f, locomotion=%.1f\n', median(statTrials), median(runTrials));
+
 %%  population R^2 comparison (CDF, stat vs run) 
 figure('Color', 'w', 'Name', 'Population Tuning Quality (pooled)', 'Position', [200, 200, 500, 400]);
 hold on;
 allStatR2 = statR2(~isnan(statR2));
 allRunR2  = runR2(~isnan(runR2));
+
+nStat = numel(allStatR2);
+nRun  = numel(allRunR2);
+
 hStat = cdfplot(allStatR2);
-set(hStat, 'Color', 'k', 'LineWidth', 2.5, 'DisplayName', 'Stationary');
+set(hStat, 'Color', 'k', 'LineWidth', 2.5, 'DisplayName', sprintf('Stationary (n=%d)', nStat));
 hRun = cdfplot(allRunR2);
-set(hRun, 'Color', 'r', 'LineWidth', 2.5, 'DisplayName', 'Locomotion');
+set(hRun, 'Color', 'r', 'LineWidth', 2.5, 'DisplayName', sprintf('Locomotion (n=%d)', nRun));
+
 title(sprintf('Cross-validated R^2 distribution (pooled, n=%d boutons)', nBoutonsTotal), 'FontSize', 12, 'FontWeight', 'bold');
+subtitle('Numbers in brackets indicate number of contributing tuning curves', 'FontSize', 9, 'FontAngle', 'italic');
 xlabel('Cross-validated R^2 score', 'FontSize', 11);
 ylabel('Proportion of ROIs', 'FontSize', 11);
 legend('Location', 'southeast');
@@ -551,16 +733,66 @@ if ~isempty(validIdx_both)
     sgtitle('Gaussian Model Fits Across States (cross-validated cohort)', 'FontSize', 13, 'FontWeight', 'bold');
 end
 
+%%
+r2_thresh  = 0.1;
+r2p_thresh = 0.05;
+ 
+nBoutonsTotal = numel(allDotUnits);
+ 
+stateFieldSuffix = {'stat', 'run'};
+stateTitles      = {'Stationary', 'Running'};
+ 
+for si = 1:2
+    suffix = stateFieldSuffix{si};
+ 
+    cvR2   = cat(1, allDotUnits.([suffix 'R2']));
+    cvPval = cat(1, allDotUnits.([suffix 'R2_pval']));
+ 
+    validIdx = find(cvR2 > r2_thresh & cvPval < r2p_thresh);
+    fprintf('\n[%s] %d / %d boutons pass R^2 filter (R^2>%.2f, p<%.2f) for descriptive summaries.\n', ...
+        stateTitles{si}, numel(validIdx), nBoutonsTotal, r2_thresh, r2p_thresh);
+ 
+    gaussChar    = cat(1, allDotUnits.(['gaussChar_' suffix]));
+    prefSpeed    = cat(1, allDotUnits.(['prefSpeed_' suffix]));
+    dynamicRange = cat(1, allDotUnits.(['dynamicRange_' suffix]));
+    fanoFactor   = cat(1, allDotUnits.(['fanoFactor_' suffix]));
+ 
+    figure('Position', [100 100 1000 700]);
+ 
+    subplot(2,2,1);
+    histogram(gaussChar(validIdx), 'BinMethod', 'integers');
+    xlabel('Gaussian tuning category (gaussChar)'); ylabel('Count');
+    title('Tuning shape category');
+ 
+    subplot(2,2,2);
+    histogram(prefSpeed(validIdx), 'BinMethod', 'integers');
+    xlabel('Preferred speed index'); ylabel('Count');
+    title('Preferred speed distribution');
+ 
+    subplot(2,2,3);
+    histogram(dynamicRange(validIdx));
+    xlabel('Dynamic range'); ylabel('Count');
+    title('Dynamic range distribution');
+ 
+    subplot(2,2,4);
+    histogram(fanoFactor(validIdx));
+    xlabel('Fano factor'); ylabel('Count');
+    title('Fano factor distribution');
+ 
+    sgtitle(sprintf('Descriptive tuning summaries [%s] (R^2-filtered, n=%d)', ...
+        stateTitles{si}, numel(validIdx)));
+end
+
 % tests
 % DotFields_SelectRepresentativeBouton
 
 
 
-plotDotFieldsExampleBoutonStateSplit('M25132', '20260226',12)
-plotDotFieldsExampleBoutonStateSplit('M25132', '20260226',9)
-plotDotFieldsExampleBoutonStateSplit('M25133', '20260224',38)
-
-plotDotFieldsExampleBoutonStateSplit('M26003', '20260326',20)
+% plotDotFieldsExampleBoutonStateSplit('M25132', '20260226',12)
+% plotDotFieldsExampleBoutonStateSplit('M25132', '20260226',9)
+% plotDotFieldsExampleBoutonStateSplit('M25133', '20260224',38)
+% 
+% plotDotFieldsExampleBoutonStateSplit('M26003', '20260326',20)
 
 
 %DotFields_TrialCountMatchedComparison

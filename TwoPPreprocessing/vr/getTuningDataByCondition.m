@@ -27,7 +27,7 @@ function sessionMetrics = getTuningDataByCondition(sessionTable, varargin)
         end
         fprintf('Processing Mouse %s Session %s \n', currentSessionData.MouseID, currentSessionData.Session)
         
-        [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, ~] = loadVRLapSignalByCondition(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse); 
+        [condActivity, sfi, movementVisualGain, SMI, SMR, flaggedLaps, ~] = loadVRLapSignalByCondition(currentSessionData.MouseID, currentSessionData.Session, params.signalToUse); 
         if isempty(fieldnames(condActivity)), continue; end
         % new: saves the gain 
         
@@ -35,6 +35,7 @@ function sessionMetrics = getTuningDataByCondition(sessionTable, varargin)
         currentSessionData.movementVisualGain=movementVisualGain; 
 
         currentSessionData.SMI = SMI;
+        currentSessionData.SMR = SMR;
 
         currentSessionData.flaggedLaps = flaggedLaps; 
         
@@ -102,8 +103,13 @@ end
 %     end
 % end
 
-function [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, errorMessage] = loadVRLapSignalByCondition(subjectID, sessionID, signalName)
+function [condActivity, sfi, movementVisualGain, SMI, SMR, flaggedLaps, errorMessage] = loadVRLapSignalByCondition(subjectID, sessionID, signalName)
     condActivity = struct(); errorMessage = ''; sfi = struct();
+    % FIX: initialize all outputs up front so a caught error (or a
+    % missing field) never leaves an output argument unassigned, which
+    % would otherwise throw an uncatchable "output not assigned" error
+    % on function exit.
+    SMI = []; SMR = []; movementVisualGain = []; flaggedLaps = [];
     try
         sessionInfoPath = findSessionFileInfoFilePath(subjectID, sessionID);
         D = load(sessionInfoPath, 'sessionFileInfo');
@@ -147,14 +153,16 @@ function [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, errorMessage]
         
         responseFilePath = sfi.stimFiles(targetIdx).Response;
     
-        response = load(responseFilePath, 'lapPositionActivity', 'movementVisualGain', 'trialIndicesByCondition', 'SMI_Metrics', 'flaggedLaps', 'stimName');
+        % FIX: 'SMR_metric' -> 'SMR_Metrics' (must match the variable name
+        % exactly as saved by computeSpatialModulationRatio, since load()
+        % silently skips names that don't match -- it does not error).
+        response = load(responseFilePath, 'lapPositionActivity', 'movementVisualGain', 'trialIndicesByCondition', 'SMI_Metrics', 'flaggedLaps', 'stimName', 'SMR_Metrics');
         
         
         % response = load(sfi.stimFiles(targetIdx).Response);        
         if ~isfield(response.lapPositionActivity, signalName)
             error('Signal %s missing from data.', signalName);
          end
-        movementVisualGain = [];
         if isfield(response, 'movementVisualGain')
             movementVisualGain = response.movementVisualGain; 
         end 
@@ -173,8 +181,18 @@ function [condActivity, sfi, movementVisualGain, SMI, flaggedLaps, errorMessage]
             condActivity.Default = fullActivity;
         end
 
-        if isfield(response, 'SMI_Metrics') && ~isempty(response.SMI_Metrics)
+        % FIX: SMI_Metrics.(signalName) is a struct with fields
+        % {SMI, Rp, Rn, RpBin, RnBin, ...}. Index into .SMI to get the
+        % plain per-ROI index vector, matching how SMI is used downstream
+        % (currentSessionData.SMI = SMI;) as a plain numeric array.
+        if isfield(response, 'SMI_Metrics') && ~isempty(response.SMI_Metrics) && isfield(response.SMI_Metrics, signalName)
            SMI = response.SMI_Metrics.(signalName);       
+        end
+
+        % FIX: same issue as SMI above -- index into .SMR for the plain
+        % ratio vector rather than assigning the whole metrics struct.
+        if isfield(response, 'SMR_Metrics') && ~isempty(response.SMR_Metrics) && isfield(response.SMR_Metrics, signalName)
+           SMR = response.SMR_Metrics.(signalName);       
         end
 
         if isfield(response, 'flaggedLaps') %&& ~isempty(response.flaggedLaps)

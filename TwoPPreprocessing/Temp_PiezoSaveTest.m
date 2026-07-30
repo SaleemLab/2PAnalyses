@@ -62,7 +62,7 @@ frameData.AlignedTime = frameData.TwoPFrameTime + globalOffset;
 
 %% extract planes
 numPlanes = 8;
-frameDurationMs = 133; % ~8.33ms per frame
+frameDurationMs = 16; %
 numFrames = height(frameData);
 numVolumes = floor(numFrames / numPlanes);
 

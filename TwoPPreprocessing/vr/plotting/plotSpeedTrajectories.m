@@ -1,146 +1,3 @@
-% function figA = plotSpeedTrajectories(response, smoothSigma)
-% % Loads lap running speed data and plots traces across position bins.
-% % Shows the per-position median threshold line from getLowHighSpeedPositionMatrix
-% % instead of fixed horizontal patches — so the shading reflects the actual
-% % occupancy-based split used in the analysis.
-% 
-% if nargin < 2, smoothSigma = 2; end
-% 
-% %% Interpolate and smooth lap speeds
-% numLaps    = length(response.lapRunningSpeed);
-% numPosBins = 200;
-% allInterpSpeeds = nan(numLaps, numPosBins);
-% 
-% for l = 1:numLaps
-%     rawV = response.lapRunningSpeed{l};
-%     if length(rawV) < 5, continue; end
-%     binnedV = interp1(linspace(1, numPosBins, length(rawV)), rawV, 1:numPosBins, 'linear', 'extrap');
-%     allInterpSpeeds(l, :) = smoothdata(binnedV, 'gaussian', smoothSigma * 3);
-% end
-% 
-% %% Get per-position median threshold from saved analysis
-% if isfield(response, 'speedPositionActivity') && ...
-%    isfield(response.speedPositionActivity, 'lowHigh') && ...
-%    isfield(response.speedPositionActivity.lowHigh, 'medianThreshLine')
-%     medianThreshLine = response.speedPositionActivity.lowHigh.medianThreshLine;
-%     fprintf('Using saved per-position median threshold line\n');
-% else
-%     error('No medianThreshLine found. Run getLowHighSpeedPositionMatrix first.');
-% end
-% 
-% %% Axis limits
-% minY = 0;
-% maxY = max(allInterpSpeeds(:)) + 1;
-% if isnan(maxY), maxY = 50; end
-% 
-% %% Plot
-% figA = figure('Name', 'Speed Trajectories', ...
-%     'Position', [100, 100, 650, 520], 'Color', 'w', 'Visible', 'off');
-% ax = axes('Position', [0.15, 0.15, 0.75, 0.75]);
-% hold on;
-% 
-% % Speed traces
-% for l = 1:numLaps
-%     if all(isnan(allInterpSpeeds(l,:))), continue; end
-%     plot(ax, 1:numPosBins, allInterpSpeeds(l,:), 'Color', [0.2, 0.2, 0.2, 0.25], 'LineWidth', 1.5);
-% end
-% 
-% % Per-position median threshold line
-% plot(ax, 1:numPosBins, medianThreshLine, '-', 'Color', [0.8 0.0 0.6], 'LineWidth', 2.5);
-% 
-% %% Formatting
-% ylabel(ax, 'Speed (cm/s)', 'FontSize', 14);
-% xlabel(ax, 'Position (cm)', 'FontSize', 14);
-% box off;
-% set(ax, 'TickDir', 'out', 'LineWidth', 1.2, 'FontSize', 12);
-% xlim([1, numPosBins]);
-% xticks([1, 40, 80, 120, 160, 200]);
-% xticklabels({'1', '40', '80', '120', '160', '200'});
-% ylim([minY, maxY]);
-% 
-% % Y ticks: min, session median summary, max
-% sessionMedian = response.speedPositionActivity.lowHigh.sessionMedian;
-% cleanTicks    = unique([1, round(sessionMedian), round(maxY)]);
-% yticks(cleanTicks);
-% 
-% if exist('defaultAxesProperties', 'file') == 2, defaultAxesProperties(ax, 0); end
-% if exist('offsetAxes',            'file') == 2, offsetAxes(ax); end
-% 
-% set(figA, 'Visible', 'on');
-% end
-
-
-% function figA = plotSpeedTrajectories(response, smoothSigma)
-% % Loads lap running speed data and plots traces across position bins.
-% % Shows the per-position median threshold line from getLowHighSpeedPositionMatrix
-% % instead of fixed horizontal patches — so the shading reflects the actual
-% % occupancy-based split used in the analysis.
-% 
-% if nargin < 2, smoothSigma = 2; end
-% 
-% %% Interpolate and smooth lap speeds
-% numLaps    = length(response.lapRunningSpeed);
-% numPosBins = 200;
-% allInterpSpeeds = nan(numLaps, numPosBins);
-% 
-% for l = 1:numLaps
-%     rawV = response.lapRunningSpeed{l};
-%     if length(rawV) < 5, continue; end
-%     binnedV = interp1(linspace(1, numPosBins, length(rawV)), rawV, 1:numPosBins, 'linear', 'extrap');
-%     allInterpSpeeds(l, :) = smoothdata(binnedV, 'gaussian', smoothSigma * 3);
-% end
-% 
-% %% Get per-position median threshold from saved analysis
-% if isfield(response, 'speedPositionActivity') && ...
-%    isfield(response.speedPositionActivity, 'lowHigh') && ...
-%    isfield(response.speedPositionActivity.lowHigh, 'medianThreshLine')
-%     medianThreshLine = response.speedPositionActivity.lowHigh.medianThreshLine;
-%     fprintf('Using saved per-position median threshold line\n');
-% else
-%     error('No medianThreshLine found. Run getLowHighSpeedPositionMatrix first.');
-% end
-% 
-% %% Axis limits
-% minY = 0;
-% maxY = max(allInterpSpeeds(:)) + 1;
-% if isnan(maxY), maxY = 50; end
-% 
-% %% Plot
-% figA = figure('Name', 'Speed Trajectories', ...
-%     'Position', [100, 100, 650, 520], 'Color', 'w', 'Visible', 'off');
-% ax = axes('Position', [0.15, 0.15, 0.75, 0.75]);
-% hold on;
-% 
-% % Speed traces
-% for l = 1:numLaps
-%     if all(isnan(allInterpSpeeds(l,:))), continue; end
-%     plot(ax, 1:numPosBins, allInterpSpeeds(l,:), 'Color', [0.2, 0.2, 0.2, 0.25], 'LineWidth', 1.5);
-% end
-% 
-% % Per-position median threshold line
-% plot(ax, 1:numPosBins, medianThreshLine, '-', 'Color', [0.8 0.0 0.6], 'LineWidth', 2.5);
-% 
-% %% Formatting
-% ylabel(ax, 'Speed (cm/s)', 'FontSize', 14);
-% xlabel(ax, 'Position (cm)', 'FontSize', 14);
-% box off;
-% set(ax, 'TickDir', 'out', 'LineWidth', 1.2, 'FontSize', 12);
-% xlim([1, numPosBins]);
-% xticks([1, 40, 80, 120, 160, 200]);
-% xticklabels({'1', '40', '80', '120', '160', '200'});
-% ylim([minY, maxY]);
-% 
-% % Y ticks: min, session median summary, max
-% sessionMedian = response.speedPositionActivity.lowHigh.sessionMedian;
-% cleanTicks    = unique([1, round(sessionMedian), round(maxY)]);
-% yticks(cleanTicks);
-% 
-% if exist('defaultAxesProperties', 'file') == 2, defaultAxesProperties(ax, 0); end
-% if exist('offsetAxes',            'file') == 2, offsetAxes(ax); end
-% 
-% set(figA, 'Visible', 'on');
-% end
-
 function figA = plotSpeedTrajectories(response, smoothSigma)
 % Loads lap running speed data and plots traces across position bins.
 % Colour patches use the fixed speed edges saved by getLowMedHigh_SpeedPosActivityMatrix
@@ -461,4 +318,148 @@ end
 %         sum(strat.lowIdx), sum(strat.medIdx), sum(strat.highIdx)));
 %     grid on; box off;
 %     xlim([0 215]); ylim([-2 60]);
+% end
+
+
+% function figA = plotSpeedTrajectories(response, smoothSigma)
+% % Loads lap running speed data and plots traces across position bins.
+% % Shows the per-position median threshold line from getLowHighSpeedPositionMatrix
+% % instead of fixed horizontal patches — so the shading reflects the actual
+% % occupancy-based split used in the analysis.
+% 
+% if nargin < 2, smoothSigma = 2; end
+% 
+% %% Interpolate and smooth lap speeds
+% numLaps    = length(response.lapRunningSpeed);
+% numPosBins = 200;
+% allInterpSpeeds = nan(numLaps, numPosBins);
+% 
+% for l = 1:numLaps
+%     rawV = response.lapRunningSpeed{l};
+%     if length(rawV) < 5, continue; end
+%     binnedV = interp1(linspace(1, numPosBins, length(rawV)), rawV, 1:numPosBins, 'linear', 'extrap');
+%     allInterpSpeeds(l, :) = smoothdata(binnedV, 'gaussian', smoothSigma * 3);
+% end
+% 
+% %% Get per-position median threshold from saved analysis
+% if isfield(response, 'speedPositionActivity') && ...
+%    isfield(response.speedPositionActivity, 'lowHigh') && ...
+%    isfield(response.speedPositionActivity.lowHigh, 'medianThreshLine')
+%     medianThreshLine = response.speedPositionActivity.lowHigh.medianThreshLine;
+%     fprintf('Using saved per-position median threshold line\n');
+% else
+%     error('No medianThreshLine found. Run getLowHighSpeedPositionMatrix first.');
+% end
+% 
+% %% Axis limits
+% minY = 0;
+% maxY = max(allInterpSpeeds(:)) + 1;
+% if isnan(maxY), maxY = 50; end
+% 
+% %% Plot
+% figA = figure('Name', 'Speed Trajectories', ...
+%     'Position', [100, 100, 650, 520], 'Color', 'w', 'Visible', 'off');
+% ax = axes('Position', [0.15, 0.15, 0.75, 0.75]);
+% hold on;
+% 
+% % Speed traces
+% for l = 1:numLaps
+%     if all(isnan(allInterpSpeeds(l,:))), continue; end
+%     plot(ax, 1:numPosBins, allInterpSpeeds(l,:), 'Color', [0.2, 0.2, 0.2, 0.25], 'LineWidth', 1.5);
+% end
+% 
+% % Per-position median threshold line
+% plot(ax, 1:numPosBins, medianThreshLine, '-', 'Color', [0.8 0.0 0.6], 'LineWidth', 2.5);
+% 
+% %% Formatting
+% ylabel(ax, 'Speed (cm/s)', 'FontSize', 14);
+% xlabel(ax, 'Position (cm)', 'FontSize', 14);
+% box off;
+% set(ax, 'TickDir', 'out', 'LineWidth', 1.2, 'FontSize', 12);
+% xlim([1, numPosBins]);
+% xticks([1, 40, 80, 120, 160, 200]);
+% xticklabels({'1', '40', '80', '120', '160', '200'});
+% ylim([minY, maxY]);
+% 
+% % Y ticks: min, session median summary, max
+% sessionMedian = response.speedPositionActivity.lowHigh.sessionMedian;
+% cleanTicks    = unique([1, round(sessionMedian), round(maxY)]);
+% yticks(cleanTicks);
+% 
+% if exist('defaultAxesProperties', 'file') == 2, defaultAxesProperties(ax, 0); end
+% if exist('offsetAxes',            'file') == 2, offsetAxes(ax); end
+% 
+% set(figA, 'Visible', 'on');
+% end
+
+
+% function figA = plotSpeedTrajectories(response, smoothSigma)
+% % Loads lap running speed data and plots traces across position bins.
+% % Shows the per-position median threshold line from getLowHighSpeedPositionMatrix
+% % instead of fixed horizontal patches — so the shading reflects the actual
+% % occupancy-based split used in the analysis.
+% 
+% if nargin < 2, smoothSigma = 2; end
+% 
+% %% Interpolate and smooth lap speeds
+% numLaps    = length(response.lapRunningSpeed);
+% numPosBins = 200;
+% allInterpSpeeds = nan(numLaps, numPosBins);
+% 
+% for l = 1:numLaps
+%     rawV = response.lapRunningSpeed{l};
+%     if length(rawV) < 5, continue; end
+%     binnedV = interp1(linspace(1, numPosBins, length(rawV)), rawV, 1:numPosBins, 'linear', 'extrap');
+%     allInterpSpeeds(l, :) = smoothdata(binnedV, 'gaussian', smoothSigma * 3);
+% end
+% 
+% %% Get per-position median threshold from saved analysis
+% if isfield(response, 'speedPositionActivity') && ...
+%    isfield(response.speedPositionActivity, 'lowHigh') && ...
+%    isfield(response.speedPositionActivity.lowHigh, 'medianThreshLine')
+%     medianThreshLine = response.speedPositionActivity.lowHigh.medianThreshLine;
+%     fprintf('Using saved per-position median threshold line\n');
+% else
+%     error('No medianThreshLine found. Run getLowHighSpeedPositionMatrix first.');
+% end
+% 
+% %% Axis limits
+% minY = 0;
+% maxY = max(allInterpSpeeds(:)) + 1;
+% if isnan(maxY), maxY = 50; end
+% 
+% %% Plot
+% figA = figure('Name', 'Speed Trajectories', ...
+%     'Position', [100, 100, 650, 520], 'Color', 'w', 'Visible', 'off');
+% ax = axes('Position', [0.15, 0.15, 0.75, 0.75]);
+% hold on;
+% 
+% % Speed traces
+% for l = 1:numLaps
+%     if all(isnan(allInterpSpeeds(l,:))), continue; end
+%     plot(ax, 1:numPosBins, allInterpSpeeds(l,:), 'Color', [0.2, 0.2, 0.2, 0.25], 'LineWidth', 1.5);
+% end
+% 
+% % Per-position median threshold line
+% plot(ax, 1:numPosBins, medianThreshLine, '-', 'Color', [0.8 0.0 0.6], 'LineWidth', 2.5);
+% 
+% %% Formatting
+% ylabel(ax, 'Speed (cm/s)', 'FontSize', 14);
+% xlabel(ax, 'Position (cm)', 'FontSize', 14);
+% box off;
+% set(ax, 'TickDir', 'out', 'LineWidth', 1.2, 'FontSize', 12);
+% xlim([1, numPosBins]);
+% xticks([1, 40, 80, 120, 160, 200]);
+% xticklabels({'1', '40', '80', '120', '160', '200'});
+% ylim([minY, maxY]);
+% 
+% % Y ticks: min, session median summary, max
+% sessionMedian = response.speedPositionActivity.lowHigh.sessionMedian;
+% cleanTicks    = unique([1, round(sessionMedian), round(maxY)]);
+% yticks(cleanTicks);
+% 
+% if exist('defaultAxesProperties', 'file') == 2, defaultAxesProperties(ax, 0); end
+% if exist('offsetAxes',            'file') == 2, offsetAxes(ax); end
+% 
+% set(figA, 'Visible', 'on');
 % end

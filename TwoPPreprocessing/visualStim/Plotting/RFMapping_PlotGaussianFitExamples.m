@@ -12,6 +12,16 @@
 % -- this is the most direct way to SEE what "bootstrap center SD" means:
 % a tight cloud of dots = stable; a spread-out cloud = unstable.
 %
+% UPDATED to match the current field names in RFMapping_Gaussian2DFit.m:
+% the old combined 'isStable' field no longer exists on gaussFitResults --
+% it's been folded into 'isTrusted' (TRUE only if BOTH axes pass coverage
+% + non-degenerate-sigma + not-beyond-range). Categorization below now
+% uses 'isTrusted' directly. Also, since the main script now fits ALL
+% ROIs (not just responsive ones -- see note in that script), each plot
+% title now also shows isResponsive, so you can see at a glance whether
+% an example bouton with a passing fit was actually visually responsive
+% or just cleared the R^2 floor on noise.
+%
 % REQUIRES: allRFMapping, uAz, uEl_plot, respIdx, gaussFitResults (from
 % RFMapping_Gaussian2DFit.m -- run that first, keep gaussFitResults in
 % the workspace).
@@ -37,8 +47,11 @@ lb = [0,   azRange(1)-azStep, elRange(1)-elStep, azStep/4,        elStep/4];
 ub = [Inf, azRange(2)+azStep, elRange(2)+elStep, 3*range(azRange), 3*range(elRange)];
 
 %% categorize existing fits
-allR2vals = [gaussFitResults.R2];
-allTrusted = [gaussFitResults.isStable] & ~[gaussFitResults.isBeyondRange] & ~[gaussFitResults.isDegenerateSigma];
+% NOTE: 'isTrusted' already combines bootstrap coverage-stability + non-degenerate-sigma +
+% not-beyond-range across BOTH axes (see RFMapping_Gaussian2DFit.m), so it's used directly here
+% rather than re-deriving it from the old 'isStable'/'isBeyondRange'/'isDegenerateSigma' fields.
+allR2vals   = [gaussFitResults.R2];
+allTrusted  = [gaussFitResults.isTrusted];
 
 catStableHighR2   = find(allTrusted  & allR2vals >= 0.6);
 catStableLowR2    = find(allTrusted  & allR2vals >= 0.3 & allR2vals < 0.5);
@@ -125,7 +138,11 @@ for e = 1:nExamples
     end
 
     xlabel('Azimuth (\circ)'); ylabel('Elevation (\circ)');
-    title(sprintf('%s\nBouton %d | R^2=%.2f | stable=%d', exampleList(e).label, iROI, fitR.R2, fitR.isStable), ...
+    % NOTE: 'resp' here shows isResponsive so you can tell apart a real, visually-responsive
+    % bouton that happens to fit well from a non-responsive one whose noise cleared the R^2
+    % floor by chance -- relevant now that the main script fits ALL ROIs, not just responsive ones.
+    title(sprintf('%s\nBouton %d | R^2=%.2f | trusted=%d | resp=%d', ...
+        exampleList(e).label, iROI, fitR.R2, fitR.isTrusted, fitR.isResponsive), ...
         'FontSize', 8, 'FontWeight', 'normal');
     axis tight; hold off;
 end

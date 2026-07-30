@@ -1,0 +1,341 @@
+% DirTuning_vs_DotFields_CombinedAnalysis.m
+%
+% Finds sessions where BOTH DirTuning and DotFields (DotMotion_SpeedTuning)
+% were presented, pools both stimuli's data for those sessions only,
+% computes ONE behavior-agnostic (stationary+running pooled) cross-
+% validated R^2 per bouton per stimulus, and matches boutons across the
+% two stimuli by (sessionLabel, roiIdx) -- same ROI ordering within a
+% session, since both stimuli were recorded in the same Suite2p FOV.
+%
+% BEHAVIOR-AGNOSTIC BY DESIGN: trials are still classified as
+% stationary/running/ambiguous (same wheel-based logic as the other
+% compare-states scripts), but ambiguous trials are simply excluded and
+% the two states are pooled together for the actual tuning computation
+% -- because the animal's running behavior during the DotFields block
+% has no reason to match its behavior during the DirTuning block, so a
+% state-MATCHED comparison across stimuli isn't reliable. The
+% stationary/running trial COUNTS are still recorded per bouton per
+% stimulus purely as descriptive metadata (e.g. to flag if a bouton's
+% tuning estimate came from an unusually running-heavy or stationary-
+% heavy set of trials), not used to gate or split anything.
+%
+% Requires calc_kfold_R2.m on your MATLAB path.
+
+%%
+mouseList = {'M25133', 'M26003'};
+
+runSpeedThresh  = 3;
+statSpeedThresh = 0.5;
+propThresh      = 0.75;
+
+alpha      = 0.05;
+r2_thresh  = 0.1;
+r2p_thresh = 0.05;
+
+r2opts.kval       = 3;
+r2opts.nPerms     = 10;
+r2opts.randFlag   = 1;
+r2opts.validMeans = 1;
+r2opts.nShuffle   = 100;
+seed = 1;
+
+nTrialsTarget = 5; % same floor applied to BOTH stimuli, for a fair comparison
+
+respWin_2sOn = [0.1 3]; respWin_1sOn = [0.1 3]; % DirTuning resp windows, by postStimTime
+stimWindowMask_range = [0.1 3]; % DotFields resp window
+
+%% find sessions with BOTH stimuli
+DirTuningTable = filterMasterTable_usingNameSessionPairs('MouseID', mouseList, 'Exclude', 0, 'HasStimulus', {'DirTuning'});
+allMice = DirTuningTable.MouseID;
+
+matched = struct('mouseID', {}, 'sessionName', {}); % sessions confirmed to have BOTH stimuli
+
+for iMouse = 1:numel(mouseList)
+    thisMouse = mouseList{iMouse};
+    mouseSessIdx = find(strcmp(allMice, thisMouse));
+    fprintf('MOUSE: %s | %d DirTuning sessions -- checking for paired DotFields...\n', thisMouse, numel(mouseSessIdx));
+
+    for iSess = 1:numel(mouseSessIdx)
+        thisSessionName = char(DirTuningTable.Session(mouseSessIdx(iSess)));
+
+        infoPath = findSessionFileInfoFilePath(thisMouse, thisSessionName);
+        if ~isfile(infoPath), continue; end
+        loadedInfo = load(infoPath, 'sessionFileInfo');
+        stimNames  = {loadedInfo.sessionFileInfo.stimFiles.name};
+
+        hasDirTuning = any(contains(stimNames, 'DirTuning'));
+        hasDotFields = any(contains(stimNames, 'DotMotion_SpeedTuning'));
+
+        if hasDirTuning && hasDotFields
+            matched(end+1) = struct('mouseID', thisMouse, 'sessionName', thisSessionName); %#ok<AGROW>
+            fprintf('  MATCH: %s -- has both DirTuning and DotFields.\n', thisSessionName);
+        end
+    end
+end
+
+fprintf('\n%d sessions have BOTH stimuli.\n', numel(matched));
+if isempty(matched)
+    error('No sessions found with both stimuli -- nothing to analyze.');
+end
+
+%% pool both stimuli, session by session, matched by roiIdx
+comboUnits = struct('sessionLabel', {}, 'roiIdx', {}, ...
+    'cvR2_dir', {}, 'cvPval_dir', {}, 'isTuned_dir', {}, 'minTrialUsed_dir', {}, ...
+    'nStatTotal_dir', {}, 'nRunTotal_dir', {}, ...
+    'cvR2_dot', {}, 'cvPval_dot', {}, 'isTuned_dot', {}, 'minTrialUsed_dot', {}, ...
+    'nStatTotal_dot', {}, 'nRunTotal_dot', {});
+
+for iSess = 1:numel(matched)
+    thisMouse       = matched(iSess).mouseID;
+    thisSessionName = matched(iSess).sessionName;
+    sessionLabel    = sprintf('%s_%s', thisMouse, thisSessionName);
+    fprintf('\n=== Session %d/%d: %s ===\n', iSess, numel(matched), sessionLabel);
+
+    infoPath = findSessionFileInfoFilePath(thisMouse, thisSessionName);
+    loadedInfo      = load(infoPath, 'sessionFileInfo');
+    sessionFileInfo = loadedInfo.sessionFileInfo;
+    stimNames       = {sessionFileInfo.stimFiles.name};
+
+    %% ---------- DirTuning: combined (stat+run pooled), per bouton ----------
+    dirIdx = find(contains(stimNames, 'DirTuning'), 1);
+    load(sessionFileInfo.stimFiles(dirIdx).Response, 'response'); % variable name: response
+
+    switch response.postStimTime
+        case 4, respWin = respWin_2sOn;
+        case 3, respWin = respWin_1sOn;
+        otherwise, warning('  Unexpected postStimTime for DirTuning -- skipping session.'); continue;
+    end
+    stimOnDuration = (response.postStimTime == 4) * 2 + (response.postStimTime == 3) * 1;
+    stimFramesMask_range_dir = [-0.2, stimOnDuration + 0.8];
+
+    nDirConds = numel(response.psthData);
+    timeVecDir = response.psthData(1).timeVector(:)';
+    respIdxDir = timeVecDir >= respWin(1) & timeVecDir <= respWin(2);
+    nBoutonsDir = size(response.psthData(1).alignedResponses, 1);
+
+    % classify every trial per direction as stat(0)/run(1)/ambiguous(NaN)
+    dirTrialFlag = cell(nDirConds, 1);
+    for d = 1:nDirConds
+        grpWheel = response.wheelData(d);
+        speedMatrix = grpWheel.alignedResponses;
+        tVecWheel = grpWheel.timeVector(:)';
+        mask = tVecWheel >= stimFramesMask_range_dir(1) & tVecWheel <= stimFramesMask_range_dir(2);
+        nTrialsThisDir = size(speedMatrix, 2);
+        flag = nan(nTrialsThisDir, 1);
+        for ti = 1:nTrialsThisDir
+            trace = speedMatrix(:, ti);
+            if all(isnan(trace)), continue; end
+            meanSpeed = nanmean(trace(mask));
+            propRun   = sum(trace(mask) > statSpeedThresh) / sum(mask);
+            propStat  = sum(trace(mask) < runSpeedThresh)  / sum(mask);
+            if propRun >= propThresh && meanSpeed > runSpeedThresh, flag(ti) = 1;
+            elseif propStat >= propThresh && meanSpeed < statSpeedThresh, flag(ti) = 0;
+            end
+        end
+        dirTrialFlag{d} = flag;
+    end
+
+    dirResults = struct('cvR2', {}, 'cvPval', {}, 'minTrialUsed', {}, 'nStat', {}, 'nRun', {});
+    for iBouton = 1:nBoutonsDir
+        gcaComb = cell(1, nDirConds);
+        nStatThis = 0; nRunThis = 0;
+        for d = 1:nDirConds
+            traceMat = squeeze(response.psthData(d).alignedResponses(iBouton, :, :));
+            if isvector(traceMat), traceMat = traceMat(:); end
+            traceMat = double(traceMat)';
+            flag = dirTrialFlag{d};
+            keepIdx = find(~isnan(flag)); % exclude ambiguous
+            traceMat = traceMat(keepIdx, :);
+            vals = mean(traceMat(:, respIdxDir), 2, 'omitnan')';
+            vals = vals(~isnan(vals));
+            gcaComb{d} = vals;
+            nStatThis = nStatThis + sum(flag(keepIdx) == 0);
+            nRunThis  = nRunThis  + sum(flag(keepIdx) == 1);
+        end
+
+        trialCounts = cellfun(@numel, gcaComb);
+        r = struct('cvR2', NaN, 'cvPval', NaN, 'minTrialUsed', NaN, 'nStat', nStatThis, 'nRun', nRunThis);
+        if ~any(trialCounts == 0)
+            minTrial = min(trialCounts);
+            if minTrial >= nTrialsTarget
+                gcaDown = cellfun(@(x) x(1:minTrial), gcaComb, 'UniformOutput', false);
+                [r.cvR2, r.cvPval] = calc_kfold_R2(gcaDown, r2opts.kval, r2opts.nPerms, ...
+                    r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
+                r.minTrialUsed = minTrial;
+            end
+        end
+        dirResults(iBouton) = r;
+    end
+    fprintf('  DirTuning: %d boutons processed.\n', nBoutonsDir);
+
+    %% ---------- DotFields: combined (stat+run pooled), per bouton ----------
+    dotIdx = find(contains(stimNames, 'DotMotion_SpeedTuning'), 1);
+    load(sessionFileInfo.stimFiles(dotIdx).Response, 'response');
+    load(sessionFileInfo.stimFiles(dotIdx).BonsaiData, 'bonsaiData');
+
+    nGroups = numel(response.wheelData);
+    trialsSpeed2D = struct('VelX1', {}, 'numDots1', {}, 'runFlag', {}, 'origGroup', {}, 'origTrialInGroup', {});
+    trialCounter = 1;
+    stimFramesMask_range_dot = [-0.2 2.8];
+
+    for g = 1:nGroups
+        grpWheel = response.wheelData(g);
+        speedMatrix = grpWheel.alignedResponses;
+        tVec = grpWheel.timeVector;
+        mask = tVec >= stimFramesMask_range_dot(1) & tVec <= stimFramesMask_range_dot(2);
+        for ti = 1:size(speedMatrix, 2)
+            trace = speedMatrix(:, ti);
+            if all(isnan(trace)), continue; end
+            meanSpeed = nanmean(trace(mask));
+            propRun  = sum(trace(mask) > statSpeedThresh) / sum(mask);
+            propStat = sum(trace(mask) < runSpeedThresh)  / sum(mask);
+            flag = NaN;
+            if propRun >= propThresh && meanSpeed > runSpeedThresh, flag = 1;
+            elseif propStat >= propThresh && meanSpeed < statSpeedThresh, flag = 0;
+            end
+            if isnan(flag), continue; end % ambiguous -- excluded
+
+            trialsSpeed2D(trialCounter).VelX1 = grpWheel.stimValue;
+            trialsSpeed2D(trialCounter).numDots1 = (grpWheel.stimValue == 1) * 0 + (grpWheel.stimValue ~= 1) * 573;
+            trialsSpeed2D(trialCounter).runFlag = flag;
+            trialsSpeed2D(trialCounter).origGroup = g;
+            trialsSpeed2D(trialCounter).origTrialInGroup = ti;
+            trialCounter = trialCounter + 1;
+        end
+    end
+
+    tsd = trialsSpeed2D;
+    temp_tsd = tsd([tsd.numDots1] == 573); % real (non-blank) trials, non-ambiguous
+    if isempty(temp_tsd)
+        warning('  No valid non-blank DotFields trials -- skipping DotFields for this session.');
+        continue;
+    end
+    uniqueVelocities = unique(abs([temp_tsd.VelX1]));
+    nSpeeds = numel(uniqueVelocities);
+
+    timeVecDot = response.psthData(1).timeVector(:)';
+    stimWindowMaskDot = timeVecDot >= stimWindowMask_range(1) & timeVecDot <= stimWindowMask_range(2);
+    nBoutonsDot = size(response.psthData(1).alignedResponses, 1);
+
+    dotResults = struct('cvR2', {}, 'cvPval', {}, 'minTrialUsed', {}, 'nStat', {}, 'nRun', {});
+    for iBouton = 1:nBoutonsDot
+        gcaComb = cell(1, nSpeeds);
+        nStatThis = 0; nRunThis = 0;
+        for thisSpeed = 1:nSpeeds
+            matchIdx = find(abs([temp_tsd.VelX1]) == uniqueVelocities(thisSpeed));
+            vals = nan(1, numel(matchIdx));
+            for mt = 1:numel(matchIdx)
+                og = temp_tsd(matchIdx(mt)).origGroup;
+                ot = temp_tsd(matchIdx(mt)).origTrialInGroup;
+                fullTrace = squeeze(response.psthData(og).alignedResponses(iBouton, :, ot));
+                vals(mt) = nanmean(fullTrace(stimWindowMaskDot));
+            end
+            vals = vals(~isnan(vals));
+            gcaComb{thisSpeed} = vals;
+            flags = [temp_tsd(matchIdx).runFlag];
+            nStatThis = nStatThis + sum(flags == 0);
+            nRunThis  = nRunThis  + sum(flags == 1);
+        end
+
+        trialCounts = cellfun(@numel, gcaComb);
+        r = struct('cvR2', NaN, 'cvPval', NaN, 'minTrialUsed', NaN, 'nStat', nStatThis, 'nRun', nRunThis);
+        if ~any(trialCounts == 0)
+            minTrial = min(trialCounts);
+            if minTrial >= nTrialsTarget
+                gcaDown = cellfun(@(x) x(1:minTrial), gcaComb, 'UniformOutput', false);
+                [r.cvR2, r.cvPval] = calc_kfold_R2(gcaDown, r2opts.kval, r2opts.nPerms, ...
+                    r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
+                r.minTrialUsed = minTrial;
+            end
+        end
+        dotResults(iBouton) = r;
+    end
+    fprintf('  DotFields: %d boutons processed.\n', nBoutonsDot);
+
+    %% ---------- match boutons by roiIdx (assumes shared ROI ordering) ----------
+    nBoutonsMatch = min(nBoutonsDir, nBoutonsDot);
+    if nBoutonsDir ~= nBoutonsDot
+        warning('  nBoutons differs between DirTuning (%d) and DotFields (%d) for %s -- matching only the first %d ROIs; VERIFY this assumption before trusting results.', ...
+            nBoutonsDir, nBoutonsDot, sessionLabel, nBoutonsMatch);
+    end
+
+    for iBouton = 1:nBoutonsMatch
+        comboUnits(end+1) = struct( ...
+            'sessionLabel',     sessionLabel, ...
+            'roiIdx',           iBouton, ...
+            'cvR2_dir',         dirResults(iBouton).cvR2, ...
+            'cvPval_dir',       dirResults(iBouton).cvPval, ...
+            'isTuned_dir',      dirResults(iBouton).cvR2 > r2_thresh & dirResults(iBouton).cvPval < r2p_thresh, ...
+            'minTrialUsed_dir', dirResults(iBouton).minTrialUsed, ...
+            'nStatTotal_dir',   dirResults(iBouton).nStat, ...
+            'nRunTotal_dir',    dirResults(iBouton).nRun, ...
+            'cvR2_dot',         dotResults(iBouton).cvR2, ...
+            'cvPval_dot',       dotResults(iBouton).cvPval, ...
+            'isTuned_dot',      dotResults(iBouton).cvR2 > r2_thresh & dotResults(iBouton).cvPval < r2p_thresh, ...
+            'minTrialUsed_dot', dotResults(iBouton).minTrialUsed, ...
+            'nStatTotal_dot',   dotResults(iBouton).nStat, ...
+            'nRunTotal_dot',    dotResults(iBouton).nRun); 
+    end
+end
+
+nComboTotal = numel(comboUnits);
+fprintf('\nDone. %d matched boutons pooled across %d sessions (both stimuli).\n', nComboTotal, numel(matched));
+
+%% ============================================================
+%  Summary + plot: DirTuning cvR2 vs DotFields cvR2
+% ============================================================
+validCompare = ~isnan([comboUnits.cvR2_dir]) & ~isnan([comboUnits.cvR2_dot]);
+nCompared = sum(validCompare);
+fprintf('%d boutons have a valid combined cvR2 for BOTH stimuli.\n', nCompared);
+
+if nCompared > 0
+    cvR2_dir_v = [comboUnits(validCompare).cvR2_dir];
+    cvR2_dot_v = [comboUnits(validCompare).cvR2_dot];
+    isTuned_dir_v = [comboUnits(validCompare).isTuned_dir];
+    isTuned_dot_v = [comboUnits(validCompare).isTuned_dot];
+
+    n_bothTuned    = sum(isTuned_dir_v & isTuned_dot_v);
+    n_dirOnly      = sum(isTuned_dir_v & ~isTuned_dot_v);
+    n_dotOnly      = sum(~isTuned_dir_v & isTuned_dot_v);
+    n_neitherTuned = sum(~isTuned_dir_v & ~isTuned_dot_v);
+
+    fprintf('\n%-30s %6d  (%.1f%%)\n', 'Tuned to BOTH stimuli',     n_bothTuned,    100*n_bothTuned/nCompared);
+    fprintf('%-30s %6d  (%.1f%%)\n', 'DirTuning only',              n_dirOnly,      100*n_dirOnly/nCompared);
+    fprintf('%-30s %6d  (%.1f%%)\n', 'DotFields only',              n_dotOnly,      100*n_dotOnly/nCompared);
+    fprintf('%-30s %6d  (%.1f%%)\n', 'Neither',                     n_neitherTuned, 100*n_neitherTuned/nCompared);
+
+    % behaviour note: proportion running, per stimulus, purely descriptive
+    propRun_dir_v = [comboUnits(validCompare).nRunTotal_dir] ./ ...
+        ([comboUnits(validCompare).nRunTotal_dir] + [comboUnits(validCompare).nStatTotal_dir]);
+    propRun_dot_v = [comboUnits(validCompare).nRunTotal_dot] ./ ...
+        ([comboUnits(validCompare).nRunTotal_dot] + [comboUnits(validCompare).nStatTotal_dot]);
+
+    figure('Color', 'w', 'Position', [100 100 1100 450]);
+    subplot(1,2,1);
+    scatter(cvR2_dot_v, cvR2_dir_v, 20, 'filled', 'MarkerFaceAlpha', 0.5);
+    hold on;
+    xline(r2_thresh, 'k:'); yline(r2_thresh, 'k:');
+    xlabel('Cross-val R^2 (DotFields, combined)'); ylabel('Cross-val R^2 (DirTuning, combined)');
+    title(sprintf('cvR2 agreement across stimuli (n=%d)', nCompared));
+    axis square;
+
+    subplot(1,2,2);
+    scatter(cvR2_dot_v, cvR2_dir_v, 25, mean([propRun_dir_v; propRun_dot_v], 1), 'filled');
+    hold on;
+    xline(r2_thresh, 'k:'); yline(r2_thresh, 'k:');
+    xlabel('Cross-val R^2 (DotFields)'); ylabel('Cross-val R^2 (DirTuning)');
+    cb = colorbar; ylabel(cb, 'Mean proportion running (both stimuli, note only)');
+    title('Same data, colored by behaviour (descriptive only)');
+    axis square;
+    clim([0 1]); % or caxis([0 1]) on older MATLAB versions
+
+    sgtitle(sprintf('DirTuning vs DotFields: combined (behavior-agnostic) cvR2, n=%d boutons', nCompared));
+end
+
+
+
+%%
+% first load this in the workspace 
+DirTuning_IncTuningCurveAnalysis_CompareStates_2PData
+DotFields_IncTuningCurveAnalysis_compareStatesV2_2PData
+DirTuning_vs_DotFields_ExampleBoutons_EitherTuned

@@ -92,7 +92,7 @@ function [alignedFull, fig] = plotSMI_PeakDistributions_VISP_RSP(RegionData, reg
     
     alignedFull = allAlignedProfiles;
     numStable = size(alignedFull, 1);
-    
+%     
     fprintf('Successfully grouped and evaluated %d stable %s for %s.\n', ...
         numStable, lower(cellLabelText), regionName);
     
@@ -204,7 +204,7 @@ function [alignedFull, fig] = plotSMI_PeakDistributions_VISP_RSP(RegionData, reg
         delete(findobj(h_listeners(idx), '-class', 'event.listener'));
     end
     
-    % save
+%     % save
     baseFileName = sprintf('%s_PeakAlignedTuning.png', regionName);
     outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4\tuningCurved_PeakAlignedTuning_RSP_VISp_160';
     if ~exist(outputDir, 'dir'), mkdir(outputDir); end

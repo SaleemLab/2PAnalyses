@@ -7,6 +7,7 @@ pairs.M26003 = ['20260322', '20260324', '20260325'];
 
 
 ExpRSPSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
+RSPData = getTuningDataByCondition(ExpRSPSessions);
 % bin data by condition and load inclusion critera
 
 %% ev

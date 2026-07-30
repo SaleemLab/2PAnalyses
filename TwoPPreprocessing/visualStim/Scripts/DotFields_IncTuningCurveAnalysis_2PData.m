@@ -1,4 +1,4 @@
-% DotFields_Pooled_AllTrials.m
+% DotFields_IncTuningCurveAnalysis_2PData.m
 %
 % Pools DotMotion_SpeedTuning boutons across MULTIPLE mice/sessions, with
 % NO running/stationary split -- all valid, non-blank trials used
@@ -22,13 +22,20 @@
 % reference for the ANOVA+threshold criterion -- a more faithful
 % implementation of the originally published method.
 %
-% Requires calc_kfold_R2.m on MATLAB path.
+% Requires calc_kfold_R2.m from NeuralDataAnalysis (Ed. Horrocks).
 
 
 mouseList = {'M25132', 'M25133', 'M26003'};  % 
 
-stimWindowMask_range = [0.5 2];  % window for extracting per-trial calcium response (matches original script)
-stimFramesMask_range = [0 2.0];  % window for wheel-speed behavior evaluation (matches original script; unused here since no state split, kept for reference)
+stimWindowMask_range = [0.1 3];  % window for extracting per-trial calcium response for Anova 
+stimFramesMask_range = [-0.2 2.8];  % window for wheel-speed behavior classification
+% 
+% runSpeedThresh  = 3;    % mean speed above this =  "running"
+% statSpeedThresh = 0.5;  % mean speed below this = candidate "stationary"
+% propThresh      = 0.75;
+
+ALPHA = 0.05;
+NSD   = 1;
 
 ALPHA = 0.05;
 
@@ -37,14 +44,15 @@ r2opts.nPerms     = 10;
 r2opts.randFlag   = 1;
 r2opts.validMeans = 1;
 r2opts.nShuffle   = 100;
-%% ===================================================
+%% 
 
 filteredTable = filterMasterTable('MouseID', mouseList, 'HasStimulus', 'DotMotion_SpeedTuning', ...
     'Suite2PPreprocessing', 1, 'Exclude', 0);
 allMice    = filteredTable.MouseID;
 uniqueMice = unique(allMice, 'stable');
 
-allDotUnits = struct('alltraces', {}, 'blankTrials', {}, 'tuning', {}, 'sessionLabel', {});
+allDotUnits = struct('alltraces', {}, 'blankTrials', {}, 'tuning', {}, 'sessionLabel', {}, ...
+    'mouseID', {}, 'sessionName', {}, 'roiIdx', {});
 haveWarnedShape = false;
 
 for iMouse = 1:length(uniqueMice)
@@ -155,7 +163,10 @@ for iMouse = 1:length(uniqueMice)
                 'alltraces',     {alltraces}, ...
                 'blankTrials',   blankAccumulator, ...
                 'tuning',        cellfun(@nanmean, alltraces), ...
-                'sessionLabel',  sprintf('%s_%s', thisMouse, thisSessionName));
+                'sessionLabel',  sprintf('%s_%s', thisMouse, thisSessionName), ...
+                 'mouseID',      thisMouse, ...
+                'sessionName',  thisSessionName, ...
+                'roiIdx',       thisROI);
         end
         fprintf('    Added %d boutons (running total: %d).\n', nBoutons, numel(allDotUnits));
     end
@@ -294,6 +305,7 @@ fprintf('%-35s %6d\n', 'ANOVA-protected Wilcoxon',        sum(isResponsive_ranks
 anovaP = nan(nBoutonsTotal, 1);
 cvR2   = nan(nBoutonsTotal, 1);
 cvPval = nan(nBoutonsTotal, 1);
+seed = 1;
 
 for b = 1:nBoutonsTotal
     alltraces = allDotUnits(b).alltraces;
@@ -319,7 +331,7 @@ for b = 1:nBoutonsTotal
             gcaDownsampled = cellfun(@(x) x(~isnan(x)), alltraces, 'UniformOutput', false);
             gcaDownsampled = cellfun(@(x) x(1:minTrial), gcaDownsampled, 'UniformOutput', false);
             [cvR2(b), cvPval(b)] = calc_kfold_R2(gcaDownsampled, r2opts.kval, r2opts.nPerms, ...
-                r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle);
+                r2opts.randFlag, r2opts.validMeans, r2opts.nShuffle, seed);
         end
     end
 
@@ -435,6 +447,7 @@ title('Fano factor distribution');
 sgtitle(sprintf('Descriptive tuning summaries (pooled, filtered, n=%d)', numel(validIdx)));
 
 %% individual Gaussian fit examples (first 6 cross-validated units) 
+validIdx = validIdx(randperm(length(validIdx)));
 if ~isempty(validIdx)
     maxPlots = min(6, numel(validIdx));
     xDense = linspace(1, numel(allDotUnits(1).tuning), 100);

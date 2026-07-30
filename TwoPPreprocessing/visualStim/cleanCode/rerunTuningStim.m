@@ -13,12 +13,12 @@ fprintf('Error logging enabled. Log will be saved to: %s\n', logFilePath);
 % filteredTable = filterMasterTable_usingNameSessionPairs('MouseID', {'M26003', 'M25133', 'M25132'},'HasStimulus',{'RFMapping'},'Exclude', 0);
 
 pairs=struct;
-pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
-pairs.M25133 = {'20260219','20260223','20260221'};
-pairs.M26003 = {'20260316','20260322','20260324','20260325'};
-filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'RFMapping', 'BaselinCorridor', 'LandManipCorridor'});
+% pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
+% pairs.M25133 = {'20260219','20260223','20260221'};
+% pairs.M26003 = {'20260316','20260322','20260324','20260325'};
+% filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'RFMapping', 'BaselinCorridor', 'LandManipCorridor'});
 
-% filteredTable = filterMasterTable_usingNameSessionPairs('MouseID', {'M26004', 'M26005', 'M25131', 'M25126'},'HasStimulus',{'DotMotion_SpeedTuning','DirTuning', 'RFMapping'},'Exclude', 0);
+filteredTable = filterMasterTable_usingNameSessionPairs('MouseID', {'M26003', 'M25132', 'M25133'},'HasStimulus',{'DirTuning'},'Exclude', 0);
 mouseInfo = sessionsToProcess(filteredTable);
 signalName = 'dFFNeuropilCorrected';
 totalSessionsToProcess = 0;
@@ -48,7 +48,7 @@ for thisMouse = 1:size(mouseInfo, 1)
         sessionFileInfo = loadedInfo.sessionFileInfo;
         stimNames = {sessionFileInfo.stimFiles.name};
         
-        tuningStimIdx = find(contains(stimNames, {'RFMapping'}, 'IgnoreCase', true));
+        tuningStimIdx = find(contains(stimNames, { 'DirTuning'}, 'IgnoreCase', true));
         % tuningStimIdx = find(contains(stimNames, {'RFMapping', 'DotMotion_SpeedTuning', 'DirTuning'}, 'IgnoreCase', true));
         if isempty(tuningStimIdx)
             disp('  RFMapping, DotMotion_SpeedTuning, or DirTuning not found for this session.');
@@ -59,7 +59,7 @@ for thisMouse = 1:size(mouseInfo, 1)
             thisName = stimNames{tuningStimIdx(i)};
             fprintf('Processing stimulus: %s\n', thisName);
 
-            [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, thisName, 1,false, false, 5,5,20); %zscore; do not smooth or do red channel correction 
+%             [processedTwoPData, sessionFileInfo] = computeNeuropilCorrectionAndDFF(sessionFileInfo, thisName, 1,false, false, 5,5,20); %zscore; do not smooth or do red channel correction 
             [~, sessionFileInfo] = getStimTimes(sessionFileInfo, thisName, 10);
 
             try

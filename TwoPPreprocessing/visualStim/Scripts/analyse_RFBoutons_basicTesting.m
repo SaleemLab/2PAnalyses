@@ -19,15 +19,9 @@ signalName = 'dFFNeuropilCorrected';
 
 pairs=struct;
 % fov sweep sessions: 16 grids (including blanks) 
-pairs.M25132 = {...
-                '20260214A','20260214B','20260214C','20260214D', ...
-                '20260216A','20260216B','20260216C', ...
-                '20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
-pairs.M25133 = {'20260216A','20260216B','20260216C','20260216D', ...
-                 '20260219','20260223','20260221'};
-pairs.M26003 = {'20260307A','20260307B', ...
-                '20260313A','20260313B','20260313C', ...
-                '20260316','20260322','20260324','20260325'};
+pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
+pairs.M25133 = {'20260219','20260223','20260221'};
+pairs.M26003 = {'20260316','20260322','20260324','20260325'};
 
 
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'RFMapping', 'BaselinCorridor', 'LandManipCorridor'});
@@ -185,7 +179,7 @@ uAz        = RFMappingMetadata.uAz;
 uEl_plot   = RFMappingMetadata.uEl;
 timeVector = RFMappingMetadata.timeVector;
 % respWin    = RFMappingMetadata.respWin;
-respWin    = [0.5 2];   % override saved window (was [0.5 3]) to match published method
+respWin    = [0.1 3];   % 
 
 
 nAz = length(uAz);
@@ -198,23 +192,23 @@ nEl = length(uEl_plot);
 % fprintf('Total boutons: %d | Responsive (isResponsive): %d (%.1f%%)\n', ...
 %     numel(allRFMapping), numel(respIdxList), 100*numel(respIdxList)/numel(allRFMapping));
 %%
-
-visualReliability = nan(numBoutons, 1);
-for iROI = 1:numBoutons
-    visualReliability(iROI) = computeVisualReliabilityIndex(iROI, allRFMapping);
-end
-
-figure;
-histogram(visualReliability, 50);
-xline(0.1, 'r--', 'Threshold (0.3)');
-xlabel('Visual reliability index (75th percentile pairwise r)');
-title('Stimulus-independent reliability (pairwise correlation method)');
-
+% numBoutons = numel(allRFMapping);
+% visualReliability = nan(numBoutons, 1);
+% for iROI = 1:numBoutons
+%     visualReliability(iROI) = computeVisualReliabilityIndex(iROI, allRFMapping);
+% end
+% 
+% figure;
+% histogram(visualReliability, 50);
+% xline(0.1, 'r--', 'Threshold (0.3)');
+% xlabel('Visual reliability index (75th percentile pairwise r)');
+% title('Stimulus-independent reliability (pairwise correlation method)');
+% 
 
 
 %% Recompute responsiveness and RF centers manually for all pooled boutons
-numBoutons = numel(allRFMapping);
 
+numBoutons = numel(allRFMapping);
 % Re-extract the matching indices from the reference metadata
 respIdx = timeVector >= respWin(1) & timeVector <= respWin(2);
 
@@ -244,7 +238,7 @@ for iROI = 1:numBoutons
     blankTrialMeans = mean(bTrialsCorrected(:, respIdx), 2, 'omitnan');
 
     allTrialMeans = blankTrialMeans(:);
-    groupLabels   = repmat(17, numel(blankTrialMeans), 1); % Group 17 is Blank % is this just a label that was assigned?
+    groupLabels   = repmat(17, numel(blankTrialMeans), 1); % Group 17 is Blank % is this just a label that was assigned
 
 
     % loop through grid locations to run ANOVA
@@ -346,13 +340,13 @@ fprintf('\n--- After Recomputation ---\n');
 fprintf('Total boutons: %d | Responsive (isResponsive): %d (%.1f%%)\n', ...
     numBoutons, numel(respIdxList), 100 * numel(respIdxList) / numBoutons);
 %%  how much is the amplitude gate costing us vs. ANOVA alone?
-anovaOnlyMask   = [allRFMapping.pValANOVA] < 0.05;
-lostToAmplitude = anovaOnlyMask & ~isResp;
-
-fprintf('Pass ANOVA alone (p<0.05): %d (%.1f%%)\n', ...
-    sum(anovaOnlyMask), 100*sum(anovaOnlyMask)/numel(allRFMapping));
-fprintf('Pass ANOVA but excluded by amplitude gate: %d (%.1f%%)\n', ...
-    sum(lostToAmplitude), 100*sum(lostToAmplitude)/numel(allRFMapping));
+% anovaOnlyMask   = [allRFMapping.pValANOVA] < 0.05;
+% lostToAmplitude = anovaOnlyMask & ~isResp;
+% 
+% fprintf('Pass ANOVA alone (p<0.05): %d (%.1f%%)\n', ...
+%     sum(anovaOnlyMask), 100*sum(anovaOnlyMask)/numel(allRFMapping));
+% fprintf('Pass ANOVA but excluded by amplitude gate: %d (%.1f%%)\n', ...
+%     sum(lostToAmplitude), 100*sum(lostToAmplitude)/numel(allRFMapping));
 
 %% are responsive boutons concentrated in a few sessions? yes.... m25132:/
 respSessionLabels = sessionLabels(respIdxList);
@@ -714,9 +708,39 @@ set(figE, 'Visible', 'off');
 saveFigureFormats(figE, fullfile(outputDir, 'spatialEV_vs_resp_unresp'));
 
 %% gaussian fit (melina)
+
+% gaussFit_isTrusted = isStable && ~isBeyondRange && ~isDegenerateSigma
 RFMapping_Gaussian2DFit % bootstaps 500 times with replacements to estimate how much the fitted centre moves across the sample..  
 RFMapping_PlotGaussianFitExamples
 RFMapping_PlotGaussianFitSummary
+
+%%
+
+if ~exist('gaussFitResults', 'var')
+    error('gaussFitResults not found -- run RFMapping_Gaussian2DFit.m first and keep it in the workspace.');
+end
+ 
+isTrustedAll = [gaussFitResults.isTrusted];
+sigAz = [gaussFitResults.sigmaX];  % azimuth sigma (p(4) in the fit)
+sigEl = [gaussFitResults.sigmaY];  % elevation sigma (p(5) in the fit)
+ 
+sigAzTrusted = sigAz(isTrustedAll);
+sigElTrusted = sigEl(isTrustedAll);
+ 
+n = sum(isTrustedAll);
+ 
+fprintf('\n=== Mean +/- SD sigma summary (trusted fits, n = %d) ===\n', n);
+fprintf('Sigma azimuth:    %.2f +/- %.2f deg\n', mean(sigAzTrusted), std(sigAzTrusted));
+fprintf('Sigma elevation:  %.2f +/- %.2f deg\n', mean(sigElTrusted), std(sigElTrusted));
+fprintf('\nFor reference, Timplalexi et al. Figure 1D (n = 1950, R^2 >= 0.7 only, no bootstrap QC):\n');
+fprintf('Sigma azimuth:    19.87 +/- 5.47 deg\n');
+fprintf('Sigma elevation:  16.99 +/- 6.57 deg\n');
+ 
+% quick sanity check: also report median again alongside mean, since a big
+% mean-vs-median gap is itself informative (skew from a few large sigmas)
+fprintf('\n(For reference) Median sigma azimuth: %.2f deg | Median sigma elevation: %.2f deg\n', ...
+    median(sigAzTrusted), median(sigElTrusted));
+ %%
 
 responsiveBoutons = [2330,3850, 3189];   %  3189, 
 unresponsiveBoutons  = [2637, 69];           % 
@@ -734,7 +758,7 @@ for i = 1:nEx
     b = allRFMapping(exampleSet(i));
     xBase = (i-1)*colW;
     axPanel = axes('Position', [xBase+0.03 0.15 colW-0.05 0.70]);
-    plotRFHeatmapWithTraces(axPanel, b, uAz, uEl_plot, timeVector, 'Smooth', true);
+    plotRFHeatmapWithTraces(axPanel, b, uAz, uEl_plot, timeVector,  'MapMethod', 'gaussianfit');
     title(axPanel, sprintf('%s\n(Bouton %d)', exampleLabels{i}, exampleSet(i)), ...
         'FontName', 'Arial', 'FontSize', 10, 'FontWeight', 'bold');
 end
@@ -757,3 +781,10 @@ outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-V
 if ~exist(outputDir, 'dir'), mkdir(outputDir); end
 set(figA, 'Visible', 'off');
 saveFigureFormats(figA, fullfile(outputDir, 'responsive_unresponsive_examplegrid_gaussianfit_linesuperimposed'));
+
+
+%%
+
+
+
+
