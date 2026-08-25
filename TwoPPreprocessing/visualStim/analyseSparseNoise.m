@@ -88,6 +88,7 @@ sn_options.plotflag = plotflag;
 
 %% Main Analysis Loop
 initMap = cell(numRois, 1);
+initPMap = cell(numRois, 1);
 
 for iN = 1:numRois
     roiRespTmp = squeeze(roiStimResponses(iN, :, :));
@@ -95,8 +96,11 @@ for iN = 1:numRois
     % Capture current figures to distinguish from new ones
     existingFigs = findobj('Type', 'figure');
     
+    trialResponse = mean(roiRespTmp, 2, 'omitnan');   
+    [chi2stat(iN), chi2pVal(iN)] = computeRFChiSquareSignificance(stimMatrix, trialResponse, 1000);
+
     % Run Sparse Noise Analysis
-    initMap{iN} = sparseNoiseAnalysis(stimMatrix, roiRespTmp, [], [], sn_options);
+    [initMap{iN}, initPMap{iN}, initR2{iN} ~] = sparseNoiseAnalysis(stimMatrix, roiRespTmp, [], [], sn_options);
     
     if plotflag
         % Identify new figures created for this ROI
@@ -126,11 +130,13 @@ end
 
 %% Saving Data to sessionROIData 
 if saveData && isfield(sessionFileInfo, 'otherSessFilePaths') && exist(sessionFileInfo.otherSessFilePaths.sessionROIData, 'file')
-    
+    sparseNoiseRF.initPMap = initPMap; 
     sparseNoiseRF.initMap = initMap;
     sparseNoiseRF.gridSize = bonsaiData.gridSize;
     sparseNoiseRF.options = sn_options;
     sparseNoiseRF.stimName = sessionFileInfo.stimFiles(iStim).name;
+    sparseNoiseRF.chi2stat = chi2stat;
+    sparseNoiseRF.chi2pVal = chi2pVal;
     
     disp(['Appending RF data to: ', sessionFileInfo.otherSessFilePaths.sessionROIData]);
     save(sessionFileInfo.otherSessFilePaths.sessionROIData, 'sparseNoiseRF', '-append');

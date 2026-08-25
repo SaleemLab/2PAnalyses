@@ -103,10 +103,10 @@ if ~exist(figSaveDir, 'dir'), mkdir(figSaveDir); end
 pdfPath = fullfile(figSaveDir, [response.stimName '_ConditionSummary.pdf']);
 
 % Data extraction 
-data = response.lapPositionActivity.dFFNeuropilCorrected;
+data = response.lapPositionActivity.spks;
 [nROIs, nRows, nBins] = size(data);
 conds = fieldnames(response.trialIndicesByCondition);
-compLaps = response.completedLaps; 
+compLaps = response.completedLaps_AbsoluteIdx; 
 
 % Define Color Maps
 colorMap = struct();

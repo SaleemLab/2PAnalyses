@@ -113,7 +113,7 @@ if isfield(sessionFileInfo.otherSessFilePaths, 'sessionROIData') && exist(sessio
     end
 end
 
-lapActivityFull = response.lapPositionActivity.dFF;
+lapActivityFull = response.lapPositionActivity.spks;
 nROIs = size(lapActivityFull, 1);
 
 for neuronIdx = 1:nROIs

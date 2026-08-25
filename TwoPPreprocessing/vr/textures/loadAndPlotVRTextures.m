@@ -109,6 +109,7 @@ exportgraphics(fig1, fullfile(basePath, 'Figure1_Catalog.svg'), 'ContentType', '
 
 exportgraphics(fig2, fullfile(basePath, 'Figure2_Corridors.jpg'), 'Resolution', 300);
 exportgraphics(fig2, fullfile(basePath, 'Figure2_Corridors.svg'), 'ContentType', 'vector');
+exportgraphics(fig2, fullfile(basePath, 'Figure2_Corridors.pdf'), 'ContentType', 'vector');
 
 %%---------------------------SETUP BACKGROUND 2--------------------------
 targetBG = textures(3).matrix;

@@ -163,7 +163,7 @@ fprintf('  Session Index:    RSPData(%d) (%s, Day %d)\n', ...
 fprintf('  ROI Number:       %d\n', matched_roi);
 
 %% find target that also fails bootstrapping 
-target_R2 = 0.25;
+target_R2 = 0.85;
 num_matches = 20;
 
 all_ev_values   = [];
@@ -216,6 +216,7 @@ end
 figLow = plotRoiSpatialTuning(dataToUse, 10,344, 'Low_Significant');
 saveFigureFormats(figLow, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\EV_HighMidLowROIs\ExampleTuning_Low');
 
+figLowSplot = plotRoiSpatialTuning_oddEvenSplit(dataToUse, 22,53, 'Low_Significant_split')
 
 figMid = plotRoiSpatialTuning(dataToUse, 17, 438, 'Middle_Significant'); %17, 438
 saveFigureFormats(figMid, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\EV_HighMidLowROIs\ExampleTuning_Middle');
@@ -223,11 +224,16 @@ saveFigureFormats(figMid, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\Results
 figHigh = plotRoiSpatialTuning(dataToUse,15 ,11, 'High_Significant');%14, 109
 saveFigureFormats(figHigh, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\EV_HighMidLowROIs\ExampleTuning_High');
 
+% single peak 
+figSingle = plotRoiSpatialTuning(dataToUse,22 ,53, 'singlePeak');%14, 109
+saveFigureFormats(figSingle, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\typesOfResponses\ExampleTuning_singlePeak');
+
+% 
 
 %%
 % Loop plotRoiSpatialTuning across all ROIs for a given session/condition
-dataToUse=VISpDataSpks
-sessIdx = 22;
+dataToUse=VISpSpksData
+sessIdx = 21;
 condName = 'Baseline';
 
 % Determine number of ROIs from the LapActivity array (dim 1 = ROIs)
@@ -251,3 +257,159 @@ for roiIdx = 1:numROIs
         fprintf('Skipping ROI %d (session %d): %s\n', roiIdx, sessIdx, ME.message);
     end
 end
+
+
+%% Laps per session, %tuned, and laps-vs-R2 relationship
+
+combinedEVThreshold = 0.1;
+nullMaxThreshold    = 0.01;
+pValThreshold        = 0.01;
+
+num_sessions = length(dataToUse);
+
+session_laps       = nan(num_sessions,1);
+session_meanR2      = nan(num_sessions,1);
+session_medianR2     = nan(num_sessions,1);
+session_pctTuned     = nan(num_sessions,1);
+session_nROIs        = nan(num_sessions,1);
+
+% for the supplementary ROI-level (pseudoreplicated) scatter
+roi_R2_all    = [];
+roi_laps_all  = [];
+roi_sess_all  = [];
+roi_tuned_all = [];
+
+for iSess = 1:num_sessions
+
+    % --- laps for this session ---
+    try
+        nLaps = dataToUse(iSess).ConditionData.Baseline.NumLaps;
+    catch
+        warning('Session %d: no ConditionData.Baseline.NumLaps found, skipping.', iSess);
+        continue;
+    end
+    if isempty(nLaps), continue; end
+    session_laps(iSess) = nLaps;
+
+    % --- R2 / tuning data for this session ---
+    current_cv = dataToUse(iSess).cvExpVar;
+    true_means = current_cv.meanExpVar;
+    if isempty(true_means), continue; end
+
+    nROIs = length(true_means);
+    null_matrix = current_cv.cvExpVarNull;
+    null_dims = size(null_matrix);
+    roi_dim = find(null_dims == nROIs, 1, 'first');
+    if isempty(roi_dim)
+        error('Session %d: could not match null matrix dim to nROIs.', iSess);
+    end
+    dims_to_collapse = setdiff(1:length(null_dims), roi_dim);
+    if isempty(dims_to_collapse)
+        max_null_per_ROI = null_matrix;
+    else
+        max_null_per_ROI = max(null_matrix, [], dims_to_collapse);
+    end
+    max_null_per_ROI = max_null_per_ROI(:);
+    true_means = true_means(:);
+
+    pVals = current_cv.pValues(:);
+
+    % Combined "tuned" criterion: EV threshold + null-max check + shuffle p-value
+    tuned_mask = (true_means > combinedEVThreshold) & ...
+                 (max_null_per_ROI > nullMaxThreshold) & ...
+                 (pVals < pValThreshold);
+
+    session_nROIs(iSess)     = nROIs;
+    session_meanR2(iSess)    = mean(true_means);
+    session_medianR2(iSess)  = median(true_means);
+    session_pctTuned(iSess)  = 100 * sum(tuned_mask) / nROIs;
+
+    % accumulate ROI-level (pseudoreplicated) data
+    roi_R2_all    = [roi_R2_all; true_means];
+    roi_laps_all  = [roi_laps_all; repmat(nLaps, nROIs, 1)];
+    roi_sess_all  = [roi_sess_all; repmat(iSess, nROIs, 1)];
+    roi_tuned_all = [roi_tuned_all; tuned_mask];
+end
+
+valid = ~isnan(session_laps) & ~isnan(session_meanR2);
+
+%% --- Report text-ready stats ---
+
+fprintf('\n=== LAPS SUMMARY (n = %d sessions) ===\n', sum(valid));
+fprintf('Mean +/- SD laps: %.1f +/- %.1f\n', mean(session_laps(valid)), std(session_laps(valid)));
+fprintf('Range: %d - %d laps\n', min(session_laps(valid)), max(session_laps(valid)));
+
+fprintf('\n=== %% TUNED SUMMARY ===\n');
+overall_pct_tuned = 100 * sum(roi_tuned_all) / length(roi_tuned_all);
+fprintf('Overall %% tuned (pooled across all ROIs): %.1f%%\n', overall_pct_tuned);
+fprintf('Per-session %% tuned range: %.1f - %.1f%%\n', ...
+    min(session_pctTuned(valid)), max(session_pctTuned(valid)));
+
+%% --- (a) Session-level: laps vs mean R2, and laps vs %tuned ---
+
+[r_meanR2, p_meanR2]   = corr(session_laps(valid), session_meanR2(valid), 'Type', 'Pearson');
+[rho_meanR2, p_rho_meanR2] = corr(session_laps(valid), session_meanR2(valid), 'Type', 'Spearman');
+
+[r_pctTuned, p_pctTuned] = corr(session_laps(valid), session_pctTuned(valid), 'Type', 'Pearson');
+[rho_pctTuned, p_rho_pctTuned] = corr(session_laps(valid), session_pctTuned(valid), 'Type', 'Spearman');
+
+fprintf('\n=== SESSION-LEVEL: Laps vs mean R2 (n=%d sessions) ===\n', sum(valid));
+fprintf('Pearson r = %.3f, p = %.4f\n', r_meanR2, p_meanR2);
+fprintf('Spearman rho = %.3f, p = %.4f\n', rho_meanR2, p_rho_meanR2);
+
+fprintf('\n=== SESSION-LEVEL: Laps vs %% tuned (n=%d sessions) ===\n', sum(valid));
+fprintf('Pearson r = %.3f, p = %.4f\n', r_pctTuned, p_pctTuned);
+fprintf('Spearman rho = %.3f, p = %.4f\n', rho_pctTuned, p_rho_pctTuned);
+
+% Plot: laps vs mean R2
+figLapsR2 = figure('Color','w','Position',[200,200,500,400]);
+scatter(session_laps(valid), session_meanR2(valid), 60, 'filled', ...
+    'MarkerFaceColor', '#008080', 'MarkerFaceAlpha', 0.8);
+lsline;
+xlabel('Number of laps (session)');
+ylabel('Mean R^2 across ROIs');
+title(sprintf('r = %.2f, p = %.3f', r_meanR2, p_meanR2));
+defaultAxesProperties(gca, true);
+saveFigureFormats(figLapsR2, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\LapsVsR2\LapsVsMeanR2_sessionLevel');
+
+% Plot: laps vs %tuned
+figLapsTuned = figure('Color','w','Position',[200,200,500,400]);
+scatter(session_laps(valid), session_pctTuned(valid), 60, 'filled', ...
+    'MarkerFaceColor', '#008080', 'MarkerFaceAlpha', 0.8);
+lsline;
+xlabel('Number of laps (session)');
+ylabel('% tuned ROIs');
+title(sprintf('r = %.2f, p = %.3f', r_pctTuned, p_pctTuned));
+defaultAxesProperties(gca, true);
+saveFigureFormats(figLapsTuned, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\LapsVsR2\LapsVsPctTuned_sessionLevel');
+
+%% --- (b) Supplementary ROI-level scatter (PSEUDOREPLICATED - descriptive only) ---
+% NOTE: each session contributes many ROIs sharing one lap count, so a naive
+% correlation here treats ROIs as independent when they are not - do not
+% report a p-value from this as if it were a valid inferential test.
+% Shown only to visualize whether the session-level trend holds up at the
+% single-ROI level, colored by session.
+
+figROI = figure('Color','w','Position',[250,200,550,450]);
+hold on;
+cmap = parula(num_sessions);
+for iSess = 1:num_sessions
+    idx = roi_sess_all == iSess;
+    if any(idx)
+        scatter(roi_laps_all(idx), roi_R2_all(idx), 12, cmap(iSess,:), 'filled', ...
+            'MarkerFaceAlpha', 0.35);
+    end
+end
+xlabel('Number of laps (session)');
+ylabel('R^2 (single ROI)');
+title('ROI-level (pseudoreplicated - descriptive only)');
+defaultAxesProperties(gca, true);
+hold off;
+saveFigureFormats(figROI, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_2_Section1\LapsVsR2\LapsVsR2_ROIlevel_descriptive');
+fprintf('\n=== OVERALL CELL COUNT ===\n');
+total_cells_pooled = length(roi_R2_all);
+fprintf('Total ROIs/neurons pooled across all sessions: %d\n', total_cells_pooled);
+fprintf('Per-session ROI count range: %d - %d\n', ...
+    min(session_nROIs(valid)), max(session_nROIs(valid)));
+fprintf('Mean +/- SD ROIs per session: %.1f +/- %.1f\n', ...
+    mean(session_nROIs(valid)), std(session_nROIs(valid)));

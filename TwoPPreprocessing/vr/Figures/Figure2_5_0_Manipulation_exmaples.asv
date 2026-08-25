@@ -1,6 +1,6 @@
 % Manipulation corridor 
 
-outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_5_0_Section2\example_rois_spks';
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_5_0_Section3\example_rois_spks';
 %%
 resp018_004 = load("Z:\ibn-vision\DATA\SUBJECTS\M26004\Analysis\20260318\M26004_20260318_Response_M26004_LandManipCorridor_20260318_CombinedRuns.mat");
 sfi018_004 = load("Z:\ibn-vision\DATA\SUBJECTS\M26004\Analysis\20260318\M26004_20260318_sessionFileInfo.mat");
@@ -12,11 +12,8 @@ sfi022_004 = load("Z:\ibn-vision\DATA\SUBJECTS\M26004\Analysis\20260322\M26004_2
 resp018_005 = load("Z:\ibn-vision\DATA\SUBJECTS\M26005\Analysis\20260318\M26005_20260318_Response_M26005_LandManipCorridor_20260318_CombinedRuns.mat");
 sfi018_005 = load("Z:\ibn-vision\DATA\SUBJECTS\M26005\Analysis\20260318\M26005_20260318_sessionFileInfo.mat");
 
-resp018_031 = load("Z:\ibn-vision\DATA\SUBJECTS\M25131\Analysis\20260318\M25131_20260318_Response_M25131_LandManipCorridor_20260318_CombinedRuns.mat");
-sfi018_031 = load("Z:\ibn-vision\DATA\SUBJECTS\M25131\Analysis\20260318\M25131_20260318_sessionFileInfo.mat");
-
-resp022_031 = load("Z:\ibn-vision\DATA\SUBJECTS\M25131\Analysis\20260322\M25131_20260322_Response_M25131_LandManipCorridor_20260322_CombinedRuns.mat");
-sfi022_031 = load("Z:\ibn-vision\DATA\SUBJECTS\M25131\Analysis\20260322\M25131_20260322_sessionFileInfo.mat");
+resp018_005 = load("Z:\ibn-vision\DATA\SUBJECTS\M26005\Analysis\20260318\M26005_20260318_Response_M26005_LandManipCorridor_20260318_CombinedRuns.mat");
+sfi018_005 = load("Z:\ibn-vision\DATA\SUBJECTS\M26005\Analysis\20260318\M26005_20260318_sessionFileInfo.mat");
 
 %
 figA1 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 2, 'spks', 1, 1);
@@ -29,17 +26,8 @@ figA2 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 17
 figA3 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 51, 'spks', 1, 1);
 saveFigureFormats(figA3, fullfile(outputDir, 'classic-spatialMod-butmodulated'));
 
+figA4 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 31, 'spks', 1, 1);
+figA4 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 372, 'spks', 1, 1);
 % for (a)
 figA5 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 32, 'spks', 1, 1);
 saveFigureFormats(figA5, fullfile(outputDir, 'swap-follower-panel_a'));
-
-% for e - no spatial structure
-figA4 = plotSingleROI_ConditionStack(sfi018_031.sessionFileInfo, resp018_031, 45, 'spks', 1, 1);
-saveFigureFormats(figA4, fullfile(outputDir, 'no_spatial_structure_e'));
-
-% single peak, peak somewhat persists but the amplitude decreases; 
-figA6 =  plotSingleROI_ConditionStack(sfi022_031.sessionFileInfo, resp022_031, 53, 'spks', 1, 1);
-saveFigureFormats(figA6, fullfile(outputDir, 'singlePeak_swapOmissionPersistant'));
-
-figA7 = plotSingleROI_ConditionStack(sfi018_004.sessionFileInfo, resp018_004, 11, 'spks', 1, 1);
-saveFigureFormats(figA7, fullfile(outputDir, 'visual-someBGResponse'));
