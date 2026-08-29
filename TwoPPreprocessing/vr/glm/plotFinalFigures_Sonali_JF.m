@@ -1,4 +1,4 @@
-function [T] = plotFinalFigures_Sonali(EXP, figname, singlecell_IDs)
+function plotFinalFigures_Sonali_JF(EXP, figname, singlecell_IDs)
 %%
 % PLOTFINALFIGURES_SONALI  Plot summary/diagnostic figures from a
 % concatenated multi-session EXP structure (GLM + Maps).
@@ -7,13 +7,10 @@ function [T] = plotFinalFigures_Sonali(EXP, figname, singlecell_IDs)
 %   EXP_all = load('path_to_batch_file\batch_file.mat');
 %   plotFinalFigures_Sonali(EXP_all, 'Ordered-Kernels-Space-Landmarks-BG-FullMap-all')
 %   plotFinalFigures_Sonali(EXP_all, 'Resp-snake-base-omit2-omit3')
-%   plotFinalFigures_Sonali(EXP_all, 'Resp-completeSnake')
 %   plotFinalFigures_Sonali(EXP_all, 'Resp-singleCell', {'M26004_20260318_cell#17', 'M26004_20260318_cell#43'})
 %   plotFinalFigures_Sonali(EXP_all, 'RF-LLHrel-summary')
-%   plotFinalFigures_Sonali(EXP_all, 'Texture-layout-38')
+%   plotFinalFigures_Sonali(EXP_all, 'Texture-layout-50')
 %   plotFinalFigures_Sonali(EXP_all, 'LLHi-w/oSpace')
-%   plotFinalFigures_Sonali(EXP_all, 'ExportCellMetrics') % 
-
 %
 % INPUTS
 %   EXP            Structure resulting from concatenating per-session GLM
@@ -129,7 +126,7 @@ function [T] = plotFinalFigures_Sonali(EXP, figname, singlecell_IDs)
 %   A 3x6-tile summary figure (tiledlayout) of relationships between
 %   spatial coding strength (LLHrel) and several other cell properties,
 %   restricted throughout to goodcells, with spatial_mask = goodcells &
-%   signicells & goodLLHcells used to contrast the spatiallyG
+%   signicells & goodLLHcells used to contrast the spatially
 %   selective subset:
 %     1. Histogram of peak position (cm) of the spatial GLM kernel
 %        (EXP.GLMs{1}.Tuning(iPos)) vs. peak position of the raw mean
@@ -222,7 +219,7 @@ function [T] = plotFinalFigures_Sonali(EXP, figname, singlecell_IDs)
 %                      "CELL SELECTION MASKS"). Also switches the
 %                      color-coded "spatial weight" sidebar to use
 %                      LLHrel_omit instead of LLHrel.
-%     'hist'         - add a per-group session-ID histogram next to eachF
+%     'hist'         - add a per-group session-ID histogram next to each
 %                      group's mean-kernel subplot
 %     'peak'         - order/group cells by peak position of the
 %                      reference kernel instead of the default similarity-
@@ -277,7 +274,7 @@ function [T] = plotFinalFigures_Sonali(EXP, figname, singlecell_IDs)
 %                   16 omission parameters x 2, i.e. comparing the "no
 %                   omit" reduced model to the full model), combined with
 %                   LLHrel_omit > 1+LLHrel_th.
-%                   
+%
 % ===========================================================================
 % LLH / LLHi / LLHrel NOMENCLATURE
 % ===========================================================================
@@ -540,8 +537,11 @@ period_pct = 12;% BG periodicity in percent
 %   mapVSPnoOmit_idx block 7 (cells 37-42): full model fit without the
 %                    omission predictor
 
-condNames = {'base', 'swap23', 'swap34', 'omit2', 'omit3', 'omit4'}; %condition names (same order as condition ID)
-%condNames = {'base', 'swap23', 'omit2', 'omit3'}; %condition names (same order as condition ID)
+if numel(EXP.Maps) > 28
+    condNames = {'base', 'swap23', 'swap34', 'omit2', 'omit3', 'omit4'}; %condition names (same order as condition ID)
+else
+    condNames = {'base', 'swap23', 'omit2', 'omit3'};
+end
 ncond = numel(condNames);
 mapDATA_idx = 1:ncond;
 mapVS_idx = (1:ncond) + 2*ncond;
@@ -749,15 +749,6 @@ LLH_noomit(~spatialcells) = LLH_visnoOmit(~spatialcells);
 % comfortably above 1) - the "Omit"-analog of spatialcells.
 goodOmitcells = pval_omit<= 0.05 & LLHrel_omit > 1 + LLHrel_th;
 
-% output
-if nargout > 0
-    T.goodcells = goodcells;
-    T.signicells = signicells;
-    T.spatialcells = spatialcells;
-    T.LLHrel = LLHrel;
-    T.LLHi_vis = LLHi_vis;
-    T.goodOmitCells = goodOmitcells;
-end
 
 %% AESTHETICS
 % ----- Colors (normalize 0-1) -----
@@ -823,51 +814,6 @@ if strcmp(figname, 'LLHi-w/oSpace')
 
 end
 
-
-%% EXPORT PER-CELL METRICS TABLE TO CSV
-% ---------------------------------------------------------------------
-% No figure produced. Builds a per-cell table of key GLM/spatial metrics
-% and writes it to 'cell_metrics_summary.csv' in the current working
-% directory.
-% ---------------------------------------------------------------------
-if strcmp(figname,'ExportCellMetrics')
-
-    cellName = EXP.Spk.CellListString(:);
-
-    % Core masks
-    goodcells_col    = goodcells(:);
-    signicells_col   = signicells(:);
-    goodLLHcells_col = goodLLHcells(:);
-    spatialcells_col = spatialcells(:);
-
-    % Core LLH metrics
-    LLHi_vis_col = LLHi_vis(:);
-    LLHi_pos_col = LLHi_pos(:);
-    LLHrel_col   = LLHrel(:);
-
-    % Position kernel: p-value, and max-abs value (flags exactly-flat
-    % kernels, e.g. cells where the model assigned zero spatial weight)
-    iPos_pval_col = EXP.GLMs{1}.Tuning(iPos).pval(:);
-    posKernelAll = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));  % [cells x posbins]
-    posKernel_maxabs = max(abs(posKernelAll), [], 2, 'omitnan');
-
-    % Overall response fit p-value (part of goodcells criteria)
-    overallResp_pval_col = EXP.Maps{1}.Tuning.nlogL_pval(:);
-
-    % Omission-component metrics
-    LLHrel_omit_col   = LLHrel_omit(:);
-    goodOmitcells_col = goodOmitcells(:);
-
-    T = table(cellName, goodcells_col, signicells_col, goodLLHcells_col, spatialcells_col, ...
-        LLHi_vis_col, LLHi_pos_col, LLHrel_col, iPos_pval_col, posKernel_maxabs, ...
-        overallResp_pval_col, LLHrel_omit_col, goodOmitcells_col, ...
-        'VariableNames', {'CellName','goodcells','signicells','goodLLHcells','spatialcells', ...
-        'LLHi_vis','LLHi_pos','LLHrel','iPos_pval','posKernel_maxabs', ...
-        'overallResp_pval','LLHrel_omit','goodOmitcells'});
-
-    writetable(T, 'cell_metrics_summary.csv');
-    fprintf('Wrote %d rows to cell_metrics_summary.csv\n', height(T));
-end
 
 %% EXAMPLE OF NATIVE PER-PREDICTOR KERNELS 
 %(ONLY WORKS WITH SINGLE SESSION EXP STRUCTUREs)
@@ -954,7 +900,7 @@ if strcmp(figname,'GLM-kernels')
         xlabel('Visual space (deg)');
         ylabel(EXP.Spk.CellListString{cellidx}, 'Interpreter', 'none');
         title('Visual kernels (flipped left/right)');
-        xlim([0 80]); box off; set(gca,'TickDir','out');
+        xlim([0 110]); box off; set(gca,'TickDir','out');
         legend('Location','northwest'); legend boxoff;
         pbaspect([16 9 1])
 
@@ -1004,7 +950,7 @@ if strcmp(figname,'GLM-kernels')
         xp = linspace(0,200,numel(vpos));
         seplot(ax4, xp, vpos, se_pos, se_alpha);
         plot(xp, vpos, 'k-', 'LineWidth',lwidth, 'DisplayName','Estimated');
-        set(ax4, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
+
         hold on;yline(0, 'k--', 'HandleVisibility','off');
 
         xlabel('Position (cm)');
@@ -1391,186 +1337,6 @@ if contains(figname,'Resp-snake')
     end
 end
 
-%%
-if contains(figname,'Resp-completeSnake')
-    figure;
-    colormap(flipud(gray(256)));
-    
-    % Same condition-selection logic as 'Resp-snake'
-    mask = false(size(condNames));
-    for icond = 1:numel(condNames)
-        if contains(figname, condNames{icond})
-            mask(icond) = true;
-        end
-    end
-    if ~any(mask)
-        mask(:) = true;
-    end
-    cond2disp = find(mask);
-    ncond = numel(cond2disp);
-
-    % NEW: determine, per cell, whether EACH requested condition has
-    % valid (non-degenerate) data. Heuristic: all-NaN or flat/constant
-    % row = "not presented". VERIFY this matches your actual missing-data
-    % encoding before trusting it.
-    hasCond = false(size(goodcells,1), ncond);
-    for icond = 1:ncond
-        resp_chk = squeeze(EXP.Maps{mapDATA_idx(cond2disp(icond))}.Tuning.meanrespModel(:, 1, :));
-        mx_chk = max(resp_chk, [], 2, 'omitnan');
-        mn_chk = min(resp_chk, [], 2, 'omitnan');
-        hasCond(:,icond) = ~all(isnan(resp_chk), 2) & (mx_chk ~= mn_chk);
-    end
-    fullyPresented = all(hasCond, 2);  % cell had valid data for ALL requested conditions
-
-    % ---- NEW: combine with the usual goodcells mask ----
-    plotmask = goodcells & fullyPresented;
-    nExcluded = sum(goodcells) - sum(plotmask);
-    fprintf('Resp-CompleteSnake: %d/%d goodcells excluded (missing >=1 requested condition)\n', ...
-        nExcluded, sum(goodcells));
-
-    for igroup = 1:2
-        for icond = 1:ncond
-            resp_VS  = EXP.Maps{mapVS_idx(cond2disp(icond))}.Tuning.meanrespModel(:,:);
-            resp_VSP = EXP.Maps{mapVSP_idx(cond2disp(icond))}.Tuning.meanrespModel(:,:);
-            resp     = squeeze(EXP.Maps{mapDATA_idx(cond2disp(icond))}.Tuning.meanrespModel(:, 1, :));
-            
-            % use plotmask instead of goodcells 
-            resp     = resp(plotmask, :);
-            resp_VS  = resp_VS(plotmask,:);
-            resp_VSP = resp_VSP(plotmask,:);
-
-            mn = min(resp, [], 2, 'omitnan');
-            mx = max(resp, [], 2, 'omitnan');
-            resp_norm = (resp - mn) ./ (mx - mn);
-            
-            mn = min(resp_VS, [], 2, 'omitnan');
-            mx = max(resp_VS, [], 2, 'omitnan');
-            resp_VS = (resp_VS - mn) ./ (mx - mn);
-            
-            mn = min(resp_VSP, [], 2, 'omitnan');
-            mx = max(resp_VSP, [], 2, 'omitnan');
-            resp_VSP = (resp_VSP - mn) ./ (mx - mn);
-            
-            if icond == 1
-                [~, peakIdx] = max(resp_norm, [], 2, 'omitnan');
-                [~, order] = sort(peakIdx, 'ascend', 'MissingPlacement', 'last');
-            end
-            resp_sorted = resp_norm(order, :);
-            resp_VS_o   = resp_VS(order,:);
-            resp_VSP_o  = resp_VSP(order,:);
-            
-            if igroup == 2
-                plot_idx     = find(plotmask);
-                ss_mask_plot = signicells(plot_idx) & goodLLHcells(plot_idx);
-                ss_idx_sorted = ss_mask_plot(order);
-                resp_sorted  = resp_sorted(ss_idx_sorted, :);
-                resp_VS_o    = resp_VS_o(ss_idx_sorted,:);
-                resp_VSP_o   = resp_VSP_o(ss_idx_sorted,:);
-            end
-
-            nBins = size(resp_sorted, 2);
-            xbins = linspace(0, 200, nBins);
-            nC = size(resp_sorted, 1);
-
-            subplot(3,(ncond + 1) * 3,(igroup - 1) * (ncond + 1) * 3 + icond);
-            imagesc(xbins, 1:nC, resp_sorted);
-            set(gca, 'Clim', [0 1]); set(gca, 'YDir','normal');
-            if icond == 1
-                xlabel('Position along corridor (cm)');
-                if igroup == 2, ylabel('Spatially selective cells (DATA)');
-                else, ylabel('All cells (DATA)'); end
-            end
-            if igroup == 1
-                title(sprintf('%s (n=%d)', condNames{cond2disp(icond)}, nC));
-            end
-            box off; set(gca,'TickDir','out'); axis tight;
-            
-            subplot(3,(ncond + 1) * 3,(igroup - 1) * (ncond + 1) * 3 + icond + (ncond + 1));
-            imagesc(xbins, 1:nC, resp_VS_o);
-            set(gca, 'Clim', [0 1]); set(gca, 'YDir','normal');
-            if icond == 1
-                xlabel('Position along corridor (cm)');
-                if igroup == 2, ylabel('Spatially selective cells (VS)');
-                else, ylabel('All cells (VS)'); end
-            end
-            box off; set(gca,'TickDir','out'); axis tight;
-            
-            subplot(3,(ncond + 1) * 3,(igroup - 1) * (ncond + 1) * 3 + icond + 2*(ncond + 1));
-            imagesc(xbins, 1:nC, resp_VSP_o);
-            set(gca, 'Clim', [0 1]); set(gca, 'YDir','normal');
-            if icond == 1
-                xlabel('Position along corridor (cm)');
-                if igroup == 2, ylabel('Spatially selective cells (VSP)');
-                else, ylabel('All cells (VSP)'); end
-            end
-            box off; set(gca,'TickDir','out'); axis tight;
-        end
-    end
-
-    % ---------- Spatial kernels and residuals (using plotmask) ----------
-    spat_all    = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:, 1, :));
-    spat_good   = spat_all(plotmask, :);
-    spat_sorted = spat_good(order, :);
-    
-    plot_idx     = find(plotmask);
-    ss_mask_plot = signicells(plot_idx) & goodLLHcells(plot_idx);
-    ss_idx_sorted = ss_mask_plot(order);
-    
-    mn  = min(spat_sorted, [], 2, 'omitnan');
-    mx  = max(spat_sorted, [], 2, 'omitnan');
-    denom = mx - mn; denom(denom == 0) = NaN;
-    spat_sorted_norm = (spat_sorted - mn) ./ denom;
-
-    xkern = linspace(0, 200, size(spat_sorted_norm,2));
-    
-    axSp1 = subplot(3, (ncond + 1) * 3, 2 * (ncond + 1) * 3 + 1);
-    imagesc(xkern, 1:sum(ss_idx_sorted), spat_sorted_norm(ss_idx_sorted, :), [0 1]);
-    set(gca,'YDir','normal');
-    xlabel('Position along corridor (cm)'); ylabel('Spatially selective cells');
-    colormap(axSp1, RedWhiteBlue);
-    title('Spatial kernels (same order as responses)');
-    box off; set(gca,'TickDir','out'); axis tight;
-    
-    for icond = 1:ncond
-        VSP_all    = squeeze(EXP.Maps{mapVSP_idx(cond2disp(icond))}.Tuning.meanrespModel(:, 1, :));
-        VSP_good   = VSP_all(plotmask, :);
-        VSP_sorted = VSP_good(order, :);
-
-        VS_all    = squeeze(EXP.Maps{mapVS_idx(cond2disp(icond))}.Tuning.meanrespModel(:, 1, :));
-        VS_good   = VS_all(plotmask, :);
-        VS_sorted = VS_good(order, :);
-
-        DATA_all    = squeeze(EXP.Maps{mapDATA_idx(cond2disp(icond))}.Tuning.meanrespModel(:, 1, :));
-        DATA_good   = DATA_all(plotmask, :);
-        DATA_sorted = DATA_good(order, :);
-
-        mn  = min(DATA_sorted(ss_idx_sorted, :), [], 2, 'omitnan');
-        mx  = max(DATA_sorted(ss_idx_sorted, :), [], 2, 'omitnan');
-        denom = mx - mn; denom(denom == 0) = NaN;
-
-        axSp1 = subplot(3, (ncond + 1) * 3, 2 * (ncond + 1) * 3 + (ncond + 1) + icond);
-        VSres_norm = ((DATA_sorted(ss_idx_sorted, :) - VS_sorted(ss_idx_sorted, :))) ./ denom;
-        imagesc(xkern, 1:sum(ss_idx_sorted), VSres_norm, [-1 1]);
-        set(gca,'YDir','normal');
-        colormap(axSp1, RedWhiteBlue);
-        if icond == 1
-            xlabel('Position along corridor (cm)');
-            ylabel('Spatially selective cells (DATA - VS)');
-        end
-        box off; set(gca,'TickDir','out'); axis tight;
-
-        axSp1 = subplot(3, (ncond + 1) * 3, 2 * (ncond + 1) * 3 + 2*(ncond + 1) + icond);
-        VSPres_norm = ((DATA_sorted(ss_idx_sorted, :) - VSP_sorted(ss_idx_sorted, :))) ./ denom;
-        imagesc(xkern, 1:sum(ss_idx_sorted), VSPres_norm, [-1 1]);
-        set(gca,'YDir','normal');
-        colormap(axSp1, RedWhiteBlue);
-        if icond == 1
-            xlabel('Position along corridor (cm)');
-            ylabel('Spatially selective cells (DATA - VSP)');
-        end
-        box off; set(gca,'TickDir','out'); axis tight;
-    end
-end
 
 %% EXAMPLE OF CELL RESPONSE WITH ACTUAL DATA AND FULL VSP PREDICTION OVERLAYED
 if strcmp(figname,'Resp-singleCell')
@@ -1583,7 +1349,7 @@ if strcmp(figname,'Resp-singleCell')
     for icell = 1:ncells
         cellidx = singlecell_IDs(icell);
         % Pre-scan to set a common Y limit (start at 0). Looping once
-        % over all 6 conditions first (collecting y/se/yGLM/yVS/x per
+        % over all 6 conditions first (collecting y/se/yGLM/x per
         % condition) lets every condition's subplot for this cell share
         % the same y-axis range, computed from the global max across all
         % of them, before any subplot is actually drawn.
@@ -1591,42 +1357,31 @@ if strcmp(figname,'Resp-singleCell')
         yAll  = cell(1,nCond);
         seAll = cell(1,nCond);
         yGLM  = cell(1,nCond);
-        yVS   = cell(1,nCond);
         xAll  = cell(1,nCond);
-        
-        
+
         for k = 1:nCond
-            
             % y/se: measured data mean response +/- SE, this condition
             % (EXP.Maps mapDATA_idx group)
             y  = squeeze(EXP.Maps{mapDATA_idx(k)}.Tuning.meanrespModel(cellidx,1,:));   y  = y(:);
             se = squeeze(EXP.Maps{k}.Tuning.SErespModel(cellidx,1,:)); se = se(:);
             % y_g: full-model (VSP) GLM-predicted mean response, same condition
             y_g = squeeze(EXP.Maps{mapVSP_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_g = y_g(:);
-            % y_vs: reduced-model (VS, no position) GLM-predicted mean response, same condition
-            y_vs = squeeze(EXP.Maps{mapVS_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_vs = y_vs(:);
-            
-
-                
-    
 
             x = linspace(0,200,numel(y));
 
             yAll{k}  = y;
             seAll{k} = se;
             yGLM{k}  = y_g;
-            yVS{k}   = y_vs;
             xAll{k}  = x;
 
-            yMax = max([yMax; y + se; y_g; y_vs], [], 'omitnan');
+            yMax = max([yMax; y + se; y_g], [], 'omitnan');
         end
         if ~isfinite(yMax) || yMax <= 0, yMax = 1; end
         yLim = [0, 1.05*yMax];
 
         % Colors
         col_data = [0 0 0];        % black for measured mean
-        col_glm  = col_Spatial;    % blue-ish for VSP (full model) prediction
-        col_vs   = [0.85 0.1 0.1]; % red for VS (reduced model) prediction
+        col_glm  = col_Spatial; % blue-ish for GLM prediction
 
         % Now draw the actual subplots, one per condition, reusing the
         % shared yLim computed above.
@@ -1639,11 +1394,8 @@ if strcmp(figname,'Resp-singleCell')
             % Mean response (data)
             plot(ax, xAll{k}, yAll{k}, '-', 'Color', col_data, 'LineWidth', 1.5, 'DisplayName','Data');
 
-            % VS predicted mean (reduced model, no position)
-            plot(ax, xAll{k}, yVS{k}, '-', 'Color', col_vs, 'LineWidth', 2, 'DisplayName','VS');
-
-            % VSP predicted mean (full model)
-            plot(ax, xAll{k}, yGLM{k}, '-', 'Color', col_glm, 'LineWidth', 1.5, 'DisplayName','VSP');
+            % GLM predicted mean
+            plot(ax, xAll{k}, yGLM{k}, '-', 'Color', col_glm, 'LineWidth', 1.5, 'DisplayName','GLM');
 
             % Axes / labels
             xlim(ax,[0 200]); ylim(ax,yLim);
@@ -1667,12 +1419,9 @@ if strcmp(figname,'Resp-singleCell')
     end
 
     % Overall title
-    if ncells == 1
-        sgtitle(sprintf('Cell %d - mean responses with SE and GLM overlay', singlecell_IDs(1)));
-    else
-        sgtitle('Mean responses with SE and GLM overlay');
-    end
+    sgtitle(sprintf('Cell %d - mean responses with SE and GLM overlay', cellidx));
 end
+
 
 %% METRICS SUMMARY RELATING SPATIAL COMPONENT STRENGTH TO RF AND RESPONSE PROFILE PROPERTIES
 if strcmp(figname,'RF-LLHrel-summary')
@@ -1729,25 +1478,10 @@ if strcmp(figname,'RF-LLHrel-summary')
     LAT_edges = lat_min:2000/60:lat_max; 
     LAT_centers = (LAT_edges(1:end-1)+LAT_edges(2:end))/2;
 
-    % --- NEW: helper for Wilson score CI (binomial proportion), used
-    % below to add error bars to the "fraction spatial" bar plots so bins
-    % with few cells don't visually claim the same confidence as
-    % well-sampled bins.
-    wilsonCI = @(p, n, z) deal( ...
-        (p + z^2./(2*n)) ./ (1 + z^2./n), ...                          % centre (unused, kept for ref)
-        z .* sqrt(p.*(1-p)./n + z^2./(4*n.^2)) ./ (1 + z^2./n) );      % halfwidth
-
-    % --- NEW: shared, sensible y-range for all LLHrel-vs-X violin panels
-    % (data lives in ~0.9-1.5 per LLH_edges above; letting these autoscale
-    % stretches to +/-10 and squashes the actual violins flat)
-    LLH_violin_ylim = [0.8 1.6];
-    LLH_violin_ytick = 0.8:0.2:1.6;
-
-    % Figure layout: 4 rows x 6 columns of tiles (was 3x6; extra row added
-    % for the new per-session %spatial panel below); several panels below
+    % Figure layout: 3 rows x 6 columns of tiles; several panels below
     % span multiple tile columns ([1 2]) for a wider plot.
     figure;
-    tl = tiledlayout(4,6, 'TileSpacing','compact','Padding','compact');
+    tl = tiledlayout(3,6, 'TileSpacing','compact','Padding','compact');
 
     % ===== (1) Dist of spatial-kernel peak positions =====
     % Compares where the cell's peak is according to two different
@@ -1760,7 +1494,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     pk = peak_pos(spatial_mask);
     histogram(ax1, pk, 'BinWidth', 10, 'FaceColor',col_Spatial,'EdgeColor','none', 'DisplayName','Spatial kernel peak');
     xlim(ax1,[0 200]);
-    set(ax1, 'XTick', [40 80 120 160]);
     xlabel(ax1,'Peak position (cm)'); ylabel(ax1,'# cells');
     title(ax1,'Spatial-kernel peak positions');
     box(ax1,'off'); set(ax1,'TickDir','out');
@@ -1772,7 +1505,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     % identity line
     plot(ax2, [0 200],[0 200], 'r-', 'LineWidth',1, 'HandleVisibility','off');
     xlim(ax2,[0 200]); ylim(ax2,[0 200]);
-    set(ax2, 'XTick', [40 80 120 160], 'YTick', [40 80 120 160]);
     xlabel(ax2,'Overall response peak (cm)'); ylabel(ax2,'Spatial-kernel peak (cm)');
     title(ax2,'Kernel peak vs response peak');
     box(ax2,'off'); set(ax2,'TickDir','out');
@@ -1787,9 +1519,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     msk = spatial_mask;%goodcells;
     plotViolin(ax3, overall_peak(msk), LLHplot(msk), peak_edges, peak_binwidth);
     xlim(ax3,[peak_edges(1) peak_edges(end)]);
-    set(ax3, 'XTick', [40 80 120 160]);
-    ylim(ax3, LLH_violin_ylim);              % <-- NEW: fixed sensible y-range
-    set(ax3, 'YTick', LLH_violin_ytick);     % <-- NEW
     xlabel(ax3,'Overall peak position (cm)'); ylabel(ax3,'LLH_{rel}');
     title(ax3,'LLH_{rel} vs Overall response peak');
     legend(ax3,'Location','northwest'); legend(ax3,'boxoff');
@@ -1799,9 +1528,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     msk = spatial_mask;
     plotViolin(ax3, peak_pos(msk), LLHplot(msk), peak_edges, peak_binwidth);
     xlim(ax3,[peak_edges(1) peak_edges(end)]);
-    set(ax3, 'XTick', [40 80 120 160]);
-    ylim(ax3, LLH_violin_ylim);              % <-- NEW
-    set(ax3, 'YTick', LLH_violin_ytick);     % <-- NEW
     xlabel(ax3,'Space peak position (cm)'); ylabel(ax3,'LLH_{rel}');
     title(ax3,'LLH_{rel} vs Spatial kernel Peak');
     legend(ax3,'Location','northwest'); legend(ax3,'boxoff');
@@ -1817,17 +1543,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     title(ax3,'LLH_{rel} distribution (overlay)');
     legend(ax3,'Location','northwest'); legend(ax3,'boxoff');
     box(ax3,'off'); set(ax3,'TickDir','out');
-    % --- NEW: KS test, is the spatial vs non-spatial LLHrel distribution
-    % genuinely different, not just visually different ---
-    [~, p_ks4] = kstest2(LLHplot(nonspatial_mask), LLHplot(spatial_mask));
-    yl = ylim(ax3); xl = xlim(ax3);
-    text(ax3, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('KS p = %.3g', p_ks4), ...
-        'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9);
-    % --- NEW: % spatially modulated annotation ---
-    pctSpatial4 = 100 * sum(spatial_mask) / sum(goodcells);
-    text(ax3, xl(2)-0.05*diff(xl), yl(2)-0.15*diff(yl), ...
-        sprintf('%.1f%% spatial', pctSpatial4), ...
-        'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9, 'FontWeight','bold');
 
     % ===== (5) Fraction spatially selective vs RF position =====
     % N_all==0 -> NaN guards against a 0/0 division producing a
@@ -1839,10 +1554,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     N_all(N_all == 0) = NaN;
     frac_spa = N_spa ./ N_all;
     bar(ax3, RF_centers, frac_spa, 'stacked', 'BarWidth', 1, 'EdgeColor', 'none');
-    % --- NEW: Wilson CI error bars, so under-sampled RF bins don't look
-    % as confident as well-sampled ones ---
-    [~, hw5] = wilsonCI(frac_spa, N_all, 1.96);
-    errorbar(ax3, RF_centers, frac_spa, hw5, 'k', 'LineStyle','none', 'HandleVisibility','off');
     ylim(ax3,[0 1]); xlim(ax3,[RF_edges(1) RF_edges(end)]);
     xlabel(ax3,'RF position (deg)');
     ylabel(ax3,'Fraction spatial');
@@ -1854,8 +1565,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     msk = goodcells;
     plotViolin(ax4, RFpos(msk), LLHplot(msk), RF_edges);
     xlim(ax4,[RF_edges(1) RF_edges(end)]);
-    ylim(ax4, LLH_violin_ylim);              % <-- NEW
-    set(ax4, 'YTick', LLH_violin_ytick);     % <-- NEW
     xlabel(ax4,'RF position (deg)'); ylabel(ax4,'LLH_{rel}');
     title(ax4,'LLH_{rel} vs RF position');
     legend(ax4,'Location','northwest'); legend(ax4,'boxoff');
@@ -1870,22 +1579,13 @@ if strcmp(figname,'RF-LLHrel-summary')
     title(ax5,'RF position distribution');
     legend(ax5,'Location','northwest'); legend(ax5,'boxoff');
     box(ax5,'off'); set(ax5,'TickDir','out');
-    % --- NEW: KS test ---
-    [~, p_ks7] = kstest2(RFpos(goodcells), RFpos(spatial_mask));
-    yl = ylim(ax5); xl = xlim(ax5);
-    text(ax5, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('KS p = %.3g', p_ks7), ...
-        'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9);
 
     % ===== (8) Fraction spatially selective vs visual latency =====
     ax6 = nexttile(tl, [1 2]); hold(ax6,'on');
     [N_allL,~] = histcounts(Vislat(goodcells), LAT_edges);
     [N_spaL,~] = histcounts(Vislat(spatial_mask & goodcells), LAT_edges);
-    N_allL_safe = N_allL; N_allL_safe(N_allL_safe==0) = NaN;   % guard, same logic as panel 5
-    frac_spa_L = N_spaL ./ N_allL_safe;
+    frac_spa_L = N_spaL ./ max(N_allL,1);
     bar(ax6, LAT_centers, frac_spa_L, 'stacked', 'BarWidth', 1, 'EdgeColor', 'none');
-    % --- NEW: Wilson CI error bars ---
-    [~, hw8] = wilsonCI(frac_spa_L, N_allL_safe, 1.96);
-    errorbar(ax6, LAT_centers, frac_spa_L, hw8, 'k', 'LineStyle','none', 'HandleVisibility','off');
     xlim(ax6,[LAT_edges(1) LAT_edges(end)]); ylim(ax6,[0 1]);
     xlabel(ax6,'Visual latency (s)');
     ylabel(ax6,'Fraction spatial');
@@ -1897,8 +1597,6 @@ if strcmp(figname,'RF-LLHrel-summary')
     mskL = goodcells;
     plotViolin(ax7, Vislat(mskL), LLHplot(mskL), LAT_edges);
     xlim(ax7,[LAT_edges(1) LAT_edges(end)]);
-    ylim(ax7, LLH_violin_ylim);              % <-- NEW
-    set(ax7, 'YTick', LLH_violin_ytick);     % <-- NEW
     xlabel(ax7,'Visual latency (s)'); ylabel(ax7,'LLH_{rel}');
     title(ax7,'LLH_{rel} vs RF latency');
     legend(ax7,'Location','northwest'); legend(ax7,'boxoff');
@@ -1913,170 +1611,11 @@ if strcmp(figname,'RF-LLHrel-summary')
     title(ax8,'Latency distribution');
     legend(ax8,'Location','northwest'); legend(ax8,'boxoff');
     box(ax8,'off'); set(ax8,'TickDir','out');
-    % --- NEW: KS test ---
-    [~, p_ks10] = kstest2(Vislat(goodcells), Vislat(spatial_mask));
-    yl = ylim(ax8); xl = xlim(ax8);
-    text(ax8, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('KS p = %.3g', p_ks10), ...
-        'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9);
-
-    % ===== (11) NEW: % spatial per session, to track whether the pooled
-    % %-spatial figure is being driven disproportionately by one session
-    % or animal (same session-confound logic used elsewhere, e.g.
-    % Cluster-SpaceKernels' per-cluster session histogram) =====
-    ax9 = nexttile(tl, [1 6]); hold(ax9,'on');
-    sessionid = EXP.Spk.series + 10*EXP.Spk.animal;
-    [sess_vals, ~, sess_uniq] = unique(sessionid);
-    nSess = numel(sess_vals);
-    pctSpatial_perSession = arrayfun(@(s) 100*sum(spatial_mask(sess_uniq==s))/max(sum(goodcells(sess_uniq==s)),1), 1:nSess);
-    nGood_perSession       = arrayfun(@(s) sum(goodcells(sess_uniq==s)), 1:nSess);
-
-    bar(ax9, 1:nSess, pctSpatial_perSession, 'FaceColor', col_Spatial, 'EdgeColor','none');
-    yline(ax9, 100*sum(spatial_mask)/sum(goodcells), 'k--', 'LineWidth', 1, 'DisplayName','Overall %');
-    for s = 1:nSess
-        text(ax9, s, pctSpatial_perSession(s)+2, sprintf('n=%d', nGood_perSession(s)), ...
-            'HorizontalAlignment','center', 'FontSize', 7);
-    end
-    set(ax9, 'XTick', 1:nSess, 'XTickLabel', sess_vals, 'XTickLabelRotation', 45);
-    ylim(ax9, [0 max(pctSpatial_perSession, [], 'omitnan')*1.2 + 5]);
-    xlabel(ax9, 'Session ID'); ylabel(ax9, '% spatial');
-    title(ax9, sprintf('%% spatially selective per session (overall = %.1f%%)', 100*sum(spatial_mask)/sum(goodcells)));
-    box(ax9,'off'); set(ax9,'TickDir','out');
 
     % Overall title
     sgtitle(tl, 'Spatial kernel peaks, LLH_{rel}, RF position & latency summaries');
 end
-%% SCATTER VERSION: LLHi VS (vision-only) vs LLHi VSP (full model)
-if strcmp(figname, 'LLHi-VSvsVSP-scatter')
-    g_Sig = goodcells & signicells;
-    g_NS  = goodcells & ~signicells;
 
-    figure; hold on;
-
-    % Identity line first (so points draw on top)
-    allVals = [LLHi_vis(goodcells); LLHi_pos(goodcells)];
-    axLim = [min(allVals, [], 'omitnan'), max(allVals, [], 'omitnan')];
-    plot(axLim, axLim, 'k--', 'LineWidth', 1, 'HandleVisibility','off');
-
-    % Non-significant cells (gray)
-    scatter(LLHi_vis(g_NS), LLHi_pos(g_NS), 60, [0.5 0.5 0.5], ...
-        'filled', 'MarkerFaceAlpha', ptAlpha, 'MarkerEdgeColor', [1 1 1], ...
-        'LineWidth', 0.5, 'DisplayName', 'NS');
-    
-    % Significant cells (darker green, white ring)
-    scatter(LLHi_vis(g_Sig), LLHi_pos(g_Sig), 60, [96 160 61]/255, ...
-        'filled', 'MarkerFaceAlpha', ptAlpha, 'MarkerEdgeColor', [1 1 1], ...
-        'LineWidth', 0.5, 'DisplayName', 'p < 0.05');
-
-    xlim(axLim); ylim(axLim);
-    xlabel('LLHi - No space (bits/spike)');
-    ylabel('LLHi - Space (bits/spike)');
-    title('LLH improvement: VS vs VSP model');
-    legend('Location','best'); legend boxoff;
-    box off; set(gca,'TickDir','out');
-    pbaspect([1 1 1]);
-    xticks([0 0.1 0.2 0.3 0.4 0.5]);
-    yticks([0 0.1 0.2 0.3 0.4 0.5]);
-    axis square 
-
-end
-
-%% EXAMPLE OF CELL RESPONSE WITH ACTUAL DATA, VS, AND VSP PREDICTIONS OVERLAYED
-if contains(figname,'Resp-singleCellV2')
-
-    % Select which of the conditions to display: if figname mentions one
-    % or more condition names (e.g. 'Resp-singleCell-base-omit3'), show
-    % only those, in condNames' order; otherwise (just 'Resp-singleCell')
-    % show all conditions in condNames, as before.
-    mask = false(size(condNames));
-    for icond = 1:numel(condNames)
-        if contains(figname, condNames{icond})
-            mask(icond) = true;
-        end
-    end
-    if ~any(mask)
-        mask(:) = true;
-    end
-    cond2disp = find(mask);
-    nCond = numel(cond2disp);
-
-    ncells = numel(singlecell_IDs);
-
-    figure;
-    for icell = 1:ncells
-        cellidx = singlecell_IDs(icell);
-
-        % Pre-scan to set a common Y limit (start at 0), using only the
-        % selected conditions (cond2disp) so the axis isn't stretched to
-        % accommodate conditions that aren't actually shown.
-        yMax = 0;
-        yAll  = cell(1,nCond);
-        seAll = cell(1,nCond);
-        yGLM  = cell(1,nCond);
-        yVS   = cell(1,nCond);
-        xAll  = cell(1,nCond);
-
-        for kk = 1:nCond
-            k = cond2disp(kk);
-            y   = squeeze(EXP.Maps{mapDATA_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y = y(:);
-            se  = squeeze(EXP.Maps{mapDATA_idx(k)}.Tuning.SErespModel(cellidx,1,:)); se = se(:);
-            y_g = squeeze(EXP.Maps{mapVSP_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_g = y_g(:);
-            y_vs= squeeze(EXP.Maps{mapVS_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_vs = y_vs(:);
-
-            x = linspace(0,200,numel(y));
-
-            yAll{kk}  = y;
-            seAll{kk} = se;
-            yGLM{kk}  = y_g;
-            yVS{kk}   = y_vs;
-            xAll{kk}  = x;
-
-            yMax = max([yMax; y + se; y_g; y_vs], [], 'omitnan');
-        end
-        if ~isfinite(yMax) || yMax <= 0, yMax = 1; end
-        yLim = [0, 1.05*yMax];
-
-        % Colors
-        col_data = [0 0 0];        % black for measured mean
-        col_glm  = col_Spatial;    % blue-ish for VSP (full model) prediction
-        col_vs   = [0.85 0.1 0.1]; % red for VS (reduced model) prediction
-
-        % Draw the subplots, one per selected condition, reusing the
-        % shared yLim computed above.
-        for kk = 1:nCond
-            k = cond2disp(kk);
-            ax = subplot(ncells,nCond,nCond * (icell-1) + kk); hold(ax,'on');
-
-            seplot(ax, xAll{kk}, yAll{kk}, seAll{kk}, 0.25);
-
-            plot(ax, xAll{kk}, yAll{kk}, '-', 'Color', col_data, 'LineWidth', 1.5, 'DisplayName','Data');
-            plot(ax, xAll{kk}, yVS{kk}, '--', 'Color', col_vs, 'LineWidth', 2, 'DisplayName','VS');
-            plot(ax, xAll{kk}, yGLM{kk}, '-', 'Color', col_glm, 'LineWidth', 1.5, 'DisplayName','VSP');
-
-            xlim(ax,[0 200]); ylim(ax,yLim);
-            set(ax,'XTick',[40 80 120 160]);
-            box(ax,'off'); set(ax,'TickDir','out');
-            if icell == 1
-                title(ax, sprintf('%s', condNames{k}));
-            end
-            if kk == 1
-                ylabel(ax, EXP.Spk.CellListString{cellidx}, 'Interpreter', 'none');
-            end
-            if icell == ncells
-                xlabel(ax, 'Position (cm)');
-            end
-            if kk == nCond && icell == 1
-                legend(ax, 'Location','northwest'); legend(ax,'boxoff');
-            end
-            pbaspect([16 9 1])
-        end
-    end
-
-    if ncells == 1
-        sgtitle(sprintf('Cell %d - mean responses with SE and GLM overlay', singlecell_IDs(1)));
-    else
-        sgtitle('Mean responses with SE and GLM overlay');
-    end
-end
 
 %% 
 if strcmp(figname,'Cluster-SpaceKernels')
@@ -2631,8 +2170,7 @@ if contains(figname,'Ordered-Kernels')
     cmap = cmap(32:224,:);
     group_cmap = cmap(round(linspace(1, size(cmap, 1), Ng)),:);
     
-%     sess_cmap = cmap(round(linspace(1, size(cmap, 1), numel(sess_vals))),:);
-    sess_cmap = copper(numel(sess_vals)); 
+    sess_cmap = cmap(round(linspace(1, size(cmap, 1), numel(sess_vals))),:);
 
     % === Layout: first column = heatmap (spans all rows),
     %     last columns = per-group mean+SE subplots (arranged in grid with nrow<=5),
@@ -2816,1356 +2354,6 @@ if contains(figname,'Ordered-Kernels')
 
     % Overall title
     sgtitle(tl, sprintf('SpaceKernels seriation (N=%d, K_n=%d): heatmap, group means, ranges', N, Kn));
-end
-
-
-
-%% =====================================================================
-%  'ExampleTraces-Kernels-<order_ref>-<display1>-<display2>-...'
-%
-%  Matches the paper's Figure 5D layout exactly (Morimoto/Fournier/Saleem):
-%   - Heatmap: cells ordered by similarity of a reference kernel
-%     (Manhattan distance, average linkage, optimalleaforder).
-%   - LEFT of the heatmap: colored ticks/dots showing recording
-%     SESSION/ANIMAL identity for each cell (paper's "colored ticks on
-%     the left indicate the recording session/animal for each neuron").
-%   - RIGHT edge of the heatmap: colored brackets marking which
-%     contiguous rows belong to each example group.
-%   - Further right: example trace panels showing the GROUP MEAN
-%     response, "averaged over clusters of four neurons with high
-%     similarity" (paper's exact wording) - found via the same greedy
-%     lowest-variance sliding-window search as 'Ordered-Kernels-*'.
-%   - Each cell is normalized to [0,1] BEFORE averaging into its group's
-%     mean (fixes the amplitude-domination scaling bug from earlier).
-%
-%  MULTIPLE DISPLAY KERNELS: figname = 'ExampleTraces-Kernels-<tag1>-<tag2>-...'
-%   - tag1 = reference kernel used for ordering AND for finding groups
-%   - every recognized tag gets its own heatmap+examples block, using
-%     the SAME groups (from tag1), all on one consistent [0,1] scale so
-%     different kernel types (e.g. Landmarks vs BG) are comparable.
-%  Recognized tags: 'Space', 'Landmarks', 'BG', 'Data' (measured response).
-% =====================================================================
-if contains(figname,'ExampleTraces-Kernels')
-
-    n_groups_to_show = 8;
-    Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
-
-    S = strsplit(figname, '-');
-    S = S(3:end);
-    show_all  = any(contains(S, 'all'));
-    show_omit = any(contains(S, 'omission'));
-    valid_tags = {'Space','Landmarks','BG','Data'};
-    S_tags = S(ismember(S, valid_tags));
-    if isempty(S_tags)
-        error('ExampleTraces-Kernels: no recognized tag found in figname. Use one of: Space, Landmarks, BG, Data.');
-    end
-    order_ref = S_tags{1};        % ordering ALWAYS uses the first requested tag
-
-    % HEATMAPS show exactly the requested kernel tag(s) - e.g. 'Space',
-    % or 'Landmarks'+'BG' - nothing auto-added here.
-    display_tags = S_tags;
-
-    % EXAMPLE TRACES always come from the ACTUAL MEASURED RESPONSE
-    % ('Data'), regardless of which kernel(s) are shown as heatmaps -
-    % i.e. heatmap = kernel, but the example panel next to it always
-    % shows what those same cells' real recorded data looks like.
-    example_source = 'Data';
-
-    getMap = @(tag) local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx);
-
-    % ---- Cell selection mask ----
-    % NOTE: goodcells already requires a significant VISION model fit
-    % (see header docs) - it is NOT restricted to spatially-selective
-    % cells. The further restriction to signicells & goodLLHcells only
-    % makes sense when Space is actually being examined; applying it
-    % unconditionally to Landmarks/BG would incorrectly throw away many
-    % visually-responsive cells that simply aren't spatially modulated.
-    spatial_mask = goodcells;
-    if show_omit
-        spatial_mask = spatial_mask & goodOmitcells;
-    elseif ~show_all && any(strcmp(display_tags, 'Space'))
-        spatial_mask = spatial_mask & signicells & goodLLHcells;
-    end
-
-    % ---- Build display maps (row-masked): the requested heatmap
-    % tag(s), PLUS always the example_source (Data) for computing group
-    % means, even if Data isn't itself one of the requested heatmaps ----
-    all_needed_tags = display_tags;
-    if ~any(strcmp(all_needed_tags, example_source))
-        all_needed_tags = [all_needed_tags, {example_source}];
-    end
-    X = struct();
-    for t = 1:numel(all_needed_tags)
-        rawMap = getMap(all_needed_tags{t});
-        X.(all_needed_tags{t}).raw = rawMap(spatial_mask,:);
-    end
-    N = size(X.(display_tags{1}).raw, 1);
-    Nbins = size(X.(display_tags{1}).raw, 2);
-    x_pos = linspace(0, 200, Nbins);
-
-    % ---- Animal identity, for the LEFT-side colored ticks ----
-    % NOTE: coloring by ANIMAL (not combined session+animal) gives far
-    % fewer categories, which are much easier to visually distinguish
-    % than the many small per-session groups you'd get otherwise.
-    if isfield(EXP.Spk, 'animal')
-        animalid = EXP.Spk.animal;
-    else
-        animalid = EXP.Spk.series;   % fallback if no separate animal field exists
-    end
-    [sess_vals, ~, sess_uniq] = unique(animalid);
-    sess_sel = sess_uniq(spatial_mask);
-
-    % ---- Order rows by similarity of order_ref (Manhattan distance,
-    % average linkage, optimalleaforder - same as 'Ordered-Kernels-*') ----
-    M_order = X.(order_ref).raw;
-    mu_row = mean(M_order, 2, 'omitnan');
-    sd_row = std(M_order, 0, 2, 'omitnan');
-    Mz = (M_order - mu_row) ./ sd_row;
-    valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
-    nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
-    Y = pdist(Mz(valid_idx,:), dist_metric);
-    Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
-    optiorder_valid = optimalleaforder(Z, Y);
-    optiorder = cat(1, valid_idx(optiorder_valid), nan_idx);
-    Mz_ord = Mz(optiorder,:);
-    sess_ord = sess_sel(optiorder);
-
-    % ---- Apply ordering to every needed tag, normalize EACH CELL (row)
-    % to [0,1] independently - same convention as 'Ordered-Kernels-*' ----
-    for t = 1:numel(all_needed_tags)
-        tag = all_needed_tags{t};
-        M_ord = X.(tag).raw(optiorder,:);
-        mn = min(M_ord, [], 2, 'omitnan');
-        mx = max(M_ord, [], 2, 'omitnan');
-        X.(tag).norm = (M_ord - mn) ./ max(mx - mn, eps);
-    end
-
-    % ---- SEPARATELY for the example panels: use RAW (unnormalized)
-    % values directly - now that the model is confirmed LINEAR, a
-    % kernel's raw value is a genuine additive contribution to firing
-    % rate, in the SAME UNITS as the measured response itself. This means
-    % kernel tags (Landmarks, BG) AND Data can all be shown on one
-    % shared, honest scale - no normalization needed at all. Real
-    % relative amplitude is preserved everywhere: Landmarks vs BG, AND
-    % kernel vs measured response. ----
-    for t = 1:numel(all_needed_tags)
-        tag = all_needed_tags{t};
-        X.(tag).raw_ord = X.(tag).raw(optiorder,:);
-    end
-
-    % ---- Find similarity GROUPS, forced to SPREAD ACROSS the ordered
-    % list (divide into n_groups_to_show segments, find the single best
-    % lowest-variance window WITHIN each segment) - prevents the greedy
-    % search from picking all groups out of one overly-homogeneous region
-    % (which happens e.g. for Landmarks, where most cells share a similar
-    % stereotyped shape, so the globally-tightest windows all cluster
-    % together instead of sampling the full range of shapes present) ----
-    segment_edges = round(linspace(1, N+1, n_groups_to_show+1));
-    groups = {};
-    for seg = 1:n_groups_to_show
-        seg_range = segment_edges(seg):(segment_edges(seg+1)-1);
-        if numel(seg_range) < min(Kn_local)
-            continue;
-        end
-        best_sse = inf; best_window = [];
-        for k = Kn_local(1):Kn_local(2)
-            for s = 1:(numel(seg_range)-k+1)
-                win_idx = seg_range(s:s+k-1);
-                Mw = Mz_ord(win_idx,:);
-                muW = mean(Mw,1,'omitnan');
-                sse = mean(sum((Mw - muW).^2, 2, 'omitnan'), 'omitnan') / numel(win_idx)^0.5;
-                if sse < best_sse
-                    best_sse = sse;
-                    best_window = win_idx;
-                end
-            end
-        end
-        if ~isempty(best_window)
-            groups{end+1} = best_window; %#ok<AGROW>
-        end
-    end
-
-    n_groups_actual = numel(groups);
-
-    if n_groups_actual <= 7
-        grp_cmap = lines(n_groups_actual);
-    else
-        cmap_full = hsv(64);
-        grp_cmap = cmap_full(round(linspace(1, 64, n_groups_actual)), :);
-    end
-
-    % Animal colors: a proper CATEGORICAL palette (not a smooth gradient
-    % like parula, which can make a small number of categories look too
-    % similar to each other) - maximizes visual separation between
-    % animals specifically.
-    if numel(sess_vals) <= 7
-        sess_cmap = lines(numel(sess_vals));
-    else
-        cmap_full = hsv(64);
-        sess_cmap = cmap_full(round(linspace(1, 64, numel(sess_vals))), :);
-    end
-
-    % ---- Group-mean traces: kernel tags (e.g. Landmarks, BG) use a
-    % SHARED per-cell scale (norm_examples, computed above) so their
-    % relative amplitude to EACH OTHER is preserved. 'Data' keeps its own
-    % independent [0,1] scale, since kernel-vs-data unit comparability
-    % depends on the model's link function (not currently confirmed) -
-    % that overlay remains a SHAPE comparison only. ----
-    % ---- Group-mean traces: computed from RAW values (real units,
-    % additive/comparable since the model is linear) - not normalized.
-    % Kernel tags and Data are now genuinely on one shared scale. ----
-    group_mean = struct();
-    for t = 1:numel(all_needed_tags)
-        tag = all_needed_tags{t};
-        group_mean.(tag) = cell(n_groups_actual,1);
-        for g = 1:n_groups_actual
-            idx = groups{g};
-            group_mean.(tag){g} = mean(X.(tag).raw_ord(idx,:), 1, 'omitnan');
-        end
-    end
-
-    %% ===================== PLOTTING =====================
-    n_disp = numel(display_tags);
-    fig_width_in = 6 * n_disp + 2;   % scales with number of kernel blocks
-    fig_height_in = 10;
-    figHandle = figure('Color','w', 'Units','inches', ...
-        'Position', [0.5 0.5 fig_width_in fig_height_in], ...
-        'PaperUnits','inches', 'PaperSize', [fig_width_in fig_height_in], ...
-        'PaperPosition', [0 0 fig_width_in fig_height_in], ...
-        'PaperPositionMode','manual');
-
-    % ---- Layout: FIXED so multiple blocks (e.g. Landmarks + BG) always
-    % fit within the figure's [0,1] width, instead of using fixed sizes
-    % that only worked for a single block and clipped/overflowed past
-    % x=1.0 with 2+ blocks. Widths now scale down automatically based on
-    % n_disp (number of requested display tags). ----
-    left0 = 0.03;
-    right_margin = 0.02;
-    gap = 0.03;
-    n_animals = numel(sess_vals);
-    animal_strip_width = 0.008*n_animals*1.5;
-
-    available_width = 1 - left0 - right_margin - (n_disp-1)*gap;
-    block_width = available_width / n_disp;
-    per_block_fixed = animal_strip_width + 0.015;   % animal strip + small internal gap
-    heat_width  = (block_width - per_block_fixed) * 0.62;
-    trace_width = (block_width - per_block_fixed) * 0.38 - gap*0.6;
-
-    trace_height = 0.84 / n_groups_actual;
-
-    % ---- Fixed SCALE-BAR REFERENCE quantity, computed once for the
-    % whole figure: a single 'nice' round number (e.g. 50, 100, 200)
-    % representing a fixed real-unit amount, based on the typical panel
-    % amplitude across the whole figure. Every panel below draws a
-    % bracket of THIS SAME real height. ----
-    all_amps = [];
-    for t = 1:numel(all_needed_tags)
-        for g = 1:n_groups_actual
-            all_amps = [all_amps, range(group_mean.(all_needed_tags{t}){g})]; %#ok<AGROW>
-        end
-    end
-    typical_amp = median(all_amps, 'omitnan');
-    if typical_amp > 0 && isfinite(typical_amp)
-        exp10 = floor(log10(typical_amp));
-        base = typical_amp / 10^exp10;
-        nice_vals = [1 2 5 10];
-        [~, idx_nice] = min(abs(nice_vals - base));
-        scale_ref = nice_vals(idx_nice) * 10^exp10;
-    else
-        scale_ref = 1;
-    end
-
-    for t = 1:n_disp
-        tag = display_tags{t};
-        block_left = left0 + (t-1)*(block_width + gap);
-
-        % ---- LEFT: one separate scatter COLUMN per animal (matching
-        % the original 'Ordered-Kernels-*' session-strip design) - each
-        % animal gets its own thin lane with dots ONLY at the rows where
-        % that animal's cells occur in the ordered list. This keeps
-        % individual-cell resolution (unlike a merged solid strip) while
-        % still clearly separating animals from each other. ----
-        ax_sess = axes('Position', [block_left 0.08 animal_strip_width 0.84]); hold(ax_sess,'on');
-        for s = 1:n_animals
-            vals = find(sess_vals(sess_ord) == sess_vals(s));
-            x_lane = s;   % this animal's own lane/column position
-            scatter(ax_sess, x_lane*ones(size(vals)), vals, 8, 'filled', ...
-                'MarkerFaceColor', sess_cmap(s,:), 'MarkerEdgeColor','none');
-        end
-        xlim(ax_sess, [0.3, n_animals+0.7]); ylim(ax_sess, [1 N]);
-        axis(ax_sess, 'off');
-        if t == 1
-            text(ax_sess, (n_animals+1)/2, -N*0.03, 'Animal', 'FontSize', 8, ...
-                'HorizontalAlignment','center');
-        end
-
-        % ---- MIDDLE: heatmap ----
-        heat_left = block_left + animal_strip_width + 0.015;
-        ax_heat = axes('Position', [heat_left 0.08 heat_width 0.84]); hold(ax_heat,'on');
-        imagesc(ax_heat, x_pos, 1:N, X.(tag).norm, [0 1]);
-        colormap(ax_heat, RedWhiteBlue);
-        set(ax_heat, 'YDir','normal');
-        ylim(ax_heat, [1 N]);
-        set(ax_heat, 'XTick', [40 80 120 160]);
-        xlabel(ax_heat, 'Position (cm)');
-        if strcmp(tag,'Data')
-            title(ax_heat, sprintf('Measured response (N=%d)', N));
-        else
-            title(ax_heat, sprintf('%s kernel (N=%d)', tag, N));
-        end
-        box(ax_heat,'off'); set(ax_heat,'TickDir','out');
-
-        % ---- Manually-drawn, fully INDEPENDENT colorbar strip -
-        % deliberately NOT using MATLAB's colorbar() function, which
-        % silently resizes/repositions its parent axes (this was the
-        % root cause of the cut-off/stretched export bug: even after
-        % resetting ax_heat's position on-screen, the resize could
-        % re-trigger or fail to persist correctly on export). This strip
-        % is its own axes, positioned explicitly, and can never affect
-        % ax_heat or anything else. ----
-        ax_cbar = axes('Position', [heat_left, 0.02, heat_width, 0.02]);
-        cbar_img = linspace(0,1,256);
-        imagesc(ax_cbar, [0 1], [0 1], cbar_img);
-        colormap(ax_cbar, RedWhiteBlue);
-        set(ax_cbar, 'YTick', [], 'XTick', [0 0.5 1], 'XTickLabel', {'0','0.5','1'});
-        xlabel(ax_cbar, 'Activity (norm.)', 'FontSize', 8);
-        box(ax_cbar, 'on'); set(ax_cbar, 'TickDir','out', 'FontSize', 7);
-
-        % ---- RIGHT edge of heatmap: colored brackets marking each group's
-        % range, PLUS an actual dot marker for every individual member cell ----
-        for g = 1:n_groups_actual
-            idx = groups{g};
-            y1 = min(idx); y2 = max(idx);
-            x0 = x_pos(end) + range(x_pos)*0.02;
-            plot(ax_heat, [x0 x0], [y1 y2], '-', 'Color', grp_cmap(g,:), 'LineWidth', 1.5);
-            % actual point for every member of this group
-            for m = 1:numel(idx)
-                plot(ax_heat, x0, idx(m), 'o', 'MarkerFaceColor', grp_cmap(g,:), ...
-                    'MarkerEdgeColor', 'none', 'MarkerSize', 5, 'Clipping','off');
-            end
-        end
-
-        % ---- FAR RIGHT: group-mean example trace panels - kernel AND
-        % measured response SUPERIMPOSED in the same panel ----
-        trace_left = heat_left + heat_width + gap*0.6;
-        % FIX: was text('Units','normalized',...) with NO parent axes
-        % specified - this silently attached to whatever axes happened
-        % to be "current" at that point, interpreting its position
-        % relative to THAT axes rather than the whole figure, which is
-        % why the label overlapped other titles. annotation('textbox',...)
-        % is always figure-level, regardless of which axes exist.
-        annotation('textbox', [trace_left, 0.93, trace_width, 0.04], ...
-            'String', sprintf('Examples: %s kernel + measured response', tag), ...
-            'HorizontalAlignment','center', 'FontWeight','bold', 'FontSize', 9, ...
-            'EdgeColor','none', 'VerticalAlignment','middle');
-        for g = 1:n_groups_actual
-            bottom = 0.08 + (g - 1) * trace_height;
-            axT = axes('Position', [trace_left bottom trace_width trace_height*0.85]); hold(axT,'on');
-            idx = groups{g};
-
-            % Measured response: gray/muted, drawn first (background) -
-            % skip if this heatmap IS already the measured response
-            % (avoids drawing the identical line twice)
-            panel_vals = group_mean.(tag){g};
-            if ~strcmp(tag, example_source)
-                plot(axT, x_pos, group_mean.(example_source){g}, '-', 'LineWidth', 1.4, ...
-                    'Color', [0.55 0.55 0.55]);
-                panel_vals = [panel_vals, group_mean.(example_source){g}]; %#ok<AGROW>
-            end
-
-            % Kernel (whichever is being shown as this heatmap): bold,
-            % group-colored, drawn on top
-            plot(axT, x_pos, group_mean.(tag){g}, '-', 'LineWidth', 1.8, 'Color', grp_cmap(g,:));
-
-            % Y-axis RANGE auto-scales per panel (shape fully preserved,
-            % data never rescaled/touched). Relative magnitude between
-            % panels is instead conveyed by a SCALE BRACKET of FIXED REAL
-            % SIZE (scale_ref, computed once for the whole figure, below)
-            % - since every panel has the SAME physical axes size but a
-            % DIFFERENT y-range, that same fixed-quantity bracket renders
-            % LARGER on panels with smaller true amplitude (more "zoomed
-            % in") and SMALLER on panels with bigger true amplitude (less
-            % zoomed in) - exactly the paper's "gain" scale-bar
-            % convention, where bracket size changes between panels while
-            % the underlying data is never rescaled to fit.
-            % Y-axis FORCED symmetric around zero, and always wide enough
-            % to include +/-scale_ref - guarantees -100/0/100 (or
-            % whatever scale_ref is) are ALWAYS visible and centered on
-            % EVERY panel, regardless of that panel's own data range.
-            % Panels with genuinely bigger data automatically get a
-            % wider range (extending beyond scale_ref as needed), but
-            % never narrower than scale_ref, and always centered at 0.
-            M = max(scale_ref, max(abs(panel_vals), [], 'omitnan'));
-            yPad = 0.05 * M;
-            ylim(axT, [-(M+yPad), M+yPad]);
-            xlim(axT, [x_pos(1) x_pos(end)]);
-            box(axT,'off'); set(axT,'TickDir','out'); set(axT,'FontSize',7);
-            set(axT, 'YTick', []);
-            yline(axT, 0, 'Color',[0.8 0.8 0.8], 'LineStyle',':', 'HandleVisibility','off');
-
-            yl_cur = ylim(axT);
-            % SYMMETRIC bracket, always spanning the full -scale_ref to
-            % +scale_ref (guaranteed to fit, since ylim is forced >= this)
-            y_bottom = -scale_ref; y_top = scale_ref;
-            xb = x_pos(1) - range(x_pos)*0.05;
-            plot(axT, [xb xb], [y_bottom y_top], 'k-', 'LineWidth', 1.5, 'Clipping','off');
-            label_pts = [-scale_ref, 0, scale_ref];
-            tick_len = range(x_pos)*0.015;
-            for lp = label_pts
-                plot(axT, [xb-tick_len, xb+tick_len], [lp lp], 'k-', ...
-                    'LineWidth', 1.2, 'Clipping','off');
-                text(axT, xb - range(x_pos)*0.02 - tick_len, lp, sprintf('%.3g', lp), ...
-                    'FontSize', 7, 'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
-                    'Clipping','off');
-            end
-
-            if g == 1
-                xlabel(axT, 'Position (cm)', 'FontSize', 7);
-            else
-                set(axT, 'XTickLabel', []);
-            end
-            text(axT, x_pos(1), max(ylim(axT)), sprintf('n=%d', numel(idx)), 'FontSize', 7, ...
-                'VerticalAlignment','bottom');
-            if t == 1 && g == 1
-                legend(axT, {'Measured response','Kernel'}, 'Location','southoutside', ...
-                    'Box','off', 'FontSize', 6);
-            end
-        end
-
-        % Leader lines: dot cluster (heatmap) -> trace panel
-        for g = 1:n_groups_actual
-            idx = groups{g};
-            r_center = mean(idx);
-            heat_dot_norm  = [heat_left + heat_width + 0.005, 0.08 + (r_center/N)*0.84];
-            trace_dot_norm = [trace_left, 0.08 + (g - 0.5)*trace_height];
-            annotation('line', [heat_dot_norm(1) trace_dot_norm(1)], [heat_dot_norm(2) trace_dot_norm(2)], ...
-                'LineStyle', '--', 'Color', grp_cmap(g,:), 'LineWidth', 1);
-        end
-    end
-
-    sgtitle(sprintf('Ordered by %s kernel similarity - heatmap(s): %s | examples: measured response (%d groups of %d-%d similar cells, N=%d total)', ...
-        order_ref, strjoin(display_tags, ', '), n_groups_actual, Kn_local(1), Kn_local(2), N));
-    % NOTE: figure size is now fixed explicitly above (via 'Units','inches'
-    % + matching PaperSize/PaperPosition), so on-screen and saved output
-    % are guaranteed to match. Previously this called
-    % set(gcf,'WindowState','maximized'), which made the on-screen size
-    % depend on the monitor's resolution - causing a mismatch with the
-    % fixed paper size used when saving, which is what was stretching/
-    % cutting off content in the exported file.
-end
-
-% ---- Helper: fetch either a fitted GLM kernel or the actual measured
-% response, by name tag ----
-function M = local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx)
-    switch tag
-        case 'Space'
-            M = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
-        case 'Landmarks'
-            M = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
-        case 'BG'
-            M = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
-        case 'Data'
-            M = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
-        otherwise
-            error('local_getMap: unrecognized tag "%s"', tag);
-    end
-end
-
-
-%% =====================================================================
-%  'ScaledExamples-Kernels-<display1>-<display2>-...'
-%
-%  Each requested tag (e.g. Landmarks, BG, Space, or Data) is ordered and
-%  grouped INDEPENDENTLY, based on ITS OWN similarity structure - not
-%  forced to share another tag's ordering/groups. Each panel shows ONLY
-%  that tag's own group-mean trace - no automatic measured-response
-%  overlay. If you want the measured response shown too, explicitly
-%  include 'Data' as one of the requested tags (it will then get its own
-%  independent heatmap + example panels, exactly like any other tag).
-%
-%  SCALE: ALL panels (every requested tag, every group) share ONE single,
-%  globally-computed axis range and ONE scale bar (drawn once), matching
-%  the paper's convention - not an independent bracket per panel. Data
-%  is never rescaled/normalized; only the axis window is shared. Valid
-%  because the model is LINEAR (confirmed) - all tags are in comparable
-%  additive units.
-%
-%  Recognized tags: 'Space', 'Landmarks', 'BG', 'Data' (measured response).
-% =====================================================================
-if contains(figname,'ScaledExamples-Kernels')
-
-    n_groups_to_show = 10;
-    Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
-
-    S = strsplit(figname, '-');
-    S = S(3:end);
-    show_all  = any(contains(S, 'all'));
-    show_omit = any(contains(S, 'omission'));
-    valid_tags = {'Space','Landmarks','BG','Data'};
-    S_tags = S(ismember(S, valid_tags));
-    if isempty(S_tags)
-        error('ScaledExamples-Kernels: no recognized tag found in figname. Use one of: Space, Landmarks, BG, Data.');
-    end
-
-    % Every requested tag gets shown, independently ordered/grouped.
-    % Nothing is auto-added - if you want measured response, add 'Data'
-    % explicitly to the figname.
-    display_tags = S_tags;
-
-    getMap = @(tag) local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx);
-
-    % ---- Cell selection mask ----
-    spatial_mask = goodcells;
-    if show_omit
-        spatial_mask = spatial_mask & goodOmitcells;
-    elseif ~show_all && any(strcmp(display_tags, 'Space'))
-        spatial_mask = spatial_mask & signicells & goodLLHcells;
-    end
-
-    % ---- Build raw maps for every requested tag (row-masked) ----
-    X = struct();
-    for t = 1:numel(display_tags)
-        rawMap = getMap(display_tags{t});
-        X.(display_tags{t}).raw = rawMap(spatial_mask,:);
-    end
-    N = size(X.(display_tags{1}).raw, 1);
-    Nbins = size(X.(display_tags{1}).raw, 2);
-    x_pos = linspace(0, 200, Nbins);
-
-    % ---- Animal identity ----
-    if isfield(EXP.Spk, 'animal')
-        animalid = EXP.Spk.animal;
-    else
-        animalid = EXP.Spk.series;
-    end
-    [sess_vals, ~, sess_uniq] = unique(animalid);
-    sess_sel = sess_uniq(spatial_mask);
-    n_animals = numel(sess_vals);
-    if n_animals <= 7
-        sess_cmap = lines(n_animals);
-    else
-        cmap_full = hsv(64);
-        sess_cmap = cmap_full(round(linspace(1, 64, n_animals)), :);
-    end
-
-    % =====================================================================
-    % INDEPENDENT ordering + grouping, PER REQUESTED TAG. Each tag is
-    % ordered by similarity of ITS OWN values (Manhattan distance,
-    % average linkage, optimalleaforder - same as 'Ordered-Kernels-*'),
-    % grouped into its own contiguous similarity clusters. Nothing here
-    % is shared between tags - e.g. Landmarks and BG can end up with
-    % completely different example cells, each reflecting that specific
-    % tag's own structure.
-    % =====================================================================
-    ord = struct();
-    for t = 1:numel(display_tags)
-        tag = display_tags{t};
-        M_this = X.(tag).raw;
-        mu_row = mean(M_this, 2, 'omitnan');
-        sd_row = std(M_this, 0, 2, 'omitnan');
-        Mz = (M_this - mu_row) ./ sd_row;
-        valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
-        nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
-        Y = pdist(Mz(valid_idx,:), dist_metric);
-        Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
-        optiorder_valid = optimalleaforder(Z, Y);
-        optiorder_t = cat(1, valid_idx(optiorder_valid), nan_idx);
-        Mz_ord_t = Mz(optiorder_t,:);
-
-        segment_edges = round(linspace(1, N+1, n_groups_to_show+1));
-        groups_t = {};
-        for seg = 1:n_groups_to_show
-            seg_range = segment_edges(seg):(segment_edges(seg+1)-1);
-            if numel(seg_range) < min(Kn_local)
-                continue;
-            end
-            best_sse = inf; best_window = [];
-            for k = Kn_local(1):Kn_local(2)
-                for s = 1:(numel(seg_range)-k+1)
-                    win_idx = seg_range(s:s+k-1);
-                    Mw = Mz_ord_t(win_idx,:);
-                    muW = mean(Mw,1,'omitnan');
-                    sse = mean(sum((Mw - muW).^2, 2, 'omitnan'), 'omitnan') / numel(win_idx)^0.5;
-                    if sse < best_sse
-                        best_sse = sse;
-                        best_window = win_idx;
-                    end
-                end
-            end
-            if ~isempty(best_window)
-                groups_t{end+1} = best_window; %#ok<AGROW>
-            end
-        end
-
-        ord.(tag).optiorder = optiorder_t;
-        ord.(tag).groups = groups_t;
-        ord.(tag).n_groups = numel(groups_t);
-        ord.(tag).sess_ord = sess_sel(optiorder_t);
-
-        M_ord_disp = M_this(optiorder_t,:);
-        mn = min(M_ord_disp, [], 2, 'omitnan');
-        mx = max(M_ord_disp, [], 2, 'omitnan');
-        ord.(tag).norm = (M_ord_disp - mn) ./ max(mx - mn, eps);
-
-        if ord.(tag).n_groups <= 7
-            ord.(tag).grp_cmap = lines(ord.(tag).n_groups);
-        else
-            cmap_full = hsv(64);
-            ord.(tag).grp_cmap = cmap_full(round(linspace(1, 64, ord.(tag).n_groups)), :);
-        end
-
-        % Group means: THIS tag's own value only, for THIS tag's own groups
-        group_mean = cell(ord.(tag).n_groups,1);
-        for g = 1:ord.(tag).n_groups
-            orig_rows = optiorder_t(groups_t{g});
-            group_mean{g} = mean(M_this(orig_rows,:), 1, 'omitnan');
-        end
-        ord.(tag).group_mean = group_mean;
-    end
-
-    % ---- ONE single, shared y-axis range for EVERY panel across EVERY
-    % requested tag - matching the paper's convention of one scale bar
-    % for the whole set of examples. ----
-    all_vals_global = [];
-    for t = 1:numel(display_tags)
-        tag = display_tags{t};
-        for g = 1:ord.(tag).n_groups
-            all_vals_global = [all_vals_global, ord.(tag).group_mean{g}]; 
-        end
-    end
-    global_max_abs = max(abs(all_vals_global), [], 'omitnan');
-    if ~isfinite(global_max_abs) || global_max_abs <= 0
-        global_max_abs = 1;
-    end
-    exp10 = floor(log10(global_max_abs));
-    base = global_max_abs / 10^exp10;
-    nice_vals = [1 2 5 10];
-    [~, idx_nice] = min(abs(nice_vals - base));
-    scale_ref = nice_vals(idx_nice) * 10^exp10;
-    global_ylim = [-scale_ref*1.1, scale_ref*1.1];
-
-    fprintf('\n--- ScaledExamples-Kernels scale diagnostic ---\n');
-    fprintf('Raw max abs value across all groups/tags: %.2f\n', global_max_abs);
-    fprintf('Rounded scale_ref used for every panel:    %.2f\n', scale_ref);
-    fprintf('(A single large-amplitude group anywhere in the dataset sets this\n');
-    fprintf(' shared scale - if suppressive/modest examples look flat, it is\n');
-    fprintf(' likely because one much larger group elsewhere is driving this number)\n');
-
-    %% ===================== PLOTTING =====================
-    n_disp = numel(display_tags);
-    fig_width_in = 6 * n_disp + 2;
-    fig_height_in = 10;
-    figHandle = figure('Color','w', 'Units','inches', ...
-        'Position', [0.5 0.5 fig_width_in fig_height_in], ...
-        'PaperUnits','inches', 'PaperSize', [fig_width_in fig_height_in], ...
-        'PaperPosition', [0 0 fig_width_in fig_height_in], ...
-        'PaperPositionMode','manual');
-
-    left0 = 0.03;
-    right_margin = 0.02;
-    gap = 0.03;
-    animal_strip_width = 0.008*n_animals*1.5;
-
-    available_width = 1 - left0 - right_margin - (n_disp-1)*gap;
-    block_width = available_width / n_disp;
-    per_block_fixed = animal_strip_width + 0.015;
-    heat_width  = (block_width - per_block_fixed) * 0.62;
-    trace_width = (block_width - per_block_fixed) * 0.38 - gap*0.6;
-
-    first_panel_done = false;
-
-    for t = 1:n_disp
-        tag = display_tags{t};
-        n_groups_t = ord.(tag).n_groups;
-        trace_height = 0.84 / n_groups_t;
-        block_left = left0 + (t-1)*(block_width + gap);
-
-        % ---- LEFT: one scatter column per animal, in THIS tag's own order ----
-        ax_sess = axes('Position', [block_left 0.08 animal_strip_width 0.84]); hold(ax_sess,'on');
-        for s = 1:n_animals
-            vals = find(sess_vals(ord.(tag).sess_ord) == sess_vals(s));
-            scatter(ax_sess, s*ones(size(vals)), vals, 8, 'filled', ...
-                'MarkerFaceColor', sess_cmap(s,:), 'MarkerEdgeColor','none');
-        end
-        xlim(ax_sess, [0.3, n_animals+0.7]); ylim(ax_sess, [1 N]);
-        axis(ax_sess, 'off');
-        if t == 1
-            text(ax_sess, (n_animals+1)/2, -N*0.03, 'Animal', 'FontSize', 8, ...
-                'HorizontalAlignment','center');
-        end
-
-        % ---- MIDDLE: heatmap, in THIS tag's own order ----
-        heat_left = block_left + animal_strip_width + 0.015;
-        ax_heat = axes('Position', [heat_left 0.08 heat_width 0.84]); hold(ax_heat,'on');
-        imagesc(ax_heat, x_pos, 1:N, ord.(tag).norm, [0 1]);
-        colormap(ax_heat, RedWhiteBlue);
-        set(ax_heat, 'YDir','normal');
-        ylim(ax_heat, [1 N]);
-        set(ax_heat, 'XTick', [40 80 120 160]);
-        xlabel(ax_heat, 'Position (cm)');
-        if strcmp(tag,'Data')
-            title(ax_heat, sprintf('Measured response (N=%d, own ordering)', N));
-        else
-            title(ax_heat, sprintf('%s kernel (N=%d, own ordering)', tag, N));
-        end
-        box(ax_heat,'off'); set(ax_heat,'TickDir','out');
-
-        % ---- Independent colorbar strip (never resizes ax_heat) ----
-        ax_cbar = axes('Position', [heat_left, 0.02, heat_width, 0.02]);
-        imagesc(ax_cbar, [0 1], [0 1], linspace(0,1,256));
-        colormap(ax_cbar, RedWhiteBlue);
-        set(ax_cbar, 'YTick', [], 'XTick', [0 0.5 1], 'XTickLabel', {'0','0.5','1'});
-        xlabel(ax_cbar, 'Activity (norm.)', 'FontSize', 8);
-        box(ax_cbar, 'on'); set(ax_cbar, 'TickDir','out', 'FontSize', 7);
-
-        % ---- RIGHT edge of heatmap: brackets + dots for THIS tag's groups ----
-        for g = 1:n_groups_t
-            idx = ord.(tag).groups{g};
-            y1 = min(idx); y2 = max(idx);
-            x0 = x_pos(end) + range(x_pos)*0.02;
-            plot(ax_heat, [x0 x0], [y1 y2], '-', 'Color', ord.(tag).grp_cmap(g,:), 'LineWidth', 1.5);
-            for m = 1:numel(idx)
-                plot(ax_heat, x0, idx(m), 'o', 'MarkerFaceColor', ord.(tag).grp_cmap(g,:), ...
-                    'MarkerEdgeColor', 'none', 'MarkerSize', 5, 'Clipping','off');
-            end
-        end
-
-        % ---- FAR RIGHT: group-mean example trace panels - ONLY this
-        % tag's own value, no overlay ----
-        trace_left = heat_left + heat_width + gap*0.6;
-        annotation('textbox', [trace_left, 0.93, trace_width, 0.04], ...
-            'String', sprintf('Examples: %s', tag), ...
-            'HorizontalAlignment','center', 'FontWeight','bold', 'FontSize', 9, ...
-            'EdgeColor','none', 'VerticalAlignment','middle');
-        for g = 1:n_groups_t
-            bottom = 0.08 + (g - 1) * trace_height;
-            axT = axes('Position', [trace_left bottom trace_width trace_height*0.85]); hold(axT,'on');
-            idx = ord.(tag).groups{g};
-
-            plot(axT, x_pos, ord.(tag).group_mean{g}, '-', 'LineWidth', 1.8, ...
-                'Color', ord.(tag).grp_cmap(g,:));
-
-            % ONE global, fixed y-axis range - identical on EVERY panel,
-            % every tag - matching the paper's single shared scale bar.
-            ylim(axT, global_ylim);
-            xlim(axT, [x_pos(1) x_pos(end)]);
-            box(axT,'off'); set(axT,'TickDir','out'); set(axT,'FontSize',7);
-            set(axT, 'YTick', []);
-            yline(axT, 0, 'Color',[0.8 0.8 0.8], 'LineStyle',':', 'HandleVisibility','off');
-
-            if ~first_panel_done
-                xb = x_pos(1) - range(x_pos)*0.05;
-                tick_len = range(x_pos)*0.015;
-                plot(axT, [xb xb], global_ylim, 'k-', 'LineWidth', 1.5, 'Clipping','off');
-                label_pts = [-scale_ref, 0, scale_ref];
-                for lp = label_pts
-                    plot(axT, [xb-tick_len, xb+tick_len], [lp lp], 'k-', ...
-                        'LineWidth', 1.2, 'Clipping','off');
-                    text(axT, xb - range(x_pos)*0.02 - tick_len, lp, sprintf('%.3g', lp), ...
-                        'FontSize', 7, 'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
-                        'Clipping','off');
-                end
-                first_panel_done = true;
-            end
-
-            if g == 1
-                xlabel(axT, 'Position (cm)', 'FontSize', 7);
-            else
-                set(axT, 'XTickLabel', []);
-            end
-            text(axT, x_pos(1), max(ylim(axT)), sprintf('n=%d', numel(idx)), 'FontSize', 7, ...
-                'VerticalAlignment','bottom');
-        end
-
-        % Leader lines: dot cluster (heatmap) -> trace panel
-        for g = 1:n_groups_t
-            idx = ord.(tag).groups{g};
-            r_center = mean(idx);
-            heat_dot_norm  = [heat_left + heat_width + 0.005, 0.08 + (r_center/N)*0.84];
-            trace_dot_norm = [trace_left, 0.08 + (g - 0.5)*trace_height];
-            annotation('line', [heat_dot_norm(1) trace_dot_norm(1)], [heat_dot_norm(2) trace_dot_norm(2)], ...
-                'LineStyle', '--', 'Color', ord.(tag).grp_cmap(g,:), 'LineWidth', 1);
-        end
-    end
-
-    sgtitle(sprintf('Each tag ordered/grouped independently: %s (N=%d cells each, own similarity clusters, shared scale)', ...
-        strjoin(display_tags, ', '), N));
-end
-
-% % ---- Helper: fetch either a fitted GLM kernel or the actual measured
-% % response, by name tag ----
-% function M = local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx)
-%     switch tag
-%         case 'Space'
-%             M = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
-%         case 'Landmarks'
-%             M = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
-%         case 'BG'
-%             M = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
-%         case 'Data'
-%             M = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
-%         otherwise
-%             error('local_getMap: unrecognized tag "%s"', tag);
-%     end
-% end
-
-% % ---- Helper: fetch either a fitted GLM kernel or the actual measured
-% % response, by name tag ----
-% function M = local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx)
-%     switch tag
-%         case 'Space'
-%             M = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
-%         case 'Landmarks'
-%             M = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
-%         case 'BG'
-%             M = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
-%         case 'Data'
-%             M = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
-%         otherwise
-%             error('local_getMap: unrecognized tag "%s"', tag);
-%     end
-% end
-
-%% =====================================================================
-%  HClust-Kernels-<...>  (ALTERNATIVE to 'Ordered-Kernels-<...>')
-% =====================================================================
-%  Same tag-parsing conventions as 'Ordered-Kernels-*' (figname split on
-%  '-', first tag after 'HClust'/'Kernels' = reference kernel for
-%  ordering/grouping; recognized tags add heatmap columns; 'all' /
-%  'omission' / 'hist' / 'peak' modifiers behave the same way).
-%
-%  WHAT'S DIFFERENT FROM 'Ordered-Kernels-*':
-%   1. Groups are formed by CUTTING THE SAME HIERARCHICAL TREE used for
-%      seriation (via `cluster(Z,'maxclust',n_groups)`), instead of a
-%      separate greedy lowest-variance sliding-window search. This
-%      guarantees group membership and heatmap ordering are derived from
-%      one consistent clustering result.
-%   2. Group numbering is reassigned so "Group 1" is always the
-%      topmost bracket in the (already-ordered) heatmap, "Group 2" the
-%      next, etc. - this removes the label-overlap / non-monotonic
-%      bracket problem seen with the sliding-window version.
-%   3. Session-ID dots use a DIFFERENT colormap family (bone) than group
-%      brackets/panels (hsv), so the two categorical variables (session
-%      vs. shape-cluster) can never be visually confused with each other.
-%   4. Each group's mean kernel is normalized to its own [0,1] range
-%      before plotting in the "Mean kernel" panels, so one
-%      high-amplitude group can't squash every other group's shape flat
-%      on a shared y-axis.
-%   5. n_HClusters (set near the top, alongside n_Clusters) directly
-%      controls how many example/group panels you get - no dependence on
-%      Kn/max_examples window-search parameters.
-% =====================================================================
-if contains(figname,'HClust-Kernels')
-
-    % --- number of groups to cut the tree into: chosen via elbow method
-    % on CH/silhouette curves (see diagnostic script). ---
-    n_HClusters = 6;
-
-    % --- distance metric / PCA used for clustering THIS reference kernel.
-    % Deliberately overrides the file's global dist_metric/dist_method
-    % ('cityblock'/'average' by default).
-    %
-    % Ward linkage + Euclidean distance on PCA-reduced components: a
-    % standard, well-established combination in the clustering literature
-    % for shape/pattern data (PCA reduction followed by Ward-linkage
-    % hierarchical clustering on the reduced components).
-    %
-    % PCA: 20 components retained (~80% cumulative variance), matching
-    % standard practice. ---
-    hclust_dist_metric = 'euclidean';
-    hclust_dist_method  = 'ward';
-    hclust_nPCs         = 20;
-    hclust_nPCs         = 4;
-
-    S = strsplit(figname, '-');
-    S = S(3:end);
-
-    show_all  = any(contains(S, 'all'));
-    show_omit = any(contains(S, 'omission'));
-    show_hist = any(contains(S, 'hist'));
-    ref = S(1);
-
-    % ----- Build X (same map-building logic as 'Ordered-Kernels-*') -----
-    X = [];
-    if any(strcmp(S, 'Space'))
-        X.Space.maps = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
-        X.Space.scale = 'minmax'; X.Space.clims = [0 1]; X.Space.colormap = RedWhiteBlue;
-    end
-    if any(strcmp(S, 'Landmarks'))
-        X.Landmarks.maps = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
-        X.Landmarks.scale = 'minmax'; X.Landmarks.clims = [0 1]; X.Landmarks.colormap = RedWhiteBlue;
-    end
-    if any(strcmp(S, 'BG'))
-        X.BG.maps = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
-        X.BG.scale = 'minmax'; X.BG.clims = [0 1]; X.BG.colormap = RedWhiteBlue;
-    end
-    if any(strcmp(S, 'FullMap'))
-        X.Full.maps = squeeze(EXP.Maps{mapVSP_idx(1)}.Tuning.meanrespModel(:,1,:));
-        X.Full.scale = 'minmax'; X.Full.clims = [0 1]; X.Full.colormap = flipud(gray(256));
-    end
-    % (add remaining tags - EOC/Vis/Omit/OmitMap/etc. - following the
-
-    % same pattern as 'Ordered-Kernels-*' if you need them here too)
-
-    Nbins = size(squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:)), 2);
-    x_pos = linspace(0,200,Nbins);
-
-    % ----- Cell selection mask (same logic as 'Ordered-Kernels-*') -----
-    spatial_mask = goodcells;
-    if ~show_all && ~show_omit
-        spatial_mask = spatial_mask & signicells & goodLLHcells;
-    elseif show_omit
-        spatial_mask = spatial_mask & goodOmitcells;
-    end
-    N = sum(spatial_mask);
-
-    fnames = fieldnames(X);
-    for k = 1:numel(fnames)
-        try
-            X.(fnames{k}).maps = X.(fnames{k}).maps(spatial_mask,:);
-        catch
-            X.(fnames{k}).maps = X.(fnames{k}).maps(:, spatial_mask)';
-        end
-    end
-
-    if ~show_omit
-        SpatialWeights = LLHrel(spatial_mask);
-    else
-        SpatialWeights = LLHrel_omit(spatial_mask);
-    end
-    Spatialcells = signicells(spatial_mask) & goodLLHcells(spatial_mask);
-
-    sessionid = EXP.Spk.series;
-    if isfield(EXP.Spk, 'animal')
-        sessionid = sessionid + 10*EXP.Spk.animal;
-    end
-    [sess_vals, ~, sess_uniq] = unique(sessionid);
-    sess_sel = sess_uniq(spatial_mask);
-
-    % ===================================================================
-    % HIERARCHICAL CLUSTERING: build ONE tree, use it for BOTH ordering
-    % (via optimalleaforder) AND group membership (via cluster(...)).
-    % ===================================================================
-    Xref = [];
-    for k = 1:numel(ref)
-        Xref = cat(2, Xref, X.(ref{k}).maps);
-    end
-    mu = mean(Xref, 2, 'omitnan');
-    sd = std(Xref, 0, 2, 'omitnan');
-    Xref_z = (Xref - mu) ./ sd;
-
-    valid_idx = find(~isnan(mean(Xref_z,2,'omitnan')));
-    nan_idx   = find(isnan(mean(Xref_z,2,'omitnan')));
-
-    % ---- PCA reduction before distance/linkage (18 components, 80%
-    % variance explained - see comment above) ----
-    ncomp = min([hclust_nPCs, size(Xref_z,2), numel(valid_idx)-1]);
-    if ncomp > 0
-        [~, score] = pca(Xref_z(valid_idx,:), 'NumComponents', ncomp);
-        Xclust = score;
-    else
-        Xclust = Xref_z(valid_idx,:);
-    end
-
-    Y = pdist(Xclust, hclust_dist_metric);
-    Z = linkage(Xclust, hclust_dist_method, hclust_dist_metric);
-
-    if strcmp(orderby_default_for_hclust(S), 'peak') %#ok<*NASGU> % placeholder if you want a 'peak' override here too
-    end
-    optimalorder_valid = optimalleaforder(Z, Y);
-    optiorder = valid_idx(optimalorder_valid);
-    optiorder = cat(1, optiorder(:), nan_idx(:));
-
-    % Cut the SAME tree into n_HClusters groups
-    T_raw = cluster(Z, 'maxclust', n_HClusters);
-    T_full = nan(size(Xref_z,1),1);
-    T_full(valid_idx) = T_raw;
-
-    % Apply ordering to maps + auxiliary vectors
-    for k = 1:numel(fnames)
-        X.(fnames{k}).maps = X.(fnames{k}).maps(optiorder,:);
-    end
-    SpatialWeights = SpatialWeights(optiorder);
-    Spatialcells   = Spatialcells(optiorder);
-    sess_ord       = sess_sel(optiorder);
-    T_ord          = T_full(optiorder);
-
-    % Relabel clusters 1..n_HClusters in the order they FIRST appear in
-    % the now-ordered list, so "Group 1" is always the topmost bracket
-    [uniqueClusters, ~] = unique(T_ord(~isnan(T_ord)), 'stable');
-    newLabels = nan(size(T_ord));
-    for i = 1:numel(uniqueClusters)
-        newLabels(T_ord == uniqueClusters(i)) = i;
-    end
-    n_groups_actual = numel(uniqueClusters);
-
-    groups = cell(1, n_groups_actual);
-    for g = 1:n_groups_actual
-        groups{g} = find(newLabels == g);   % row indices into the ordered list
-    end
-    Ng = n_groups_actual;
-
-    ref = ref{1};
-
-    % ===================================================================
-    % COLORS: group palette (hsv, bold) vs session palette (bone, muted) -
-    % deliberately different colormap families so the two can never be
-    % visually confused with each other.
-    % ===================================================================
-    cmap = colormap(hsv);
-    cmap = cmap(32:224,:);
-    group_cmap = cmap(round(linspace(1, size(cmap,1), Ng)),:);
-
-    sess_cmap = bone(numel(sess_vals) + 2);
-    sess_cmap = sess_cmap(2:end-1,:);   % avoid pure black/white extremes
-
-    % ===================================================================
-    % PLOTTING (same overall layout as 'Ordered-Kernels-*')
-    % ===================================================================
-    nrow = min(5, Ng);
-    ncol_groups = ceil(Ng / nrow);
-    Nmaps = numel(fnames);
-    col_offset = Nmaps + 1;
-    ncol_total = col_offset + ncol_groups;
-    if show_hist
-        ncol_total = ncol_total + ncol_groups;
-    end
-
-    figure;
-    tl = tiledlayout(nrow, ncol_total, 'TileSpacing','compact','Padding','compact');
-
-    % ---- Spatial-weight sidebar ----
-    axW = nexttile(tl, [nrow 1]); hold(axW,'on');
-    sw_median = NaN(size(SpatialWeights));
-    for j = 1:numel(SpatialWeights)
-        c = 'k'; if Spatialcells(j), c = 'r'; end
-        plot(SpatialWeights(j)*[1 1], j + [-0.5 0.5], c);
-        if j > 5 && j < numel(SpatialWeights) - 5
-            sw_median(j) = median(SpatialWeights(j-5:j+5), 'omitnan');
-        end
-    end
-    plot(sw_median, 1:numel(SpatialWeights), 'Color', [.5 .5 .5]);
-    xline(axW, 1, 'b-');
-    xlim(axW, [0.9 1.5]);           % FIX: explicit range instead of autoscale
-    xlabel(axW, 'Spatial weight (LLH_{rel})');
-    ylabel(axW, 'Cells (reordered)');
-    box(axW,'off'); set(axW,'TickDir','out');
-
-    % ---- Kernel heatmaps ----
-    for k = 1:numel(fnames)
-        axH = nexttile(tl, [nrow 1]); hold(axH,'on');
-        mx = max(X.(fnames{k}).maps, [], 2, 'omitnan');
-        mn = min(X.(fnames{k}).maps, [], 2, 'omitnan');
-        maps = (X.(fnames{k}).maps - mn) ./ max(mx - mn, eps);
-        imagesc(axH, x_pos, 1:N, maps, X.(fnames{k}).clims);
-
-        if strcmp(fnames{k}, ref)
-            for g = 1:Ng
-                idx = groups{g};
-                y1 = min(idx); y2 = max(idx);
-                x0 = x_pos(end) + 2;
-                plot(axH, [x0 x0], [y1 y2], '-', 'Color', group_cmap(g,:), 'LineWidth', 3);
-                text(x0 + 2, (y1+y2)/2, sprintf('group #%d', g), ...
-                    'HorizontalAlignment','left','VerticalAlignment','middle','FontWeight','bold');
-            end
-            for s = 1:numel(sess_vals)
-                vals = find(sess_ord == sess_vals(s));
-                scatter(axH, (x_pos(1) - 5 - 5*s)*ones(size(vals)), vals, ...
-                    'filled', 'MarkerFaceColor', sess_cmap(s,:), 'MarkerFaceAlpha', ptAlpha, ...
-                    'MarkerEdgeColor', 'none');
-            end
-            text(axH, x_pos(1) - 5 - 5*(numel(sess_vals)+1.5), N*0.5, ...
-                'Session/animal ID', 'Rotation', 90, 'HorizontalAlignment','center', 'FontSize', 8);
-        end
-
-        set(axH,'YDir','normal');
-        colormap(axH, X.(fnames{k}).colormap);
-        colorbar(axH);
-        xlabel(axH,'Position (cm)'); ylabel(axH,'Cells (reordered)');
-        title(axH,fnames{k});
-        box(axH,'off'); set(axH,'TickDir','out');
-    end
-
-    % ---- Per-group mean (+SE) kernel panels, each NORMALIZED to its own
-    % [0,1] range so no single group's amplitude squashes the rest ----
-    n_examples_per_group = 3;   % number of individual example cells to overlay per group
-
-    mu_g = []; se_g = []; example_idx_g = cell(Ng,1);
-    for k = 1:numel(fnames)
-        mu_g.(fnames{k}) = cell(Ng,1); se_g.(fnames{k}) = cell(Ng,1);
-        for g = 1:Ng
-            idx = groups{g};
-            M = X.(fnames{k}).maps(idx,:);         % [n_cells x posbins], raw values
-
-            % FIX: normalize EACH CELL (row) to [0,1] BEFORE averaging, so
-            % every cell contributes equally to the group mean regardless
-            % of its raw amplitude. Averaging raw values first (as before)
-            % lets one high-amplitude cell dominate the "mean" shape; the
-            % old post-hoc rescale of that already-distorted mean did not
-            % fix this, since the distortion happens at the averaging step.
-            mn_row = min(M, [], 2, 'omitnan');
-            mx_row = max(M, [], 2, 'omitnan');
-            M_norm = (M - mn_row) ./ max(mx_row - mn_row, eps);
-
-            mu_g.(fnames{k}){g} = mean(M_norm, 1, 'omitnan');
-            se_g.(fnames{k}){g} = std(M_norm, 0, 1, 'omitnan') / max(numel(idx),1)^0.5;
-
-            % ---- Select representative example cells for the reference
-            % kernel only: the cells whose normalized shape is CLOSEST to
-            % the group mean (by Euclidean distance), rather than a
-            % single arbitrary/cherry-picked cell. Shown as faint
-            % individual traces behind the mean+SE line, so the reader
-            % can see this shape is real, not just an averaging artifact.
-            if strcmp(fnames{k}, ref)
-                d = sqrt(sum((M_norm - mu_g.(fnames{k}){g}).^2, 2, 'omitnan'));
-                [~, order_by_dist] = sort(d, 'ascend');
-                n_ex = min(n_examples_per_group, numel(order_by_dist));
-                example_idx_g{g} = idx(order_by_dist(1:n_ex));   % row indices into X.(ref).maps
-            end
-        end
-    end
-    yLimMeans = [-0.05 1.05];   % fixed, since every trace is now [0,1]-normalized
-
-    for g = 1:Ng
-        rowIdx      = mod(g-1, nrow) + 1;
-        groupColIdx = ceil(g / nrow);
-        if show_hist
-            colMean = col_offset + 2*(groupColIdx-1) + 1;
-            colHist = col_offset + 2*(groupColIdx-1) + 2;
-        else
-            colMean = col_offset + (groupColIdx-1) + 1;
-            colHist = 0;
-        end
-
-        idx = groups{g};
-        color_g = group_cmap(g,:);
-
-        axG = nexttile(tl, (rowIdx-1)*ncol_total + colMean); hold(axG,'on');
-
-        % Faint individual example traces (closest-to-centroid cells),
-        % drawn first so the mean+SE line sits on top
-        ex_idx = example_idx_g{g};
-        M_ref = X.(ref).maps(ex_idx,:);
-        mn_row = min(M_ref, [], 2, 'omitnan');
-        mx_row = max(M_ref, [], 2, 'omitnan');
-        M_ref_norm = (M_ref - mn_row) ./ max(mx_row - mn_row, eps);
-        for e = 1:size(M_ref_norm,1)
-            plot(axG, x_pos, M_ref_norm(e,:), 'LineWidth', 0.75, ...
-                'Color', [color_g, 0.35], 'HandleVisibility','off');
-        end
-
-        for k = 1:numel(fnames)
-            if ~strcmp(fnames{k}, ref)
-                c = zeros(1,3); c(mod(k,3)+1) = 1;
-                plot(axG, x_pos, mu_g.(fnames{k}){g}, 'LineWidth',1.2, 'Color', c, 'LineStyle','--');
-            end
-        end
-        seplot(axG, x_pos, mu_g.(ref){g}, se_g.(ref){g}, 0.2);
-        plot(axG, x_pos, mu_g.(ref){g}, 'LineWidth',1.6, 'Color', color_g);
-        xlim(axG,[0 200]); ylim(axG, yLimMeans);
-        if rowIdx == nrow, xlabel(axG,'Position (cm)'); end
-        ylabel(axG, sprintf('Group %d (n=%d)', g, numel(idx)));
-        title(axG, 'Mean \pm SE (+3 example cells)');
-        box(axG,'off'); set(axG,'TickDir','out');
-
-        if colHist > 0
-            axS = nexttile(tl, (rowIdx-1)*ncol_total + colHist); hold(axS,'on');
-            sess_g = sess_ord(idx);
-            if ~isempty(sess_g)
-                histogram(axS, sess_g, 'BinMethod','integers', 'FaceColor', color_g, 'EdgeColor','none');
-            end
-            title(axS, 'Sessions');
-            xlabel(axS, 'session id'); ylabel(axS, '# cells');
-            xtickangle(axS, 45);
-            box(axS,'off'); set(axS,'TickDir','out'); grid(axS,'on');
-        end
-    end
-
-    sgtitle(tl, sprintf('Hierarchical clustering of %s kernels (N=%d, %d groups)', ref, N, Ng));
-end
-
-% Small helper referenced above as a placeholder - remove if unused, or
-% implement a 'peak' override for this block the same way 'Ordered-Kernels'
-% does, if you want that option here too.
-function m = orderby_default_for_hclust(S)
-    if any(contains(S,'peak'))
-        m = 'peak';
-    else
-        m = 'similarity';
-    end
-end
-
-
-
-
-%% =====================================================================
-%  'SpeedVsSpatial-correlations'  (new figname)
-%
-%  Correlates RUNNING SPEED sensitivity with SPATIAL coding strength,
-%  using two complementary approaches:
-%
-%   (1) SPEED SENSITIVITY INDEX (computed here): for each cell, the
-%       fold-change in gain between its fitted speed kernel's minimum and
-%       maximum (exp(max)-exp(min), on the multiplicative gain scale -
-%       i.e. "how many times stronger is firing at this cell's preferred
-%       speed vs its least-preferred speed"). Correlated against LLHrel
-%       (spatial weight): are more speed-sensitive cells more or less
-%       spatially modulated?
-%
-%   (2) LLHrel_Spd vs LLHrel (already computed elsewhere in this file):
-%       LLHrel_Spd quantifies how much the running-speed predictor
-%       SPECIFICALLY contributes to model fit (analogous to LLHrel, but
-%       for speed instead of space). Correlating these two directly asks
-%       whether speed-coding strength and spatial-coding strength are
-%       related, independent, or trade off against each other, without
-%       needing any new derived metric.
-%
-%  Both panels report Spearman correlation (robust to the non-normal,
-%  heavy-tailed distributions typical of these LLH-based metrics) with a
-%  fitted trend line for visualization.
-% =====================================================================
-if strcmp(figname, 'SpeedVsSpatial-correlations')
-
-    % ---- Cell selection: spatially-selective cells (consistent with
-    % other figures in this file) ----
-    spatial_mask = goodcells & signicells & goodLLHcells;
-
-    % ---- (1) Speed sensitivity index: fold-change in gain across the
-    % fitted speed kernel's range, per cell ----
-    speedK = squeeze(EXP.GLMs{1}.Tuning(iSpd).meanrespModel(:,1,:));
-    speedK_sel = speedK(spatial_mask,:);
-    % exp() converts the linear-scale kernel to actual multiplicative
-    % gain (see conversation notes: kernel=0 -> gain=1, i.e. no effect);
-    % fold-change = gain at preferred speed / gain at least-preferred speed
-    gain_max = exp(max(speedK_sel, [], 2, 'omitnan'));
-    gain_min = exp(min(speedK_sel, [], 2, 'omitnan'));
-    speed_sensitivity = gain_max ./ max(gain_min, eps);
-
-    LLH_sel = LLHrel(spatial_mask);
-    LLH_sel = LLH_sel(:);
-    LLH_Spd_sel = LLHrel_Spd(spatial_mask);
-    LLH_Spd_sel = LLH_Spd_sel(:);
-    speed_sensitivity = speed_sensitivity(:);
-
-    % Remove non-finite values (can arise from edge cases in the ratio
-    % or from cells with degenerate kernels) before correlating
-    valid1 = isfinite(speed_sensitivity) & isfinite(LLH_sel);
-    valid2 = isfinite(LLH_Spd_sel) & isfinite(LLH_sel);
-
-    fprintf('\n--- Diagnostic: input sizes/validity ---\n');
-    fprintf('speed_sensitivity: %d values, %d finite\n', numel(speed_sensitivity), sum(isfinite(speed_sensitivity)));
-    fprintf('LLHrel_Spd (selected): %d values, %d finite\n', numel(LLH_Spd_sel), sum(isfinite(LLH_Spd_sel)));
-    fprintf('LLHrel (selected): %d values, %d finite\n', numel(LLH_sel), sum(isfinite(LLH_sel)));
-    fprintf('valid1 (for panel 1): %d points\n', sum(valid1));
-    fprintf('valid2 (for panel 2): %d points\n', sum(valid2));
-
-    if sum(valid1) < 3
-        warning('SpeedVsSpatial-correlations: fewer than 3 valid points for panel 1 - check speed_sensitivity/LLHrel for NaN/Inf.');
-    end
-    if sum(valid2) < 3
-        warning('SpeedVsSpatial-correlations: fewer than 3 valid points for panel 2 - check LLHrel_Spd for NaN/Inf (this is likely why corr() failed).');
-    end
-
-    %% ===================== PLOTTING =====================
-    figure('Color','w');
-    tl = tiledlayout(1,2, 'TileSpacing','compact', 'Padding','compact');
-
-    % ---- Panel 1: Speed sensitivity index vs LLHrel ----
-    ax1 = nexttile(tl); hold(ax1,'on');
-    if sum(valid1) >= 3
-        scatter(ax1, speed_sensitivity(valid1), LLH_sel(valid1), 20, [0.3 0.3 0.7], ...
-            'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor','none');
-        [rho1, p1] = corr(speed_sensitivity(valid1), LLH_sel(valid1), 'Type','Spearman');
-        set(ax1, 'XScale', 'log');
-        text(ax1, 0.05, 0.95, sprintf('Spearman r = %.3f\np = %.3g\nn = %d', rho1, p1, sum(valid1)), ...
-            'Units','normalized', 'VerticalAlignment','top', 'FontSize', 9);
-    else
-        rho1 = NaN; p1 = NaN;
-        text(ax1, 0.5, 0.5, 'Insufficient valid data', 'Units','normalized', ...
-            'HorizontalAlignment','center');
-    end
-    xlabel(ax1, 'Speed sensitivity index (fold-change in gain)');
-    ylabel(ax1, 'LLH_{rel} (spatial weight)');
-    title(ax1, 'Speed sensitivity vs spatial weight');
-    box(ax1,'off'); set(ax1,'TickDir','out');
-
-    % ---- Panel 2: LLHrel_Spd vs LLHrel ----
-    ax2 = nexttile(tl); hold(ax2,'on');
-    if sum(valid2) >= 3
-        scatter(ax2, LLH_Spd_sel(valid2), LLH_sel(valid2), 20, [0.7 0.4 0.2], ...
-            'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor','none');
-        [rho2, p2] = corr(LLH_Spd_sel(valid2), LLH_sel(valid2), 'Type','Spearman');
-        text(ax2, 0.05, 0.95, sprintf('Spearman r = %.3f\np = %.3g\nn = %d', rho2, p2, sum(valid2)), ...
-            'Units','normalized', 'VerticalAlignment','top', 'FontSize', 9);
-    else
-        rho2 = NaN; p2 = NaN;
-        text(ax2, 0.5, 0.5, 'Insufficient valid data', 'Units','normalized', ...
-            'HorizontalAlignment','center');
-    end
-    xlabel(ax2, 'LLH_{rel,Spd} (speed contribution)');
-    ylabel(ax2, 'LLH_{rel} (spatial weight)');
-    title(ax2, 'Speed contribution vs spatial weight');
-    box(ax2,'off'); set(ax2,'TickDir','out');
-
-    sgtitle(sprintf('Running speed vs spatial coding (N=%d spatially-selective cells)', sum(spatial_mask)));
-
-    fprintf('\n--- Speed vs Spatial correlations ---\n');
-    fprintf('Speed sensitivity index vs LLHrel: Spearman r=%.3f, p=%.3g, n=%d\n', rho1, p1, sum(valid1));
-    fprintf('LLHrel_Spd vs LLHrel:              Spearman r=%.3f, p=%.3g, n=%d\n', rho2, p2, sum(valid2));
-
-end
-%% =====================================================================
-%  'CellCategory-table'  (new figname)
-% =====================================================================
-if strcmp(figname, 'CellCategory-table')
-
-    idx_all = find(goodcells);
-    n = numel(idx_all);
-
-    sessionid = EXP.Spk.series;
-    if isfield(EXP.Spk, 'animal')
-        animalid = EXP.Spk.animal;
-    else
-        animalid = nan(size(sessionid));
-    end
-
-    CellName = EXP.Spk.CellListString(idx_all);
-    RowIdx   = idx_all(:);
-    Animal   = animalid(idx_all);
-    Session  = sessionid(idx_all);
-
-    % ---- Category membership: masks exactly as defined elsewhere in
-    % this script, no modifications ----
-    IsSpatial   = spatialcells(idx_all);   % goodcells & signicells & goodLLHcells
-    IsOmit      = goodOmitcells(idx_all);  % pval_omit<=0.05 & LLHrel_omit>1+LLHrel_th (as originally defined; NOT restricted to goodcells)
-    IsSignif    = signicells(idx_all);     % significant position kernel
-
-    % ---- Continuous knockout metrics, raw ----
-    LLHrel_val      = LLHrel(idx_all);
-    LLHrel_omit_val = LLHrel_omit(idx_all);
-    LLHrel_L1L2_val = LLHrel_L1L2(idx_all);
-    LLHrel_BG_val   = LLHrel_BG(idx_all);
-    LLHrel_Spd_val  = LLHrel_Spd(idx_all);
-    pval_omit_val   = pval_omit(idx_all);
-
-    T = table(RowIdx, CellName(:), Animal, Session, ...
-        IsSpatial, IsSignif, IsOmit, ...
-        LLHrel_val, LLHrel_omit_val, LLHrel_L1L2_val, LLHrel_BG_val, LLHrel_Spd_val, pval_omit_val, ...
-        'VariableNames', {'RowIdx','CellName','Animal','Session', ...
-        'IsSpatial','IsSignif','IsOmit', ...
-        'LLHrel','LLHrel_omit','LLHrel_L1L2','LLHrel_BG','LLHrel_Spd','pval_omit'});
-
-    fprintf('\n--- CellCategory-table summary ---\n');
-    fprintf('Total goodcells: %d\n', n);
-    fprintf('  Spatial:         %d (%.1f%%)\n', sum(IsSpatial), 100*sum(IsSpatial)/n);
-    fprintf('  Significant pos: %d (%.1f%%)\n', sum(IsSignif), 100*sum(IsSignif)/n);
-    fprintf('  Omission (as originally defined, NOT goodcells-restricted): %d (%.1f%%)\n', ...
-        sum(IsOmit), 100*sum(IsOmit)/n);
-
-    assignin('base', 'CellCategoryTable', T);
-    outpath = fullfile(pwd, 'CellCategoryTable.csv');
-    writetable(T, outpath);
-    fprintf('\nSaved table to workspace as ''CellCategoryTable'' and to:\n  %s\n', outpath);
 end
 
 % =============================================================================

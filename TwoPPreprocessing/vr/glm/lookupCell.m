@@ -1,36 +1,69 @@
-function lookupCell(T, cellID)
-% LOOKUPCELL  Print category membership for a single cell.
-%   T       CellCategoryTable (from 'CellCategory-table' figname), or
-%           call with [] to auto-load 'CellCategoryTable' from base workspace.
-%   cellID  Either a cell-name string (e.g. 'M25131_20260318_cell#5')
-%           or a numeric Row index.
+function [cellIdx, cellNames, T] = lookupCell(csvPath, criteria)
+%FINDCELLS_SONALI_JF  Select cells from the exported metrics CSV
+%   (cell_metrics_summary.csv, from plotFinalFigures_Sonali_JF's
+%   'ExportCellMetrics' option) that satisfy a named set of criteria.
 %
-% USAGE
-%   lookupCell([], 'M25131_20260318_cell#5')
-%   lookupCell([], 4856)   % by Row index
+% EXAMPLE USAGE
+%   [idx, names] = findCells_Sonali_JF('cell_metrics_summary.csv', 'visual')
+%   [idx, names] = findCells_Sonali_JF('cell_metrics_summary.csv', 'spatial')
+%   [idx, names] = findCells_Sonali_JF('cell_metrics_summary.csv', 'nonspatial')
+%   [idx, names] = findCells_Sonali_JF('cell_metrics_summary.csv', 'omission')
+%   [idx, names, T] = findCells_Sonali_JF('cell_metrics_summary.csv', 'flatnonspatial')
+%
+% INPUTS
+%   csvPath    Path to the CSV exported by plotFinalFigures_Sonali_JF's
+%              'ExportCellMetrics' option.
+%   criteria   String selecting the cell-selection rule:
+%       'good'          - goodcells == 1
+%       'visual'        - goodcells == 1 & LLHi_vis is finite and > 0
+%                          (i.e. vision explains this cell better than
+%                          the null model; there's no separate "visual
+%                          significance" column in the CSV, so this uses
+%                          LLHi_vis as the closest available proxy - see
+%                          note below)
+%       'spatial'       - spatialcells == 1
+%       'nonspatial'    - goodcells == 1 & spatialcells == 0
+%       'flatnonspatial'- nonspatial cells with an exactly-flat position
+%                         kernel (posKernel_maxabs < 1e-6), i.e. clean
+%                         examples like cell 57/289 where VS and VSP are
+%                         identical
+%       'omission'      - goodOmitcells == 1
+%
+% OUTPUTS
+%   cellIdx    Row indices into T (not EXP.Spk row numbers, unless your
+%              CSV row order matches EXP.Spk order 1:1, which it does if
+%              exported straight from ExportCellMetrics).
+%   cellNames  Cell array of CellName strings for the matching rows.
+%   T          Filtered table (all columns from the CSV) for those cells.
+%
+% NOTE ON 'visual': the exported CSV doesn't currently include a
+% standalone "vision-only model p-value" column, only LLHi_vis (the
+% log-likelihood improvement of the vision-only model over the null). If
+% you want a true significance-based 'visual' criterion instead of this
+% effect-size proxy, add EXP.GLMs{1}.Tuning(iVismodel).pval as its own
+% column in the ExportCellMetrics block and reference it here.
 
-    if isempty(T)
-        T = evalin('base', 'CellCategoryTable');
-    end
+T_full = readtable(csvPath);
 
-    if ischar(cellID) || isstring(cellID)
-        row = find(strcmp(T.CellName, cellID));
-    else
-        row = find(T.Row == cellID);
-    end
+switch criteria
+    case 'good'
+        mask = T_full.goodcells == 1;
+    case 'visual'
+        mask = T_full.goodcells == 1 & isfinite(T_full.LLHi_vis) & T_full.LLHi_vis > 0;
+    case 'spatial'
+        mask = T_full.spatialcells == 1;
+    case 'nonspatial'
+        mask = T_full.goodcells == 1 & T_full.spatialcells == 0;
+    case 'flatnonspatial'
+        mask = T_full.goodcells == 1 & T_full.spatialcells == 0 & T_full.posKernel_maxabs < 1e-6;
+    case 'omission'
+        mask = T_full.goodOmitcells == 1;
+    otherwise
+        error('Unrecognized criteria: %s', criteria);
+end
 
-    if isempty(row)
-        fprintf('Cell not found (not in goodcells, or name/ID typo): %s\n', string(cellID));
-        return;
-    end
+T = T_full(mask, :);
+cellNames = T.CellName;
+cellIdx = find(mask);
 
-    r = T(row,:);
-    fprintf('\n--- %s ---\n', r.CellName{1});
-    fprintf('Row: %d | Animal: %d | Session: %d\n', r.Row, r.Animal, r.Session);
-    fprintf('  Spatial:         %d  (LLHrel = %.4f)\n', r.IsSpatial, r.LLHrel);
-    fprintf('  Significant pos: %d\n', r.IsSignif);
-    fprintf('  Omission:        %d  (LLHrel_omit = %.4f, p = %.3g)\n', r.IsOmit, r.LLHrel_omit, r.pval_omit);
-    fprintf('  Landmark-driven: %d  (LLHrel_L1L2 = %.4f)\n', r.IsLandmarkDriven, r.LLHrel_L1L2);
-    fprintf('  BG-driven:       %d  (LLHrel_BG = %.4f)\n', r.IsBGDriven, r.LLHrel_BG);
-    fprintf('  Speed-driven:    %d\n', r.IsSpeedDriven);
 end

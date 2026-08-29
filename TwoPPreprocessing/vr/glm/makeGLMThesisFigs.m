@@ -114,9 +114,13 @@ saveFigureFormats(figCDEF, fullfile(outputDirFig1, 'eg_nativeGLMKernel'));
 
 EXP = load("C:\Users\sonali.sriranga\Desktop\V1\analyzed\M25131\20260318\SpkLin_EXP_M25131_20260318.mat");
 %%
-outputDirFig2 = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_8_Section4';
-%
-plotFinalFigures_Sonali(EXP_all, 'Resp-completeSnake-base-swap23-omit2-omit3') % any subset of conditions works
+outputDirFig2 = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_9_Section3';
+
+% this is the version of the figure in the the thesis:
+plotFinalFigures_Sonali_JF(EXP_all, 'Resp-snake-base-omit2')
+
+% this is the older version of the figure
+% plotFinalFigures_Sonali(EXP_all, 'Resp-completeSnake-base-swap23-omit2-omit3') % any subset of conditions works
 % plotFinalFigures_Sonali(EXP_all, 'Resp-completeSnake') % this will only include rois where all conditons were present
 figA = gcf;
 
@@ -185,8 +189,8 @@ allNewAxes1 = findall(figAEdited, 'Type', 'Axes');
 set(allNewAxes1, 'CLim', [0 1]);
 
 % FIGURE 2 
-figKernelResid = figure('Position', [100 100 1600 500]);
-tlResid = tiledlayout(figKernelResid, 2, ncond+1, 'TileSpacing','compact','Padding','compact');  % <-- ncond+1, not 7
+figKernelResid = figure('Position', [100 100 1200 700]);
+tlResid = tiledlayout(figKernelResid, 2, ncond+1, 'TileSpacing','compact','Padding','compact');  
 
 axKernel = nexttile(tlResid, [2 1]);
 kernelSrc = row3_axes(1);
@@ -256,13 +260,209 @@ end
 
 sgtitle(tlResid, 'Spatially selective cells: spatial kernel & model residuals');
 
-%
-saveFigureFormats(figAEdited, fullfile(outputDirFig2, 'VS_VSP_resp_CompleteShake\VS_VSP_resp_CompleteShake_omit23_swap23'));
-saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'Kernel_Residuals_CompleteSnake\Kernel_Residuals_CompleteSnake_omit23_swap23'));
+% saveFigureFormats(figAEdited, fullfile(outputDirFig2, 'VS_VSP_resp_Shake\VS_VSP_resp_snake_base_omit2'));
+% saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'Kernel_Residuals_Snake\Kernel_Residuals_Snake_base-omit2'));
 
+saveFigureFormats(figAEdited, fullfile(outputDirFig2, 'SuppFig_VS_VSP_resp_Shake\VS_VSP_resp_snake_allcondition'));
+saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'SuppFig_Kernel_Residuals_Snake\Kernel_Residuals_Snake_allcondition'));
+
+%
+% saveFigureFormats(figAEdited, fullfile(outputDirFig2, 'VS_VSP_resp_CompleteShake\VS_VSP_resp_snake_omit23_swap23'));
+% saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'Kernel_Residuals_CompleteSnake\Kernel_Residuals_CompleteSnake_omit23_swap23'));
+
+
+%% V2 of the above figure 
+outputDirFig2 = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_9_Section3';
+
+% this is the version of the figure in the the thesis:
+plotFinalFigures_Sonali_JF(EXP_all, 'Resp-snake')
+
+figA = gcf;
+
+axAll = findall(figA, 'Type', 'Axes');
+pos = cell2mat(get(axAll, 'Position'));
+[~, sortIdx] = sortrows(pos, [-2 1]);
+axAll = axAll(sortIdx);
+pos = pos(sortIdx,:);
+yvals = round(pos(:,2), 3);
+uniqueY = unique(yvals, 'stable');
+
+topY = uniqueY(1);
+row1_axes = axAll(yvals == topY);      % All cells (igroup==1)
+
+midY = uniqueY(2);
+row2_axes = axAll(yvals == midY);      % Spatially selective (igroup==2)
+
+bottomY = uniqueY(end);
+row3_axes = axAll(yvals == bottomY);
+pos3 = cell2mat(get(row3_axes,'Position'));
+[~, sIdx3] = sort(pos3(:,1));
+row3_axes = row3_axes(sIdx3);
+
+ncond = numel(row1_axes) / 3;   % row1_axes = [DATA x ncond, VS x ncond, VSP x ncond]
+assert(numel(row2_axes) == numel(row1_axes), ...
+    'Row 1 and row 2 axis counts do not match - check figure layout assumptions.');
+assert(numel(row3_axes) == 1 + 2*ncond, ...
+    'Unexpected number of bottom-row axes - check the figure layout assumptions.');
+
+% FIX: strip any "(n=...)" suffix from the DATA-row titles before reusing
+% them below, since that n reflects the ALL-CELLS population (row 1,
+% igroup==1), not the spatially-selective population used elsewhere.
+condTitles = cell(1,ncond);
+for i = 1:ncond
+    rawTitle = row1_axes(i).Title.String;
+    condTitles{i} = regexprep(rawTitle, '\s*\(n=\d+\)', '');
+end
+
+% ===================== FIGURE 1: ALL CELLS =====================
+figAllCells = figure('Position', [100 100 1400 700]);
+tlAll = tiledlayout(figAllCells, 3, ncond, 'TileSpacing','compact','Padding','compact');
+colormap(figAllCells, flipud(gray(256)));
+
+for i = 1:numel(row1_axes)
+    axNew = nexttile(tlAll);
+    copyobj(allchild(row1_axes(i)), axNew);
+    axNew.XLim = row1_axes(i).XLim;
+    axNew.YLim = row1_axes(i).YLim;
+    box(axNew,'off'); set(axNew,'TickDir','out');
+    set(axNew, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
+    set(axNew, 'YTick', [], 'YTickLabel',[]);
+    axNew.Title.String = row1_axes(i).Title.String;
+
+    if i <= ncond
+        hold(axNew, 'on');
+        for posBin = [40 80 120 160]
+            xline(axNew, posBin, '--', 'Color', [1 1 1], 'LineWidth', 1);
+        end
+    end
+
+    if i == numel(row1_axes)
+        cb = colorbar(axNew);
+        cb.TickDirection = 'out';
+        cb.Box = 'off';
+    end
+end
+
+allAxesAllCells = findall(figAllCells, 'Type', 'Axes');
+set(allAxesAllCells, 'CLim', [0 1]);
+sgtitle(tlAll, 'All cells');
+
+% FIGURE 1b: SPATIALLY SELECTIVE CELLS 
+% Matched to the same population used for the kernel/residual figure
+% below, so Figure 1b and Figure 2 describe the same neurons.
+figSpatialCells = figure('Position', [100 100 1400 700]);
+tlSpatial = tiledlayout(figSpatialCells, 3, ncond, 'TileSpacing','compact','Padding','compact');
+colormap(figSpatialCells, flipud(gray(256)));
+
+for i = 1:numel(row2_axes)
+    axNew = nexttile(tlSpatial);
+    copyobj(allchild(row2_axes(i)), axNew);
+    axNew.XLim = row2_axes(i).XLim;
+    axNew.YLim = row2_axes(i).YLim;
+    box(axNew,'off'); set(axNew,'TickDir','out');
+    set(axNew, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
+    set(axNew, 'YTick', [], 'YTickLabel',[]);
+    axNew.Title.String = row2_axes(i).Title.String;
+
+    if i <= ncond
+        hold(axNew, 'on');
+        for posBin = [40 80 120 160]
+            xline(axNew, posBin, '--', 'Color', [1 1 1], 'LineWidth', 1);
+        end
+    end
+
+    if i == numel(row2_axes)
+        cb = colorbar(axNew);
+        cb.TickDirection = 'out';
+        cb.Box = 'off';
+    end
+end
+
+allAxesSpatial = findall(figSpatialCells, 'Type', 'Axes');
+set(allAxesSpatial, 'CLim', [0 1]);
+sgtitle(tlSpatial, 'Spatially selective cells');
+
+% row3_axes was already the spatially-selective population (built once,
+% after the igroup loop, from ss_idx_sorted), so this is unchanged.
+figKernelResid = figure('Position', [100 100 1200 700]);
+tlResid = tiledlayout(figKernelResid, 2, ncond+1, 'TileSpacing','compact','Padding','compact');
+
+axKernel = nexttile(tlResid, [2 1]);
+kernelSrc = row3_axes(1);
+copyobj(allchild(kernelSrc), axKernel);
+axKernel.XLim = kernelSrc.XLim;
+axKernel.YLim = kernelSrc.YLim;
+axKernel.CLim = kernelSrc.CLim;
+colormap(axKernel, RedWhiteBlue);
+nSpatialTotal = round(kernelSrc.YLim(2));
+axKernel.Title.String = sprintf('%s (n=%d)', kernelSrc.Title.String, nSpatialTotal);
+set(axKernel, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
+set(axKernel, 'YTick', [], 'YTickLabel', []);
+box(axKernel,'off'); set(axKernel,'TickDir','out');
+hold(axKernel, 'on');
+for posBin = [40 80 120 160]
+    xline(axKernel, posBin, ':', 'Color', [0.6 0.6 0.6], 'LineWidth', 1);
+end
+
+dataVSaxes  = row3_axes(2 : 1+ncond);
+dataVSPaxes = row3_axes(2+ncond : 1+2*ncond);
+
+for i = 1:ncond
+    axNew = nexttile(tlResid);
+    copyobj(allchild(dataVSaxes(i)), axNew);
+    axNew.XLim = dataVSaxes(i).XLim;
+    axNew.YLim = dataVSaxes(i).YLim;
+    axNew.CLim = dataVSaxes(i).CLim;
+    colormap(axNew, RedWhiteBlue);
+    nSpatial_i = round(dataVSaxes(i).YLim(2));
+    axNew.Title.String = sprintf('%s (n=%d)', condTitles{i}, nSpatial_i);
+    set(axNew, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
+    set(axNew, 'YTick', [], 'YTickLabel', []);
+    box(axNew,'off'); set(axNew,'TickDir','out');
+    if i == 1, ylabel(axNew, 'DATA - VS'); end
+    if i == ncond
+        cb = colorbar(axNew);
+        cb.TickDirection = 'out';
+        cb.Box = 'off';
+    end
+end
+
+for i = 1:ncond
+    axNew = nexttile(tlResid);
+    copyobj(allchild(dataVSPaxes(i)), axNew);
+    axNew.XLim = dataVSPaxes(i).XLim;
+    axNew.YLim = dataVSPaxes(i).YLim;
+    axNew.CLim = dataVSPaxes(i).CLim;
+    colormap(axNew, RedWhiteBlue);
+    nSpatial_i2 = round(dataVSPaxes(i).YLim(2));
+    axNew.Title.String = sprintf('%s (n=%d)', condTitles{i}, nSpatial_i2);
+    set(axNew, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
+    set(axNew, 'YTick', [], 'YTickLabel', []);
+    box(axNew,'off'); set(axNew,'TickDir','out');
+    if i == 1, ylabel(axNew, 'DATA - VSP'); end
+    if i == ncond
+        cb = colorbar(axNew);
+        cb.TickDirection = 'out';
+        cb.Box = 'off';
+    end
+end
+
+sgtitle(tlResid, 'Spatially selective cells: spatial kernel & model residuals');
+
+
+saveFigureFormats(figAllCells,    fullfile(outputDirFig2, 'VS_VSP_resp_Shake\VS_VSP_resp_snake_base_omit2'));
+saveFigureFormats(figSpatialCells, fullfile(outputDirFig2, 'VS_VSP_resp_Shake\VS_VSP_resp_snake_base_omit2'));
+saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'Kernel_Residuals_Snake\Kernel_Residuals_Snake_base_omit2'));
+
+%% save example fits 
+close all; 
+plotFinalFigures_Sonali(EXP_all, 'Resp-singleCellV2-base-omit2', {'M26004_20260318_cell#50', 'M26004_20260318_cell#289', 'M26004_20260318_cell#51', 'M26004_20260318_cell#17','M26004_20260318_cell#2'})
+FigResoSingleCells = gca;
+FigResoSingleCells = ancestor(FigResoSingleCells, 'figure');
+% defaultAxesProperties(gca, 1);
+saveFigureFormats(FigResoSingleCells, fullfile(outputDirFig2, 'VS_VSP_Data_examplefits\VS_VSP_Data_examplefits_allconditions'));
 
 %% make select examples to plot with the completesnake fig 
-
 T = plotFinalFigures_Sonali(EXP_all, 'LLHi-w/oSpace');
 
 % Pick the "spatial" example cell: spatially selective, strongest LLHrel
@@ -418,11 +618,115 @@ plotVisualFeatures_omittedbackground
 %% check for omit cells
 plotFinalFigures_Sonali(EXP_rsp, 'OmitCells-summary')
 
-%% look up cells
-plotFinalFigures_Sonali(EXP_all, 'CellCategory-table');   % builds + saves the table
-lookupCell([], 'M25131_20260318_cell#5');             % query one cell
-T = CellCategoryTable;
-T(T.IsSpatial & T.Animal==4, :)    
+%% create csv with all cells 
+
+%% find count per conditons across all sessions incldued in model fitting 
+
+
+
+expt = [];
+n = 0;
+n = n + 1;
+expt(n).animal = 'M25126';
+expt(n).group = 'V1';
+expt(n).BGtex = 'BG12';
+expt(n).series = {20260311, 20260312, 20260313};
+n = n + 1;
+expt(n).animal = 'M25131';
+expt(n).group = 'V1';
+expt(n).BGtex = 'BG12';
+expt(n).series = {20260318, 20260321, 20260322};
+n = n + 1;
+expt(n).animal = 'M26004';
+expt(n).group = 'V1';
+expt(n).BGtex = 'BG12';
+expt(n).series = {20260318, 20260321, 20260322};
+n = n + 1;
+expt(n).animal = 'M26005';
+expt(n).group = 'V1';
+expt(n).BGtex = 'BG12';
+expt(n).series = {20260318, 20260321, 20260322};
+
+
+baseDir = 'C:\Users\sonali.sriranga\Desktop\V1\analyzed';
+
+nSessions = sum(cellfun(@numel, {expt.series}));
+condTrialCounts_perSession = nan(nSessions, 6);  % rows = sessions, cols = conditions
+sessionsFound = 0;
+sessionsMissing = {};
+
+for a = 1:numel(expt)
+    animal = expt(a).animal;
+    for s = 1:numel(expt(a).series)
+        seriesID = expt(a).series{s};
+        sessionDir = fullfile(baseDir, animal, num2str(seriesID));
+
+        d = dir(fullfile(sessionDir, 'SpkLin_EXP_*.mat'));
+
+        if isempty(d)
+            sessionsMissing{end+1} = sessionDir; %#ok<SAGROW>
+            fprintf('MISSING (no matching file): %s\n', sessionDir);
+            continue;
+        end
+
+        fpath = fullfile(d(1).folder, d(1).name);
+        S = load(fpath, 'Nav');
+
+        sessionsFound = sessionsFound + 1;
+        for c = 1:6
+            mask = S.Nav.condition == c;
+            condTrialCounts_perSession(sessionsFound, c) = numel(unique(S.Nav.trialID(mask)));
+        end
+    end
+end
+
+condNames_report = {'base','swap23','swap34','omit2','omit3','omit4'};
+fprintf('\n--- Per-condition trial counts (mean +/- SD across %d sessions) ---\n', sessionsFound);
+for c = 1:6
+    m = mean(condTrialCounts_perSession(1:sessionsFound, c), 'omitnan');
+    sdv = std(condTrialCounts_perSession(1:sessionsFound, c), 'omitnan');
+    tot = sum(condTrialCounts_perSession(1:sessionsFound, c), 'omitnan');
+    fprintf('%s: %.1f +/- %.1f trials/session (pooled total: %d)\n', condNames_report{c}, m, sdv, tot);
+end
+
+% as these two were only presentred to three of the 4 mice
+for c = [3 6]  % swap34, omit4
+    vals = condTrialCounts_perSession(1:sessionsFound, c);
+    vals_present = vals(vals > 0);   % exclude sessions/mice that didn't get this condition
+    fprintf('Condition %d: %.1f +/- %.1f trials/session (n sessions = %d, pooled total = %d)\n', ...
+        c, mean(vals_present), std(vals_present), numel(vals_present), sum(vals_present));
+end
+
+
+% sum manipulated-condition trial counts (columns 2-6) per session, then
+% take mean/SD across sessions - this matches base's ± convention (SD
+% across sessions), not SD across condition-means
+manipTotal_perSession = sum(condTrialCounts_perSession(1:sessionsFound, 2:6), 2, 'omitnan');
+fprintf('Manipulated conditions combined: %.1f +/- %.1f trials/session (N=%d sessions)\n', ...
+    mean(manipTotal_perSession), std(manipTotal_perSession), sessionsFound);
+
+
+%%
+baseDir = 'C:\Users\sonali.sriranga\Desktop\V1\analyzed';
+
+fprintf('%-10s %-12s %-10s\n', 'Animal', 'Series', 'nCells');
+for a = 1:numel(expt)
+    animal = expt(a).animal;
+    for s = 1:numel(expt(a).series)
+        seriesID = expt(a).series{s};
+        sessionDir = fullfile(baseDir, animal, num2str(seriesID));
+        d = dir(fullfile(sessionDir, 'SpkLin_EXP_*.mat'));
+        if isempty(d)
+            fprintf('%-10s %-12d %-10s\n', animal, seriesID, 'MISSING');
+            continue;
+        end
+        fpath = fullfile(d(1).folder, d(1).name);
+        S = load(fpath, 'Spk');
+        nCells = numel(S.Spk.CellListString);
+        fprintf('%-10s %-12d %-10d\n', animal, seriesID, nCells);
+    end
+end
+
 %% pca and cluserting test 
 % shows Landmarks + BG + Data (measured response), all THREE panels,
 %    ordered by Landmarks (the first tag) - NOT forced to Space
