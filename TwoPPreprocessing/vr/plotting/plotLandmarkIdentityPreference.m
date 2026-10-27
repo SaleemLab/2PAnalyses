@@ -1,228 +1,3 @@
-% function plotSMI_LandmarkIdentityPreference_Both(RSPData, VISpData)
-%     excludeStart = 30; 
-%     excludeEnd = 30;
-%     
-%     landmarkCentres = [40, 80, 120, 160];
-%     gratingLandmarks = [40, 120];
-%     plaidLandmarks   = [80, 160];
-%     tolerance = 15; 
-%     
-%     pooledSMI_RSP_Grating = [];
-%     pooledSMI_RSP_Plaid   = [];
-%     countRSP_Grating = 0;
-%     countRSP_Plaid   = 0;
-%     
-%     fprintf('Processing RSP Landmark Preferences...\n');
-%     for s = 1:length(RSPData)
-%         sess = RSPData(s);
-%         if ~isfield(sess, 'ConditionData') || ~isfield(sess.ConditionData, 'Baseline') || ...
-%            ~isfield(sess, 'FilteredROIs') || isempty(sess.FilteredROIs)
-%             continue;
-%         end
-%         
-%         lapActivity = sess.ConditionData.Baseline.LapActivity;
-%         [~, ~, nBins] = size(lapActivity);
-%         validLapRange = (excludeStart + 1) : (nBins - excludeEnd);
-%         
-%         meanOdd = squeeze(mean(lapActivity(:, 1:2:end, :), 2, 'omitnan'));
-%         smiValues = sess.SMI.SMI;
-%         
-%         for i = 1:length(sess.FilteredROIs)
-%             roiIdx = sess.FilteredROIs(i);
-%             smiVal = smiValues(roiIdx);
-%             if isnan(smiVal); continue; end
-%             
-%             roiTrace = meanOdd(roiIdx, :);
-%             [pks, locs] = findpeaks(roiTrace);
-%             validMask = ismember(locs, validLapRange);
-%             validPks = pks(validMask); validLocs = locs(validMask);
-%             
-%             if ~isempty(validLocs)
-%                 [~, maxPeakIdx] = max(validPks);
-%                 prefBin = validLocs(maxPeakIdx);
-%             else
-%                 [~, maxRelIdx] = max(roiTrace(validLapRange));
-%                 prefBin = validLapRange(maxRelIdx);
-%             end
-%             
-%             [minDist, closestLandmarkIdx] = min(abs(landmarkCentres - prefBin));
-%             
-%             if minDist <= tolerance
-%                 targetLandmark = landmarkCentres(closestLandmarkIdx);
-%                 
-%                 if ismember(targetLandmark, gratingLandmarks)
-%                     countRSP_Grating = countRSP_Grating + 1;
-%                     pooledSMI_RSP_Grating = [pooledSMI_RSP_Grating; smiVal];
-%                 elseif ismember(targetLandmark, plaidLandmarks)
-%                     countRSP_Plaid = countRSP_Plaid + 1;
-%                     pooledSMI_RSP_Plaid = [pooledSMI_RSP_Plaid; smiVal];
-%                 end
-%             end
-%         end
-%     end
-%     
-%     pooledSMI_VISp_Grating = [];
-%     pooledSMI_VISp_Plaid   = [];
-%     countVISp_Grating = 0;
-%     countVISp_Plaid   = 0;
-%     
-%     fprintf('Processing VISp Landmark Preferences...\n');
-%     for s = 1:length(VISpData)
-%         sess = VISpData(s);
-%         if ~isfield(sess, 'ConditionData') || ~isfield(sess.ConditionData, 'Baseline') || ...
-%            ~isfield(sess, 'FilteredROIs') || isempty(sess.FilteredROIs)
-%             continue;
-%         end
-%         
-%         lapActivity = sess.ConditionData.Baseline.LapActivity;
-%         [~, ~, nBins] = size(lapActivity);
-%         validLapRange = (excludeStart + 1) : (nBins - excludeEnd);
-%         
-%         meanOdd = squeeze(mean(lapActivity(:, 1:2:end, :), 2, 'omitnan'));
-%         smiValues = sess.SMI.SMI;
-%         
-%         for i = 1:length(sess.FilteredROIs)
-%             roiIdx = sess.FilteredROIs(i);
-%             smiVal = smiValues(roiIdx);
-%             if isnan(smiVal); continue; end
-%             
-%             roiTrace = meanOdd(roiIdx, :);
-%             [pks, locs] = findpeaks(roiTrace);
-%             validMask = ismember(locs, validLapRange);
-%             validPks = pks(validMask); validLocs = locs(validMask);
-%             
-%             if ~isempty(validLocs)
-%                 [~, maxPeakIdx] = max(validPks);
-%                 prefBin = validLocs(maxPeakIdx);
-%             else
-%                 [~, maxRelIdx] = max(roiTrace(validLapRange));
-%                 prefBin = validLapRange(maxRelIdx);
-%             end
-%             
-%             [minDist, closestLandmarkIdx] = min(abs(landmarkCentres - prefBin));
-%             
-%             if minDist <= tolerance
-%                 targetLandmark = landmarkCentres(closestLandmarkIdx);
-%                 
-%                 if ismember(targetLandmark, gratingLandmarks)
-%                     countVISp_Grating = countVISp_Grating + 1;
-%                     pooledSMI_VISp_Grating = [pooledSMI_VISp_Grating; smiVal];
-%                 elseif ismember(targetLandmark, plaidLandmarks)
-%                     countVISp_Plaid = countVISp_Plaid + 1;
-%                     pooledSMI_VISp_Plaid = [pooledSMI_VISp_Plaid; smiVal];
-%                 end
-%             end
-%         end
-%     end
-%     
-%     totalRSP = countRSP_Grating + countRSP_Plaid;
-%     pctRSP_Grating = (countRSP_Grating / totalRSP) * 100;
-%     pctRSP_Plaid   = (countRSP_Plaid / totalRSP) * 100;
-%     [pValRSP] = ranksum(pooledSMI_RSP_Grating, pooledSMI_RSP_Plaid);
-%     
-%     totalVISp = countVISp_Grating + countVISp_Plaid;
-%     pctVISp_Grating = (countVISp_Grating / totalVISp) * 100;
-%     pctVISp_Plaid   = (countVISp_Plaid / totalVISp) * 100;
-%     [pValVISp] = ranksum(pooledSMI_VISp_Grating, pooledSMI_VISp_Plaid);
-%     
-%     figHandle = figure('Name', 'Landmark Identity Preference: RSP vs VISp', ...
-%                        'Color', [1 1 1], 'Position', [150, 150, 600, 550]);
-%                    
-%     % RSP BAR CHART
-%     subplot(2, 2, 1); hold on;
-%     grid off;
-%     b1 = bar([pctRSP_Grating, pctRSP_Plaid], 'FaceColor', 'flat', 'EdgeColor', 'none', 'BarWidth', 0.5);
-%     b1.CData(1,:) = [0.15 0.15 0.15]; 
-%     b1.CData(2,:) = [0.60 0.60 0.60]; 
-%     
-%     set(gca, 'Box', 'off', 'Visible', 'off'); 
-%     xlim([0.5, 2.5]); ylim([0, 100]); axis square;
-%     
-%     plot([0.4, 0.4], [0, 100], 'k', 'LineWidth', 0.5, 'Clipping', 'off'); 
-%     
-%     for yTick = 0:20:100
-%         plot([0.33, 0.4], [yTick, yTick], 'k', 'LineWidth', 0.5, 'Clipping', 'off');
-%         text(0.23, yTick, num2str(yTick), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
-%     end
-%     
-%     text(1, -8, 'Grating', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
-%     text(2, -8, 'Plaid', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
-%     
-%     text(-0.05, 50, '% of selective ROIs', 'Rotation', 90, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom');
-%     title(sprintf('RSP Preferred Feature\n(n = %d)', totalRSP));
-%     if exist('offsetAxes(gca);', 'file') == 2; offsetAxes(gca); end
-%     
-%     % RSP CDF CHART
-%     subplot(2, 2, 2); hold on;
-%     grid off;
-%     [fRG, xRG] = ecdf(pooledSMI_RSP_Grating);
-%     [fRP, xRP] = ecdf(pooledSMI_RSP_Plaid);
-%     plot(xRG, fRG, 'LineWidth', 1.5, 'Color', [0.15 0.15 0.15], 'DisplayName', sprintf('Grating (n=%d)', length(pooledSMI_RSP_Grating)));
-%     plot(xRP, fRP, 'LineWidth', 1.5, 'Color', [0.60 0.60 0.60], 'DisplayName', sprintf('Plaid (n=%d)', length(pooledSMI_RSP_Plaid)));
-%     xline(0, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.8, 'HandleVisibility', 'off');
-%     yline(0.5, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.8, 'HandleVisibility', 'off');
-%     xlabel('Spatial modulation index'); ylabel('Cumulative probability');
-%     title(sprintf('RSP Modulation \n(p = %.4e)', pValRSP));
-%     xlim([-1.1, 1.1]); ylim([0, 1.02]); 
-%     box off;
-%     axis square;
-%     defaultAxesProperties(gca);
-%     offsetAxes(gca);
-%     
-%     % VISp SOMAS BAR CHART
-%     subplot(2, 2, 3); hold on;
-%     grid off;
-%     b2 = bar([pctVISp_Grating, pctVISp_Plaid], 'FaceColor', 'flat', 'EdgeColor', 'none', 'BarWidth', 0.5);
-%     b2.CData(1,:) = [0.15 0.15 0.15]; 
-%     b2.CData(2,:) = [0.60 0.60 0.60]; 
-%     
-%     set(gca, 'Box', 'off', 'Visible', 'off'); 
-%     xlim([0.5, 2.5]); ylim([0, 100]); axis square;
-%     
-%     plot([0.4, 0.4], [0, 100], 'k', 'LineWidth', 0.5, 'Clipping', 'off'); 
-%     
-%     for yTick = 0:20:100
-%         plot([0.33, 0.4], [yTick, yTick], 'k', 'LineWidth', 0.5, 'Clipping', 'off');
-%         text(0.23, yTick, num2str(yTick), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'middle');
-%     end
-%     
-%     text(1, -8, 'Grating', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
-%     text(2, -8, 'Plaid', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'top');
-%     
-%     text(-0.05, 50, '% of selective ROIs', 'Rotation', 90, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom');
-%     title(sprintf('VISp Preferred Feature\n(n = %d)', totalVISp));
-%     if exist('offsetAxes(gca);', 'file') == 2; offsetAxes(gca); end
-%     
-%     % VISp SOMAS CDF CHART
-%     subplot(2, 2, 4); hold on;
-%     grid off;
-%     [fVG, xVG] = ecdf(pooledSMI_VISp_Grating);
-%     [fVP, xVP] = ecdf(pooledSMI_VISp_Plaid);
-%     plot(xVG, fVG, 'LineWidth', 1.5, 'Color', [0.15 0.15 0.15], 'DisplayName', sprintf('Grating (n=%d)', length(pooledSMI_VISp_Grating)));
-%     plot(xVP, fVP, 'LineWidth', 1.5, 'Color', [0.60 0.60 0.60], 'DisplayName', sprintf('Plaid (n=%d)', length(pooledSMI_VISp_Plaid)));
-%     xline(0, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.8, 'HandleVisibility', 'off');
-%     yline(0.5, '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.8, 'HandleVisibility', 'off');
-%     xlabel('Spatial modulation index'); ylabel('Cumulative probability');
-%     title(sprintf('VISp Modulation \n(p = %.4e)', pValVISp));
-%     xlim([-1.1, 1.1]); ylim([0, 1.02]);
-%     box off;
-%     axis square;
-%     defaultAxesProperties(gca);
-%     offsetAxes(gca);
-%     
-%     outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1\RSPVsVISp\';
-%     if ~exist(outputDir, 'dir')
-%         mkdir(outputDir);
-%     end
-%     
-%     baseFileName = 'landmark_identity_preference_both_regions';
-%     fullSavePath = fullfile(outputDir, baseFileName);
-%     
-%     saveFigureFormats(figHandle, fullSavePath);
-%     fprintf('Landmark identity preference analysis completed and plots saved for both regions.\n');
-% end
-
-
 function plotLandmarkIdentityPreference(RSPData, VISpData)
     
     landmarkCentres  = [40, 80, 120, 160];
@@ -233,41 +8,67 @@ function plotLandmarkIdentityPreference(RSPData, VISpData)
     
     % --- Extract Pure Quantitative Arrays ---
     fprintf('Extracting RSP population profiles...\n');
-    [rspSI, rspPeaks] = extractSplitMetrics(RSPData, ...
+    [rspSI, rspPeaks, rspSessionID] = extractSplitMetrics(RSPData, ...
         landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius);
         
     fprintf('Extracting VISp population profiles...\n');
-    [vispSI, vispPeaks] = extractSplitMetrics(VISpData, ...
+    [vispSI, vispPeaks, vispSessionID] = extractSplitMetrics(VISpData, ...
         landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius);
     
     if isempty(rspSI) || isempty(vispSI)
         error('Data extraction returned 0 cells. Check track coordinates or field names.');
     end
     
-    rspG  = sum(ismember(rspPeaks,  gratingLandmarks)) / length(rspPeaks)  * 100;
-    rspP  = sum(ismember(rspPeaks,  plaidLandmarks))   / length(rspPeaks)  * 100;
-    vispG = sum(ismember(vispPeaks, gratingLandmarks)) / length(vispPeaks) * 100;
-    vispP = sum(ismember(vispPeaks, plaidLandmarks))   / length(vispPeaks) * 100;
-    
-    barData = [rspG, vispG; rspP, vispP];
-    p_Bars   = ranksum(rspPeaks, vispPeaks);
     p_Curves = ranksum(rspSI, vispSI);
 
-    % Within-region: does RSP significantly prefer grating over plaid?
-    rspGCount  = sum(ismember(rspPeaks, gratingLandmarks));
-    rspPCount  = sum(ismember(rspPeaks, plaidLandmarks));
-    p_RSP_G_vs_P = chi2GoodnessOfFit5050(rspGCount, rspPCount);
+    % median and median absolute deviation (MAD) of each SI distribution
+    median_rspSI  = median(rspSI);
+    median_vispSI = median(vispSI);
+    mad_rspSI     = mad(rspSI, 1);
+    mad_vispSI    = mad(vispSI, 1);
+    
+    % --- Per-session grating/plaid percentages, for the scatter + mean +/- SD bars ---
+    rspSession  = computeLandmarkSessionStats(rspPeaks,  rspSessionID,  gratingLandmarks, plaidLandmarks);
+    vispSession = computeLandmarkSessionStats(vispPeaks, vispSessionID, gratingLandmarks, plaidLandmarks);
+    
+    rspMeanG  = mean(rspSession.pctGrating);
+    rspMeanP  = mean(rspSession.pctPlaid);
+    vispMeanG = mean(vispSession.pctGrating);
+    vispMeanP = mean(vispSession.pctPlaid);
+    
+    rspSDG  = std(rspSession.pctGrating);
+    rspSDP  = std(rspSession.pctPlaid);
+    vispSDG = std(vispSession.pctGrating);
+    vispSDP = std(vispSession.pctPlaid);
+    
+    % CHANGED: consistent, session-level statistics for all four bar-to-bar
+    % comparisons.
+    % Within-region comparisons (RSP-G vs RSP-P, VISp-G vs VISp-P) are
+    % PAIRED, since the grating and plaid percentages for a given session
+    % come from the same session and are not independent (they sum to
+    % ~100%), so Wilcoxon signed-rank (signrank) is used, not chi-square
+    % on pooled cells, which would incorrectly treat all cells as
+    % independent and inflate the effective sample size.
+    p_RSP_G_vs_P  = signrank(rspSession.pctGrating,  rspSession.pctPlaid);
+    p_VISp_G_vs_P = signrank(vispSession.pctGrating, vispSession.pctPlaid);
+    
+    % Cross-region comparisons (RSP-G vs VISp-G, RSP-P vs VISp-P) are
+    % UNPAIRED, since RSP and VISp sessions are independent (different
+    % mice/sessions), so Wilcoxon rank-sum (ranksum) is used.
+    p_Grating_RSPvsVISp = ranksum(rspSession.pctGrating, vispSession.pctGrating);
+    p_Plaid_RSPvsVISp   = ranksum(rspSession.pctPlaid,   vispSession.pctPlaid);
 
-    % Within-region: does VISp significantly prefer plaid over grating?
-    vispGCount = sum(ismember(vispPeaks, gratingLandmarks));
-    vispPCount = sum(ismember(vispPeaks, plaidLandmarks));
-    p_VISp_G_vs_P = chi2GoodnessOfFit5050(vispGCount, vispPCount);
-
-    fprintf('\n=== Within-Region Grating vs Plaid Preference ===\n');
-    fprintf('RSP:  Grating n=%d (%.1f%%)  Plaid n=%d (%.1f%%)  p = %.3e\n', ...
-        rspGCount, rspG, rspPCount, rspP, p_RSP_G_vs_P);
-    fprintf('VISp: Grating n=%d (%.1f%%)  Plaid n=%d (%.1f%%)  p = %.3e\n', ...
-        vispGCount, vispG, vispPCount, vispP, p_VISp_G_vs_P);
+    fprintf('\n=== Landmark Identity Preference: Session-Level Statistics ===\n');
+    fprintf('RSP:  Grating %.1f +/- %.1f%% (SD)  Plaid %.1f +/- %.1f%% (SD)  [n=%d sessions]  signrank p = %.3e\n', ...
+        rspMeanG, rspSDG, rspMeanP, rspSDP, length(rspSession.pctGrating), p_RSP_G_vs_P);
+    fprintf('VISp: Grating %.1f +/- %.1f%% (SD)  Plaid %.1f +/- %.1f%% (SD)  [n=%d sessions]  signrank p = %.3e\n', ...
+        vispMeanG, vispSDG, vispMeanP, vispSDP, length(vispSession.pctGrating), p_VISp_G_vs_P);
+    fprintf('Cross-region: Grating RSP vs VISp ranksum p = %.3e | Plaid RSP vs VISp ranksum p = %.3e\n', ...
+        p_Grating_RSPvsVISp, p_Plaid_RSPvsVISp);
+    fprintf('SI: RSP median = %.3f +/- %.3f MAD, VISp median = %.3f +/- %.3f MAD\n', ...
+        median_rspSI, mad_rspSI, median_vispSI, mad_vispSI);
+    
+    barData = [rspMeanG, vispMeanG; rspMeanP, vispMeanP];
     
     %% Plotting
     fig = figure('Color', 'w', 'Position', [100 100 850 420]);
@@ -278,11 +79,56 @@ function plotLandmarkIdentityPreference(RSPData, VISpData)
     b(1).FaceColor = 'k';
     b(2).FaceColor = [0.6 0.6 0.6];
     
+    jitterWidth = 0.12;
+    scatterFaceAlpha = 0.6;
+    
+    rspX_G   = b(1).XEndPoints(1) + (rand(size(rspSession.pctGrating))  - 0.5) * jitterWidth;
+    rspX_P   = b(1).XEndPoints(2) + (rand(size(rspSession.pctPlaid))    - 0.5) * jitterWidth;
+    vispX_G  = b(2).XEndPoints(1) + (rand(size(vispSession.pctGrating)) - 0.5) * jitterWidth;
+    vispX_P  = b(2).XEndPoints(2) + (rand(size(vispSession.pctPlaid))   - 0.5) * jitterWidth;
+    
+    scatter(rspX_G,  rspSession.pctGrating,  28, 'k', 'filled', ...
+        'MarkerFaceAlpha', scatterFaceAlpha, 'MarkerEdgeColor', 'w', 'LineWidth', 0.5, 'HandleVisibility', 'off');
+    scatter(rspX_P,  rspSession.pctPlaid,    28, 'k', 'filled', ...
+        'MarkerFaceAlpha', scatterFaceAlpha, 'MarkerEdgeColor', 'w', 'LineWidth', 0.5, 'HandleVisibility', 'off');
+    scatter(vispX_G, vispSession.pctGrating, 28, [0.6 0.6 0.6], 'filled', ...
+        'MarkerFaceAlpha', scatterFaceAlpha, 'MarkerEdgeColor', 'w', 'LineWidth', 0.5, 'HandleVisibility', 'off');
+    scatter(vispX_P, vispSession.pctPlaid,   28, [0.6 0.6 0.6], 'filled', ...
+        'MarkerFaceAlpha', scatterFaceAlpha, 'MarkerEdgeColor', 'w', 'LineWidth', 0.5, 'HandleVisibility', 'off');
+    
+    errorbar([b(1).XEndPoints(1), b(1).XEndPoints(2)], ...
+             [rspMeanG, rspMeanP], ...
+             [rspSDG, rspSDP], ...
+             'LineStyle', 'none', 'Color', 'k', 'LineWidth', 1.2, 'CapSize', 8, 'HandleVisibility', 'off');
+    errorbar([b(2).XEndPoints(1), b(2).XEndPoints(2)], ...
+             [vispMeanG, vispMeanP], ...
+             [vispSDG, vispSDP], ...
+             'LineStyle', 'none', 'Color', [0.3 0.3 0.3], 'LineWidth', 1.2, 'CapSize', 8, 'HandleVisibility', 'off');
+    
+    % CHANGED: significance brackets for the four bar-to-bar comparisons.
+    % Heights are stacked upward from the tallest error bar so they don't
+    % overlap; adjust stepHeight if your ylim changes.
+    topOfBars = max([rspMeanG+rspSDG, rspMeanP+rspSDP, vispMeanG+vispSDG, vispMeanP+vispSDP]);
+    stepHeight = 6;
+    
+    y1 = topOfBars + stepHeight;        % within-region RSP
+    y2 = topOfBars + stepHeight;        % within-region VISp
+    y3 = topOfBars + stepHeight * 2.2;  % cross-region grating
+    y4 = topOfBars + stepHeight * 3.4;  % cross-region plaid
+    
+    drawSigBracket(b(1).XEndPoints(1), b(1).XEndPoints(2), y1, p_RSP_G_vs_P, 'k');
+    drawSigBracket(b(2).XEndPoints(1), b(2).XEndPoints(2), y2, p_VISp_G_vs_P, [0.4 0.4 0.4]);
+    drawSigBracket(b(1).XEndPoints(1), b(2).XEndPoints(1), y3, p_Grating_RSPvsVISp, [0.2 0.2 0.2]);
+    drawSigBracket(b(1).XEndPoints(2), b(2).XEndPoints(2), y4, p_Plaid_RSPvsVISp, [0.2 0.2 0.2]);
+    
     set(gca, 'Box', 'off', 'XTick', 1:2, 'XTickLabel', {'Prefers Grating', 'Prefers Plaid'}, ...
              'FontName', 'Arial', 'FontSize', 11);
-    ylabel('% of Landmark Population', 'FontName', 'Arial', 'FontSize', 12);
-    title(sprintf('Landmark Absolute Peak Allocation\nPopulation Shift p = %.3e\nRSP G vs P p = %.3e | VISp G vs P p = %.3e', ...
-        p_Bars, p_RSP_G_vs_P, p_VISp_G_vs_P), 'FontWeight', 'normal');
+    ylabel('% of Landmark Population (mean +/- SD, dots = sessions)', 'FontName', 'Arial', 'FontSize', 12);
+    ylim([0, y4 + stepHeight*1.5]);
+    title('Landmark Absolute Peak Allocation', 'FontWeight', 'normal');
+    legend(b, {sprintf('RSP (n=%d sessions)', length(rspSession.pctGrating)), ...
+               sprintf('VISp (n=%d sessions)', length(vispSession.pctGrating))}, ...
+        'Location', 'southoutside', 'Box', 'off', 'FontName', 'Arial');
     axis square; box off;
     if exist('defaultAxesProperties', 'file') == 2, defaultAxesProperties(gca); end
     if exist('offsetAxes', 'file') == 2, offsetAxes(gca); end
@@ -299,6 +145,11 @@ function plotLandmarkIdentityPreference(RSPData, VISpData)
     
     maxHeight = max([h1.Values, h2.Values]);
     
+    plot(median_rspSI, maxHeight * 0.03, 'x', 'Color', 'k', ...
+        'MarkerSize', 10, 'LineWidth', 2, 'HandleVisibility', 'off');
+    plot(median_vispSI, maxHeight * 0.03, 'x', 'Color', [0.6 0.6 0.6], ...
+        'MarkerSize', 10, 'LineWidth', 2, 'HandleVisibility', 'off');
+    
     text(0.02, maxHeight * 0.80, '\leftarrow Less Selective', 'HorizontalAlignment', 'left', ...
         'FontName', 'Arial', 'Color', [0.5 0.5 0.5], 'FontSize', 9);
     text(0.98, maxHeight * 0.80, 'More Selective \rightarrow', 'HorizontalAlignment', 'right', ...
@@ -307,8 +158,8 @@ function plotLandmarkIdentityPreference(RSPData, VISpData)
     xlim([-0.02, 1.02]); ylim([0, maxHeight * 1.15]);
     xlabel('Feature Selectivity Index (Normalized)', 'FontName', 'Arial', 'FontSize', 11);
     ylabel('Proportion of ROIs', 'FontName', 'Arial', 'FontSize', 11);
-    title(sprintf('Identity Tuning Discrimination\nSelectivity Shift p = %.3e', p_Curves), ...
-        'FontWeight', 'normal', 'FontSize', 12);
+    title(sprintf('Identity Tuning Discrimination\nSelectivity Shift p = %.3e\nRSP: %.3f +/- %.3f MAD | VISp: %.3f +/- %.3f MAD', ...
+        p_Curves, median_rspSI, mad_rspSI, median_vispSI, mad_vispSI), 'FontWeight', 'normal', 'FontSize', 12);
     
     legend([h1, h2], {sprintf('RSP (n=%d)', length(rspSI)), sprintf('VISp (n=%d)', length(vispSI))}, ...
         'Location', 'southoutside', 'Box', 'off', 'FontName', 'Arial');
@@ -318,30 +169,92 @@ function plotLandmarkIdentityPreference(RSPData, VISpData)
     if exist('offsetAxes', 'file') == 2, offsetAxes(gca); end
     
     % Save
-    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4\feature_selective_rsp_visp';
+    outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\feature_selective_rsp_visp';
     if ~exist(outputDir, 'dir'), mkdir(outputDir); end
     saveFigureFormats(fig, fullfile(outputDir, 'landmark_preference_and_selectivity'));
+
+        p_Curves = ranksum(rspSI, vispSI);
+
+    % median and median absolute deviation (MAD) of each SI distribution
+    median_rspSI  = median(rspSI);
+    median_vispSI = median(vispSI);
+    mad_rspSI     = mad(rspSI, 1);
+    mad_vispSI    = mad(vispSI, 1);
+
+    % CHANGED: percentage of cells with SI above 0.25 and above 0.5,
+    % matching the same thresholds used for the SMI summary earlier.
+    pctRSP_SI025  = (sum(rspSI > 0.25) / length(rspSI)) * 100;
+    pctRSP_SI05   = (sum(rspSI > 0.5)  / length(rspSI)) * 100;
+    pctVISp_SI025 = (sum(vispSI > 0.25) / length(vispSI)) * 100;
+    pctVISp_SI05  = (sum(vispSI > 0.5)  / length(vispSI)) * 100;
+
+        fprintf('SI: RSP median = %.3f +/- %.3f MAD, VISp median = %.3f +/- %.3f MAD\n', ...
+        median_rspSI, mad_rspSI, median_vispSI, mad_vispSI);
+    fprintf('SI thresholds: RSP %.1f%% (%d/%d) > 0.25, %.1f%% (%d/%d) > 0.5\n', ...
+        pctRSP_SI025, sum(rspSI > 0.25), length(rspSI), pctRSP_SI05, sum(rspSI > 0.5), length(rspSI));
+    fprintf('SI thresholds: VISp %.1f%% (%d/%d) > 0.25, %.1f%% (%d/%d) > 0.5\n', ...
+        pctVISp_SI025, sum(vispSI > 0.25), length(vispSI), pctVISp_SI05, sum(vispSI > 0.5), length(vispSI));
 end
 
-%% Chi-Square Goodness of Fit (50/50 split)
-function p = chi2GoodnessOfFit5050(count1, count2)
-    observed = [count1, count2];
-    total = sum(observed);
-    if total == 0, p = 1; return; end
-    expected = [total/2, total/2];
-    chi2Val = sum((observed - expected).^2 ./ expected);
-    df = 1;
-    p = 1 - chi2cdf(chi2Val, df);
+%% Draw a significance bracket with stars (or "n.s.") between two x positions
+function drawSigBracket(x1, x2, y, pVal, lineColor)
+    tickHeight = 0.8;
+    plot([x1, x1, x2, x2], [y, y+tickHeight, y+tickHeight, y], ...
+        'Color', lineColor, 'LineWidth', 1, 'HandleVisibility', 'off');
+    text(mean([x1, x2]), y + tickHeight*1.3, pToStars(pVal), ...
+        'HorizontalAlignment', 'center', 'FontSize', 12, 'FontName', 'Arial', 'Color', lineColor);
 end
 
-%%
-function [siVector, peakLocations] = extractSplitMetrics(RegionData, ...
-    landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius)
-    siVector = []; peakLocations = [];
-    w_space = gausswin(15); w_space = w_space / sum(w_space);
+
+%% cross-region grating, cross-region plaid).
+function starStr = pToStars(pVal)
+    numComparisons = 4;
+    alpha001 = 0.001 / numComparisons;
+    alpha01  = 0.01  / numComparisons;
+    alpha05  = 0.05  / numComparisons;
     
-    gratingBins = []; for g = gratingLandmarks, gratingBins = [gratingBins, (g - windowRadius):(g + windowRadius)]; end
-    plaidBins   = []; for p = plaidLandmarks,   plaidBins   = [plaidBins,   (p - windowRadius):(p + windowRadius)]; end
+    if pVal <= alpha001
+        starStr = '***';
+    elseif pVal <= alpha01
+        starStr = '**';
+    elseif pVal <= alpha05
+        starStr = '*';
+    else
+        starStr = 'n.s.';
+    end
+end
+
+%% Group pooled peak locations by session and compute per-session grating/plaid percentages
+function stats = computeLandmarkSessionStats(peakLocations, sessionID, gratingLandmarks, plaidLandmarks)
+    pctGrating = [];
+    pctPlaid   = [];
+    nCellsArr  = [];
+    
+    uniqueSessions = unique(sessionID);
+    for u = 1:length(uniqueSessions)
+        thisSess = uniqueSessions(u);
+        sessPeaks = peakLocations(sessionID == thisSess);
+        nCells = length(sessPeaks);
+        if nCells == 0, continue; end
+        
+        nG = sum(ismember(sessPeaks, gratingLandmarks));
+        nP = sum(ismember(sessPeaks, plaidLandmarks));
+        
+        pctGrating(end+1) = (nG / nCells) * 100; %#ok<AGROW>
+        pctPlaid(end+1)   = (nP / nCells) * 100; %#ok<AGROW>
+        nCellsArr(end+1)  = nCells;              %#ok<AGROW>
+    end
+    
+    stats.pctGrating = pctGrating;
+    stats.pctPlaid   = pctPlaid;
+    stats.nCells     = nCellsArr;
+end
+
+function [siVector, peakLocations, sessionID] = extractSplitMetrics(RegionData, ...
+    landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius)
+    
+    siVector = []; peakLocations = []; sessionID = [];
+    w_space = gausswin(15); w_space = w_space / sum(w_space);
     
     allowedLandmarkBins = [];
     for c = landmarkCentres
@@ -403,8 +316,26 @@ function [siVector, peakLocations] = extractSplitMetrics(RegionData, ...
             [~, closestLandmarkIdx] = min(abs(landmarkCentres - prefBin));
             primaryLandmark = landmarkCentres(closestLandmarkIdx);
             
-            actG    = mean(max(0, normTestEven(gratingBins)), 'omitnan');
-            actP    = mean(max(0, normTestEven(plaidBins)),   'omitnan');
+            numBinsThisROI = length(testTrace);
+            
+            gPeaks = nan(1, length(gratingLandmarks));
+            for gi = 1:length(gratingLandmarks)
+                thisWindow = (gratingLandmarks(gi) - windowRadius):(gratingLandmarks(gi) + windowRadius);
+                thisWindow = thisWindow(thisWindow >= 1 & thisWindow <= numBinsThisROI);
+                if isempty(thisWindow), continue; end
+                gPeaks(gi) = max(max(0, normTestEven(thisWindow)), [], 'omitnan');
+            end
+            actG = mean(gPeaks, 'omitnan');
+            
+            pPeaks = nan(1, length(plaidLandmarks));
+            for pi = 1:length(plaidLandmarks)
+                thisWindow = (plaidLandmarks(pi) - windowRadius):(plaidLandmarks(pi) + windowRadius);
+                thisWindow = thisWindow(thisWindow >= 1 & thisWindow <= numBinsThisROI);
+                if isempty(thisWindow), continue; end
+                pPeaks(pi) = max(max(0, normTestEven(thisWindow)), [], 'omitnan');
+            end
+            actP = mean(pPeaks, 'omitnan');
+            
             actPeak = max(0, normTestEven(prefBin));
             
             if ismember(primaryLandmark, gratingLandmarks)
@@ -413,14 +344,16 @@ function [siVector, peakLocations] = extractSplitMetrics(RegionData, ...
                 actAlternative = actG;
             end
             
+            if isnan(actAlternative), continue; end
+            
             if (actPeak + actAlternative) > 0
                 valSI = (actPeak - actAlternative) / (actPeak + actAlternative);
                 if ~isnan(valSI)
                     siVector      = [siVector;      max(0, min(1, valSI))];
                     peakLocations = [peakLocations; primaryLandmark];
+                    sessionID     = [sessionID;      s];
                 end
             end
         end
     end
 end
-

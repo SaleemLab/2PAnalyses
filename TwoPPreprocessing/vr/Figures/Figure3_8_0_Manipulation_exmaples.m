@@ -31,3 +31,5 @@ figA7 = plotSingleROI_ConditionStack(sfi024.sessionFileInfo, resp024, 58, 'spks'
 saveFigureFormats(figA7, fullfile(outputDir, 'swap23_magnitudehigh'));
 
 
+
+%%

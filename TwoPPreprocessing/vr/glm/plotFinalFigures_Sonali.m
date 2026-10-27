@@ -5,6 +5,7 @@ function [T] = plotFinalFigures_Sonali(EXP, figname, singlecell_IDs)
 %
 % EXAMPLE USAGE
 %   EXP_all = load('path_to_batch_file\batch_file.mat');
+%   EXP_all = load("C:\Users\sonali.sriranga\Desktop\RSP\batch\SpkLinRSP_batch_SpkLinRSP_VisSpkLinParams.mat")
 %   plotFinalFigures_Sonali(EXP_all, 'Ordered-Kernels-Space-Landmarks-BG-FullMap-all')
 %   plotFinalFigures_Sonali(EXP_all, 'Resp-snake-base-omit2-omit3')
 %   plotFinalFigures_Sonali(EXP_all, 'Resp-completeSnake')
@@ -647,6 +648,8 @@ LLH_pos = -nlogL(:, end);
 LLH_visnoOmit = -nlogL(:, iVisnoOmit);
 LLH_posnoOmit = -nlogL(:, iPosnoOmit);
 
+
+
 %% CELL SELECTION
 % ---------------------------------------------------------------------
 % goodcells: basic quality-control mask, independent of whether a cell
@@ -748,6 +751,8 @@ LLH_noomit(~spatialcells) = LLH_visnoOmit(~spatialcells);
 % significant (LR test) AND large enough to matter in practice (LLHrel_omit
 % comfortably above 1) - the "Omit"-analog of spatialcells.
 goodOmitcells = pval_omit<= 0.05 & LLHrel_omit > 1 + LLHrel_th;
+fprintf('Good omit cells: %d\n', sum(goodOmitcells));
+fprintf('Good omit cells as %% of goodcells: %.1f%%\n', 100*sum(goodOmitcells)/sum(goodcells));
 
 % output
 if nargout > 0
@@ -789,7 +794,167 @@ col_sim_pos   = [0.6 0.6 0.6];       % Spatial position (simulated overlay) -
 bg_cols = [linspace(col_BG_start(1), col_BG_end(1), nBG + 1)', ...
            linspace(col_BG_start(2), col_BG_end(2), nBG + 1)', ...
            linspace(col_BG_start(3), col_BG_end(3), nBG + 1)'];
-       
+
+%% 
+%%
+proportionSpatial = 1 - (1 ./ LLHrel);
+mean_contribution = mean(proportionSpatial(spatialcells), 'omitnan');
+% fprintf('Mean proportion of explainable response attributable to position (spatial cells): %.3f (%.1f%%), n = %d\n', ...
+%     mean_contribution, 100*mean_contribution, sum(spatialcells));
+
+% Median spatial weight (LLHrel itself, the panel c x-axis) for each group
+nonspatialcells = goodcells & ~spatialcells;
+
+median_spatial    = median(LLHrel(spatialcells),    'omitnan');
+median_nonspatial = median(LLHrel(nonspatialcells), 'omitnan');
+
+% fprintf('Median spatial weight (spatially modulated cells): %.3f, n = %d\n', ...
+%     median_spatial, sum(spatialcells));
+% fprintf('Median spatial weight (remaining cells): %.3f, n = %d\n', ...
+%     median_nonspatial, sum(nonspatialcells));
+% 
+% median_contribution = 1 - 1/median_spatial;  % = 1 - 1/1.138, directly from LLHrel median already computed
+% fprintf('Median proportion of explainable response attributable to position (spatial cells): %.3f (%.1f%%), n = %d\n', ...
+%     median_contribution, 100*median_contribution, sum(spatialcells));
+
+%% CORRELATION: LANDMARK EXCITATION/SUPPRESSION BALANCE VS SPATIAL WEIGHT
+if strcmp(figname,'LandmarkBalance-vs-SpatialWeight')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_gc  = landmark_est(goodcells,:);
+
+    exc = max(landmark_gc,[],2,'omitnan');
+    supp = -min(landmark_gc,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    weight_gc = LLHrel(goodcells);
+
+    valid = ~isnan(balance) & ~isnan(weight_gc);
+    [r, p] = corr(balance(valid), weight_gc(valid), 'type', 'Pearson');
+    fprintf('Correlation: landmark excitation/suppression balance vs spatial weight, r = %.3f, p = %.3g, n = %d\n', r, p, sum(valid));
+
+    figure;
+    scatter(balance(valid), weight_gc(valid), 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    xlabel('Landmark kernel balance (-1 = suppressive, +1 = excitatory)');
+    ylabel('Spatial weight (LLH_{rel})');
+    title('Landmark excitation/suppression balance vs spatial weight');
+    box off; set(gca,'TickDir','out');
+end
+
+%% COMBINED: peak-based and area-based landmark balance, correlated with
+% spatial weight, computed separately for spatial and non-spatial cells.
+if strcmp(figname,'LandmarkBalance-Combined-SpatialWeight')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_gc  = landmark_est(goodcells,:);
+    weight_gc    = LLHrel(goodcells);
+    spatial_gc   = spatialcells(goodcells);   % logical mask, aligned to goodcells rows
+
+    % --- Peak-based balance (existing metric) ---
+    exc_peak  = max(landmark_gc,[],2,'omitnan');
+    supp_peak = -min(landmark_gc,[],2,'omitnan');
+    balance_peak = (exc_peak - supp_peak) ./ (exc_peak + supp_peak);
+
+    % --- Area-based balance (robustness check) ---
+    exc_area  = sum(max(landmark_gc,0), 2, 'omitnan');
+    supp_area = sum(max(-landmark_gc,0), 2, 'omitnan');
+    balance_area = (exc_area - supp_area) ./ (exc_area + supp_area);
+
+    % --- Correlations, split by spatial vs non-spatial ---
+    for metricName = {'peak','area'}
+        if strcmp(metricName{1}, 'peak')
+            bal = balance_peak;
+        else
+            bal = balance_area;
+        end
+
+        valid_sp = ~isnan(bal) & ~isnan(weight_gc) & spatial_gc;
+        valid_ns = ~isnan(bal) & ~isnan(weight_gc) & ~spatial_gc;
+
+        [r_sp, p_sp] = corr(bal(valid_sp), weight_gc(valid_sp), 'type', 'Spearman');
+        [r_ns, p_ns] = corr(bal(valid_ns), weight_gc(valid_ns), 'type', 'Spearman');
+
+        fprintf('[%s-based balance] Spatial cells: Spearman r = %.3f, p = %.3g, n = %d\n', ...
+            metricName{1}, r_sp, p_sp, sum(valid_sp));
+        fprintf('[%s-based balance] Non-spatial cells: Spearman r = %.3f, p = %.3g, n = %d\n', ...
+            metricName{1}, r_ns, p_ns, sum(valid_ns));
+    end
+
+    % --- Plot: 2x2, peak/area (rows) x spatial/non-spatial (cols) ---
+    figure;
+    subplot(2,2,1); scatter(balance_peak(spatial_gc), weight_gc(spatial_gc), 10, 'filled', 'MarkerFaceAlpha',0.3);
+    xlabel('Peak-based balance'); ylabel('Spatial weight'); title('Spatial cells'); box off; set(gca,'TickDir','out'); axis square;
+
+    subplot(2,2,2); scatter(balance_peak(~spatial_gc), weight_gc(~spatial_gc), 10, 'filled', 'MarkerFaceAlpha',0.3);
+    xlabel('Peak-based balance'); ylabel('Spatial weight'); title('Non-spatial cells'); box off; set(gca,'TickDir','out'); axis square;
+
+    subplot(2,2,3); scatter(balance_area(spatial_gc), weight_gc(spatial_gc), 10, 'filled', 'MarkerFaceAlpha',0.3);
+    xlabel('Area-based balance'); ylabel('Spatial weight'); box off; set(gca,'TickDir','out'); axis square;
+
+    subplot(2,2,4); scatter(balance_area(~spatial_gc), weight_gc(~spatial_gc), 10, 'filled', 'MarkerFaceAlpha',0.3);
+    xlabel('Area-based balance'); ylabel('Spatial weight'); box off; set(gca,'TickDir','out'); axis square;
+
+    sgtitle('Landmark balance (peak vs area) vs spatial weight, spatial vs non-spatial cells');
+end
+
+%% THREE-GROUP COMPARISON: pure excitatory vs pure suppressive vs mixed
+% landmark balance, spatial weight comparison
+if strcmp(figname,'LandmarkBalance-Groups-SpatialWeight')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_sp  = landmark_est(spatialcells,:);
+
+    exc = max(landmark_sp,[],2,'omitnan');
+    supp = -min(landmark_sp,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+    weight_sp = LLHrel(spatialcells);
+
+    group_exc  = balance == 1;
+    group_supp = balance == -1;
+    group_mix  = abs(balance) < 1;
+
+    fprintf('Purely excitatory: n = %d, median spatial weight = %.3f\n', ...
+        sum(group_exc), median(weight_sp(group_exc),'omitnan'));
+    fprintf('Purely suppressive: n = %d, median spatial weight = %.3f\n', ...
+        sum(group_supp), median(weight_sp(group_supp),'omitnan'));
+    fprintf('Mixed: n = %d, median spatial weight = %.3f\n', ...
+        sum(group_mix), median(weight_sp(group_mix),'omitnan'));
+
+    groupLabels = nan(size(balance));
+    groupLabels(group_exc) = 1;
+    groupLabels(group_supp) = 2;
+    groupLabels(group_mix) = 3;
+
+    valid = ~isnan(groupLabels) & ~isnan(weight_sp);
+    [p_kw, tbl, stats] = kruskalwallis(weight_sp(valid), groupLabels(valid), 'off');
+    fprintf('Kruskal-Wallis test across 3 groups: p = %.3g\n', p_kw);
+
+    figure;
+    boxplot(weight_sp(valid), groupLabels(valid), 'Labels', {'Excitatory','Suppressive','Mixed'});
+    ylabel('Spatial weight (LLH_{rel})');
+    title('Spatial weight by landmark balance group');
+    box off; set(gca,'TickDir','out');
+end
+%% LLHREL VS RF POSITION, SPATIALLY MODULATED CELLS ONLY (DISCRETE)
+if strcmp(figname,'LLHrel-RFposition-spatial-discrete')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    RFvals = [35 40 45];
+
+    figure; hold on;
+    for i = 1:numel(RFvals)
+        vals = LLHrel(spatialcells & RFpos == RFvals(i));
+        fprintf('RF = %d deg: mean LLHrel = %.3f, n = %d\n', RFvals(i), mean(vals,'omitnan'), numel(vals));
+    end
+
+    msk = spatialcells;
+    plotViolin(gca, RFpos(msk), LLHrel(msk), [30 40 50], 10);  % edges/binwidth chosen to isolate each discrete value
+    xlim([30 50]);
+    xticks(RFvals);
+    xlabel('RF position (deg)'); ylabel('LLH_{rel}');
+    title('LLH_{rel} vs RF position, spatially modulated cells only');
+    box off; set(gca,'TickDir','out');
+end
        
 %% SIMPLE FIGURE TO SHOW INCREASE IN LLH WHEN ADDING SPATIAL PREDICTOR
 if strcmp(figname, 'LLHi-w/oSpace')
@@ -1607,7 +1772,6 @@ if strcmp(figname,'Resp-singleCell')
             y_vs = squeeze(EXP.Maps{mapVS_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_vs = y_vs(:);
             
 
-                
     
 
             x = linspace(0,200,numel(y));
@@ -1621,7 +1785,7 @@ if strcmp(figname,'Resp-singleCell')
             yMax = max([yMax; y + se; y_g; y_vs], [], 'omitnan');
         end
         if ~isfinite(yMax) || yMax <= 0, yMax = 1; end
-        yLim = [0, 1.05*yMax];
+        yLim = [-50, 1.05*yMax];
 
         % Colors
         col_data = [0 0 0];        % black for measured mean
@@ -1647,6 +1811,7 @@ if strcmp(figname,'Resp-singleCell')
 
             % Axes / labels
             xlim(ax,[0 200]); ylim(ax,yLim);
+            set(gca, 'XTick', [40 80 120 160], 'XTickLabel', {'40','80','120','160'});
             box(ax,'off'); set(ax,'TickDir','out');
             if icell == 1
                 title(ax, sprintf('%s', condNames{k}));
@@ -1674,6 +1839,241 @@ if strcmp(figname,'Resp-singleCell')
     end
 end
 
+
+%% RF = -5 cells: identify in/out-of-field amplitude bias in AZIMUTH space,
+% then plot the selected cells' landmark kernel in CORRIDOR coordinates,
+% sorted by distance from each cell's peak to landmark 1 (40 cm)
+if strcmp(figname, 'RFm5-InOutSplit')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx  = find(rfm5_mask);
+    fprintf('RF = -5 (off-screen) cells: n = %d / %d goodcells\n', numel(rfm5_idx), sum(goodcells));
+
+    % ---- STEP 1: in/out split, done in VISUAL AZIMUTH (native GLM kernel,
+    % 0-110 deg). This is the only space where "off-screen" is meaningful. ----
+    visK_raw = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK_raw,2);
+
+    % Flip so bin 1 = front (0 deg), matching 'GLM-kernels' and
+    % 'RFdirection-KernelBias', where RFpos < 0 is documented as
+    % extrapolated PAST the front edge.
+    visK_flip = fliplr(visK_raw);
+
+    edgeWidth = max(1, round(nBins*0.2));
+    slopeAtFrontEdge = mean(diff(visK_flip(:,1:edgeWidth+1), 1, 2), 2, 'omitnan');
+    fprintf('Mean slope approaching bin 1 of the flipped kernel: %.3f\n', mean(slopeAtFrontEdge,'omitnan'));
+    fprintf('(negative = still rising toward the front edge - consistent with RFpos < 0)\n');
+
+    outBins = 1:edgeWidth;
+    inBins  = (edgeWidth+1):nBins;
+    outAmp = mean(visK_flip(:,outBins), 2, 'omitnan');
+    inAmp  = mean(visK_flip(:,inBins),  2, 'omitnan');
+    edgeBias = outAmp - inAmp;
+    isOutDominant = edgeBias > 0;
+
+    cellNames = EXP.Spk.CellListString(rfm5_idx);
+    T_rf = table(cellNames(:), inAmp, outAmp, edgeBias, isOutDominant, ...
+        'VariableNames', {'CellName','InFieldAmp','OutFieldAmp','EdgeBias','OutDominant'});
+    T_rf = sortrows(T_rf, 'EdgeBias', 'descend');
+    disp(T_rf);
+    fprintf('%d / %d RF=-5 cells have higher amplitude on the OUT (off-screen) side\n', ...
+        sum(isOutDominant), numel(rfm5_idx));
+    writetable(T_rf, 'RFm5_InOutSplit.csv');
+
+    % ---- STEP 2: plot the SELECTED cells' landmark kernel in CORRIDOR
+    % COORDINATES (0-200 cm), sorted by distance from each cell's peak to
+    % the first landmark (40 cm), same convention as
+    % 'ScaledExamples-CorridorCoords-NegRF-LandmarkDist' ----
+    outDominant_idx = rfm5_idx(isOutDominant);
+    edgeBias_sel = edgeBias(isOutDominant);
+    Nsel = numel(outDominant_idx);
+    fprintf('Plotting corridor-coordinate landmark kernels for %d out-dominant RF=-5 cells\n', Nsel);
+
+    mapLandmark_idx = (1:ncond) + 3*ncond; % landmark component of the model output, base condition
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+
+    M = landmarkTrace(outDominant_idx, :);
+
+    % Restrict the peak search to a window around the first landmark only,
+    % so the sort isn't driven by whichever of the 4 repeating bumps
+    % happens to be tallest for a given cell.
+    landmarkCenter = 40;
+    landmarkWindow = xpos >= (landmarkCenter-15) & xpos <= (landmarkCenter+15);
+    xpos_windowed = xpos(landmarkWindow);
+    M_windowed = M(:, landmarkWindow);
+
+    [~, peakBin] = max(M_windowed, [], 2, 'omitnan');
+    peakPos = xpos_windowed(peakBin)';
+    distToLandmark1 = peakPos - landmarkCenter; % signed distance from landmark 1
+
+    [sortedDist, plotOrder] = sort(distToLandmark1, 'ascend', 'MissingPlacement', 'last');
+    fprintf('Distance-to-landmark-1 range: %.1f to %.1f cm\n', min(sortedDist), max(sortedDist));
+
+    M_sorted = M(plotOrder, :);
+    edgeBias_sorted = edgeBias_sel(plotOrder);
+
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+    M_scaled = scaleKernel(M_sorted);
+
+    figure('Color','w','Position',[100 100 650 700]);
+
+    % Main heatmap: landmark kernel, corridor coordinates
+    axH = subplot(1,5,1:4);
+    imagesc(xpos, 1:Nsel, M_scaled, [0 1]);
+    colormap(axH, parula); colorbar(axH);
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance to landmark 1)');
+    title(sprintf('Landmark kernel (corridor coords), RF=-5 out-dominant cells (n=%d)', Nsel));
+    box off; set(gca,'TickDir','out');
+    xticks([40 80 120 160]);
+    xticklabels({'40','80','120','160'});
+    for lm = [40 80 120 160]
+        xline(lm, '--w', 'Alpha', 0.4, 'HandleVisibility', 'off');
+    end
+
+    % Sidebar: each row's edgeBias value (azimuth-space out-field minus
+    % in-field amplitude), same row order as the heatmap, so you can see
+    % whether corridor position and out-field strength track each other
+    axB = subplot(1,5,5);
+    barh(axB, 1:Nsel, edgeBias_sorted, 'FaceColor',[0.6 0.6 0.9], 'EdgeColor','none');
+    set(axB, 'YDir', 'normal');
+    ylim(axB, [0.5 Nsel+0.5]);
+    xlabel(axB, 'Edge bias (azimuth)');
+    box off; set(axB,'TickDir','out');
+    set(axB, 'YTick', []);
+end
+
+
+%% CORRECTED: latency distribution, non-spatial vs spatial, with Wilcoxon test
+if strcmp(figname,'Latency-NonspatialVsSpatial-Corrected')
+
+    % Masks
+    % spatial_mask / nonspatial_mask partition goodcells into spatially
+    % selective vs. not, used throughout this figure to contrast the two
+    % populations (overlaid histograms, etc.).
+    spatial_mask    = goodcells & signicells & goodLLHcells;         % spatially selective
+    nonspatial_mask = goodcells & ~(signicells & goodLLHcells);      % non-spatial
+
+    % Visual latencies (milliseconds)
+    Vislat = EXP.GLMs{1}.Perf.bestVisdelay(:);
+
+    % Latency bins (milliseconds)
+    lat_min = -1000/60; lat_max = 500+1000/60;
+    LAT_edges = lat_min:2000/60:lat_max;
+
+    % Sanity check: confirm masks are correctly sized/populated
+    fprintf('CHECK: sum(nonspatial_mask) = %d\n', sum(nonspatial_mask));
+    fprintf('CHECK: sum(spatial_mask) = %d\n', sum(spatial_mask));
+    fprintf('CHECK: sum(goodcells) = %d\n', sum(goodcells));
+
+    figure; hold on;
+%     histogram(Vislat(nonspatial_mask), LAT_edges, 'FaceColor',[0.3 0.3 0.3], 'EdgeColor','none', 'DisplayName',sprintf('Non spatial (n=%d)',sum(nonspatial_mask)));
+%     histogram(Vislat(spatial_mask), LAT_edges, 'EdgeColor','none', 'FaceColor',[0.6 0.2 0.6], 'FaceAlpha',1.0, 'DisplayName',sprintf('Spatial (n=%d)',sum(spatial_mask)));
+    histogram(Vislat(nonspatial_mask), LAT_edges, 'DisplayStyle','stairs', 'EdgeColor',[0.3 0.3 0.3], 'LineWidth',1.5, 'DisplayName',sprintf('Non spatial (n=%d)',sum(nonspatial_mask)));
+    histogram(Vislat(spatial_mask), LAT_edges, 'DisplayStyle','stairs', 'EdgeColor',[0.6 0.2 0.6], 'LineWidth',1.5, 'DisplayName',sprintf('Spatial (n=%d)',sum(spatial_mask)));
+    xlabel('Visual latency (ms)'); ylabel('# cells');
+    legend('Location','northeast'); legend boxoff;
+    box off; set(gca,'TickDir','out');
+    title('Corrected: latency distribution, non-spatial vs spatial');
+
+    [p_wrs, ~] = ranksum(Vislat(nonspatial_mask), Vislat(spatial_mask));
+    fprintf('Corrected Wilcoxon rank-sum test (non-spatial vs spatial latency): p = %.3g\n', p_wrs);
+end
+
+
+
+%% RF=-5 cells, refined by higher kernel amplitude on the OUT side 
+if strcmp(figname, 'RFm5-HighOutBias-LandmarkHeatmap')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx = find(rfm5_mask);
+    fprintf('RF = -5 cells: n = %d\n', numel(rfm5_idx));
+
+    % Split the visual kernel into in vs out of the visual field
+    visK = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK, 2);
+    edgeWidth = round(nBins * 0.2); % outer 20% = "out" side
+    outFieldAmp = mean(visK(:, 1:edgeWidth), 2, 'omitnan');
+    inFieldAmp  = mean(visK(:, edgeWidth+1:end), 2, 'omitnan');
+    edgeBias = outFieldAmp - inFieldAmp;
+
+    % Select cells with HIGHER amplitude on the OUT side
+    selected_idx = rfm5_idx(edgeBias < 0);
+    fprintf('%d/%d RF=-5 cells selected (higher amplitude on OUT side)\n', ...
+        numel(selected_idx), numel(rfm5_idx));
+
+    % Landmark kernel, corridor coordinates, base condition
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+    M = landmarkTrace(selected_idx, :);
+
+    landmarks = [40 80 120 160];
+    [~, peakBin] = max(M, [], 2, 'omitnan');
+    peakPos = xpos(peakBin)';
+    distToLandmark = nan(size(peakPos));
+    for c = 1:numel(peakPos)
+        [~, closestIdx] = min(abs(peakPos(c) - landmarks));
+        distToLandmark(c) = peakPos(c) - landmarks(closestIdx);
+    end
+    [~, sortIdx] = sort(distToLandmark, 'ascend', 'MissingPlacement', 'last');
+    M_sorted = M(sortIdx, :);
+
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+    M_scaled = scaleKernel(M_sorted);
+
+    figure('Color','w','Position',[100 100 500 700]);
+    imagesc(xpos, 1:numel(selected_idx), M_scaled, [0 1]);
+    colormap(parula); colorbar;
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance to nearest landmark)');
+    title(sprintf('Landmark kernel, RF=-5 + high out-bias (n=%d)', numel(selected_idx)));
+    box off; set(gca,'TickDir','out');
+end
+%% RF == -5 cells, refined by which show higher kernel amplitude on the "out of field" side
+if strcmp(figname, 'RFm5-HighOutAmplitude')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+
+    % Base group: exact RF = -5 (the discrete "off-screen" RF value)
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx = find(rfm5_mask);
+    fprintf('RF = -5 cells: n = %d\n', numel(rfm5_idx));
+
+    % Azimuth-domain landmark kernel for THIS group only
+    visK = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK, 2);
+
+    % "Out" = near the 0-deg (front) edge — the direction RFpos=-5 is
+    % extrapolated toward. "In" = rest of the sampled kernel.
+    edgeWidth = round(nBins * 0.2); % outer 20% of bins — adjust as needed
+    outFieldAmp = mean(visK(:, 1:edgeWidth), 2, 'omitnan');
+    inFieldAmp  = mean(visK(:, edgeWidth+1:end), 2, 'omitnan');
+    edgeBias = outFieldAmp - inFieldAmp; % positive = higher amplitude on the "out" side
+
+    % Refine: among RF=-5 cells, keep only those with higher out-side amplitude
+    highOutBias_mask = edgeBias > 0;
+    highOutBias_idx = rfm5_idx(highOutBias_mask);
+
+    fprintf('Of these, %d/%d show higher amplitude on the OUT side (edgeBias > 0)\n', ...
+        numel(highOutBias_idx), numel(rfm5_idx));
+
+    cellNamesRefined = EXP.Spk.CellListString(highOutBias_idx);
+    [sortedBias, sortIdx] = sort(edgeBias(highOutBias_mask), 'descend');
+    cellNamesRefined = cellNamesRefined(sortIdx);
+
+    fprintf('\n%-30s %10s\n', 'Cell name', 'edgeBias');
+    for i = 1:numel(cellNamesRefined)
+        fprintf('%-30s %10.3f\n', cellNamesRefined{i}, sortedBias(i));
+    end
+
+    figure('Color','w'); histogram(edgeBias, 30);
+    xline(0, 'k--');
+    xlabel('Out-field - In-field kernel amplitude'); ylabel('# cells');
+    title(sprintf('RF=-5 cells (n=%d), edge bias distribution', numel(rfm5_idx)));
+    box off; set(gca,'TickDir','out');
+end
 %% METRICS SUMMARY RELATING SPATIAL COMPONENT STRENGTH TO RF AND RESPONSE PROFILE PROPERTIES
 if strcmp(figname,'RF-LLHrel-summary')
    
@@ -1707,7 +2107,7 @@ if strcmp(figname,'RF-LLHrel-summary')
     % RF positions (visual azimuth, degrees)
     RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
 
-    % Visual latencies (seconds)
+    % Visual latencies (milliseconds)
     Vislat = EXP.GLMs{1}.Perf.bestVisdelay(:);
 
     % Bin definitions
@@ -1718,18 +2118,19 @@ if strcmp(figname,'RF-LLHrel-summary')
     % LLHrel bins
     LLH_edges = 0.9:0.01:1.5;
     % RF position bins (visual azimuth 0-110 deg, as used elsewhere)
-    RF_edges = 32.5:5:47.5;% 0.5:22.5;% 
+    %RF_edges = 32.5:5:47.5;% 0.5:22.5;% 
+    RF_edges = -10:5:10;
     RF_centers = (RF_edges(1:end-1)+RF_edges(2:end))/2;
     % Peak pos edges and bin size
     peak_edges = 0:2:200;% 0.5:22.5;% 
     peak_binwidth = 20;
-    % Latency bins (0-0.25 s default)
+    % Latency bins (milliseconds)
     lat_min = -1000/60; lat_max = 500+1000/60;
 
     LAT_edges = lat_min:2000/60:lat_max; 
     LAT_centers = (LAT_edges(1:end-1)+LAT_edges(2:end))/2;
 
-    % --- NEW: helper for Wilson score CI (binomial proportion), used
+    % --- Helper for Wilson score CI (binomial proportion), used
     % below to add error bars to the "fraction spatial" bar plots so bins
     % with few cells don't visually claim the same confidence as
     % well-sampled bins.
@@ -1737,7 +2138,7 @@ if strcmp(figname,'RF-LLHrel-summary')
         (p + z^2./(2*n)) ./ (1 + z^2./n), ...                          % centre (unused, kept for ref)
         z .* sqrt(p.*(1-p)./n + z^2./(4*n.^2)) ./ (1 + z^2./n) );      % halfwidth
 
-    % --- NEW: shared, sensible y-range for all LLHrel-vs-X violin panels
+    % --- Shared, sensible y-range for all LLHrel-vs-X violin panels
     % (data lives in ~0.9-1.5 per LLH_edges above; letting these autoscale
     % stretches to +/-10 and squashes the actual violins flat)
     LLH_violin_ylim = [0.8 1.6];
@@ -1768,7 +2169,9 @@ if strcmp(figname,'RF-LLHrel-summary')
     % ===== (2) Scatter: spatial-kernel peak vs overall-response peak =====
     ax2 = nexttile(tl); hold(ax2,'on');
     mask_sc = spatial_mask;
-    scatter(ax2, overall_peak(mask_sc), peak_pos(mask_sc), ptSize, [0 0 0], 'filled', 'MarkerFaceAlpha', ptAlpha);
+    scatter(ax2, overall_peak(mask_sc), peak_pos(mask_sc), 100, [0 0 0], 'filled', 'MarkerFaceAlpha', ptAlpha);
+
+%     scatter(ax2, overall_peak(mask_sc), peak_pos(mask_sc), ptSize, [0 0 0], 'filled', 'MarkerFaceAlpha', ptAlpha);
     % identity line
     plot(ax2, [0 200],[0 200], 'r-', 'LineWidth',1, 'HandleVisibility','off');
     xlim(ax2,[0 200]); ylim(ax2,[0 200]);
@@ -1788,8 +2191,8 @@ if strcmp(figname,'RF-LLHrel-summary')
     plotViolin(ax3, overall_peak(msk), LLHplot(msk), peak_edges, peak_binwidth);
     xlim(ax3,[peak_edges(1) peak_edges(end)]);
     set(ax3, 'XTick', [40 80 120 160]);
-    ylim(ax3, LLH_violin_ylim);              % <-- NEW: fixed sensible y-range
-    set(ax3, 'YTick', LLH_violin_ytick);     % <-- NEW
+    ylim(ax3, LLH_violin_ylim);
+    set(ax3, 'YTick', LLH_violin_ytick);
     xlabel(ax3,'Overall peak position (cm)'); ylabel(ax3,'LLH_{rel}');
     title(ax3,'LLH_{rel} vs Overall response peak');
     legend(ax3,'Location','northwest'); legend(ax3,'boxoff');
@@ -1800,8 +2203,8 @@ if strcmp(figname,'RF-LLHrel-summary')
     plotViolin(ax3, peak_pos(msk), LLHplot(msk), peak_edges, peak_binwidth);
     xlim(ax3,[peak_edges(1) peak_edges(end)]);
     set(ax3, 'XTick', [40 80 120 160]);
-    ylim(ax3, LLH_violin_ylim);              % <-- NEW
-    set(ax3, 'YTick', LLH_violin_ytick);     % <-- NEW
+    ylim(ax3, LLH_violin_ylim);
+    set(ax3, 'YTick', LLH_violin_ytick);
     xlabel(ax3,'Space peak position (cm)'); ylabel(ax3,'LLH_{rel}');
     title(ax3,'LLH_{rel} vs Spatial kernel Peak');
     legend(ax3,'Location','northwest'); legend(ax3,'boxoff');
@@ -1817,13 +2220,14 @@ if strcmp(figname,'RF-LLHrel-summary')
     title(ax3,'LLH_{rel} distribution (overlay)');
     legend(ax3,'Location','northwest'); legend(ax3,'boxoff');
     box(ax3,'off'); set(ax3,'TickDir','out');
-    % --- NEW: KS test, is the spatial vs non-spatial LLHrel distribution
-    % genuinely different, not just visually different ---
-    [~, p_ks4] = kstest2(LLHplot(nonspatial_mask), LLHplot(spatial_mask));
+    % --- Wilcoxon rank-sum test (two-sided): is the spatial vs
+    % non-spatial LLHrel distribution genuinely different, not just
+    % visually different? ---
+    [p_wrs4, ~] = ranksum(LLHplot(nonspatial_mask), LLHplot(spatial_mask));
     yl = ylim(ax3); xl = xlim(ax3);
-    text(ax3, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('KS p = %.3g', p_ks4), ...
+    text(ax3, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('Wilcoxon p = %.3g', p_wrs4), ...
         'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9);
-    % --- NEW: % spatially modulated annotation ---
+    % --- % spatially modulated annotation ---
     pctSpatial4 = 100 * sum(spatial_mask) / sum(goodcells);
     text(ax3, xl(2)-0.05*diff(xl), yl(2)-0.15*diff(yl), ...
         sprintf('%.1f%% spatial', pctSpatial4), ...
@@ -1839,7 +2243,7 @@ if strcmp(figname,'RF-LLHrel-summary')
     N_all(N_all == 0) = NaN;
     frac_spa = N_spa ./ N_all;
     bar(ax3, RF_centers, frac_spa, 'stacked', 'BarWidth', 1, 'EdgeColor', 'none');
-    % --- NEW: Wilson CI error bars, so under-sampled RF bins don't look
+    % --- Wilson CI error bars, so under-sampled RF bins don't look
     % as confident as well-sampled ones ---
     [~, hw5] = wilsonCI(frac_spa, N_all, 1.96);
     errorbar(ax3, RF_centers, frac_spa, hw5, 'k', 'LineStyle','none', 'HandleVisibility','off');
@@ -1854,8 +2258,8 @@ if strcmp(figname,'RF-LLHrel-summary')
     msk = goodcells;
     plotViolin(ax4, RFpos(msk), LLHplot(msk), RF_edges);
     xlim(ax4,[RF_edges(1) RF_edges(end)]);
-    ylim(ax4, LLH_violin_ylim);              % <-- NEW
-    set(ax4, 'YTick', LLH_violin_ytick);     % <-- NEW
+    ylim(ax4, LLH_violin_ylim);
+    set(ax4, 'YTick', LLH_violin_ytick);
     xlabel(ax4,'RF position (deg)'); ylabel(ax4,'LLH_{rel}');
     title(ax4,'LLH_{rel} vs RF position');
     legend(ax4,'Location','northwest'); legend(ax4,'boxoff');
@@ -1870,10 +2274,10 @@ if strcmp(figname,'RF-LLHrel-summary')
     title(ax5,'RF position distribution');
     legend(ax5,'Location','northwest'); legend(ax5,'boxoff');
     box(ax5,'off'); set(ax5,'TickDir','out');
-    % --- NEW: KS test ---
-    [~, p_ks7] = kstest2(RFpos(goodcells), RFpos(spatial_mask));
+    % --- Wilcoxon rank-sum test ---
+    [p_wrs7, ~] = ranksum(RFpos(goodcells), RFpos(spatial_mask));
     yl = ylim(ax5); xl = xlim(ax5);
-    text(ax5, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('KS p = %.3g', p_ks7), ...
+    text(ax5, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('Wilcoxon p = %.3g', p_wrs7), ...
         'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9);
 
     % ===== (8) Fraction spatially selective vs visual latency =====
@@ -1883,11 +2287,11 @@ if strcmp(figname,'RF-LLHrel-summary')
     N_allL_safe = N_allL; N_allL_safe(N_allL_safe==0) = NaN;   % guard, same logic as panel 5
     frac_spa_L = N_spaL ./ N_allL_safe;
     bar(ax6, LAT_centers, frac_spa_L, 'stacked', 'BarWidth', 1, 'EdgeColor', 'none');
-    % --- NEW: Wilson CI error bars ---
+    % --- Wilson CI error bars ---
     [~, hw8] = wilsonCI(frac_spa_L, N_allL_safe, 1.96);
     errorbar(ax6, LAT_centers, frac_spa_L, hw8, 'k', 'LineStyle','none', 'HandleVisibility','off');
     xlim(ax6,[LAT_edges(1) LAT_edges(end)]); ylim(ax6,[0 1]);
-    xlabel(ax6,'Visual latency (s)');
+    xlabel(ax6,'Visual latency (ms)');
     ylabel(ax6,'Fraction spatial');
     title(ax6,'Spatial fraction vs RF latency');
     box(ax6,'off'); set(ax6,'TickDir','out');
@@ -1897,9 +2301,9 @@ if strcmp(figname,'RF-LLHrel-summary')
     mskL = goodcells;
     plotViolin(ax7, Vislat(mskL), LLHplot(mskL), LAT_edges);
     xlim(ax7,[LAT_edges(1) LAT_edges(end)]);
-    ylim(ax7, LLH_violin_ylim);              % <-- NEW
-    set(ax7, 'YTick', LLH_violin_ytick);     % <-- NEW
-    xlabel(ax7,'Visual latency (s)'); ylabel(ax7,'LLH_{rel}');
+    ylim(ax7, LLH_violin_ylim);
+    set(ax7, 'YTick', LLH_violin_ytick);
+    xlabel(ax7,'Visual latency (ms)'); ylabel(ax7,'LLH_{rel}');
     title(ax7,'LLH_{rel} vs RF latency');
     legend(ax7,'Location','northwest'); legend(ax7,'boxoff');
     box(ax7,'off'); set(ax7,'TickDir','out');
@@ -1909,17 +2313,17 @@ if strcmp(figname,'RF-LLHrel-summary')
     histogram(ax8, Vislat(goodcells), LAT_edges, 'FaceColor',[0.3 0.3 0.3], 'EdgeColor','none', 'DisplayName',sprintf('Non spatial (n=%d)',sum(nonspatial_mask)));
     histogram(ax8, Vislat(spatial_mask), LAT_edges, 'EdgeColor','none', 'FaceColor',col_Spatial, 'FaceAlpha',1.0, 'DisplayName',sprintf('Spatial (n=%d)',sum(spatial_mask)));
     xlim(ax8,[LAT_edges(1) LAT_edges(end)]);
-    xlabel(ax8,'Visual latency (s)'); ylabel(ax8,'# cells');
+    xlabel(ax8,'Visual latency (ms)'); ylabel(ax8,'# cells');
     title(ax8,'Latency distribution');
     legend(ax8,'Location','northwest'); legend(ax8,'boxoff');
     box(ax8,'off'); set(ax8,'TickDir','out');
-    % --- NEW: KS test ---
-    [~, p_ks10] = kstest2(Vislat(goodcells), Vislat(spatial_mask));
+    % --- Wilcoxon rank-sum test ---
+    [p_wrs10, ~] = ranksum(Vislat(goodcells), Vislat(spatial_mask));
     yl = ylim(ax8); xl = xlim(ax8);
-    text(ax8, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('KS p = %.3g', p_ks10), ...
+    text(ax8, xl(2)-0.05*diff(xl), yl(2)-0.05*diff(yl), sprintf('Wilcoxon p = %.3g', p_wrs10), ...
         'HorizontalAlignment','right', 'VerticalAlignment','top', 'FontSize', 9);
 
-    % ===== (11) NEW: % spatial per session, to track whether the pooled
+    % ===== (11) % spatial per session, to track whether the pooled
     % %-spatial figure is being driven disproportionately by one session
     % or animal (same session-confound logic used elsewhere, e.g.
     % Cluster-SpaceKernels' per-cluster session histogram) =====
@@ -1945,137 +2349,1298 @@ if strcmp(figname,'RF-LLHrel-summary')
     % Overall title
     sgtitle(tl, 'Spatial kernel peaks, LLH_{rel}, RF position & latency summaries');
 end
-%% SCATTER VERSION: LLHi VS (vision-only) vs LLHi VSP (full model)
+
+
+%% LLHrel (spatial weight) vs RF position, spatially modulated cells only
+if strcmp(figname,'LLHrel-RFposition-spatialOnly')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    %RF_edges = 32.5:5:47.5;
+    %RFvals = [35 40 45];
+
+    RF_edges = -7.5:5:7.5;  
+    RFvals = [-5 0 5];
+
+    figure; hold on;
+    msk = spatialcells;
+    plotViolin(gca, RFpos(msk), LLHrel(msk), RF_edges);
+    xlim([RF_edges(1) RF_edges(end)]);
+    set(gca, 'XTick', RFvals);
+    ylim([0.8 1.6]);
+    set(gca, 'YTick', 0.8:0.2:1.6);
+    xlabel('RF position (deg)'); ylabel('LLH_{rel}');
+    title('LLH_{rel} vs RF position (spatially modulated cells only)');
+    box off; set(gca,'TickDir','out');
+
+    for i = 1:numel(RFvals)
+        vals = LLHrel(spatialcells & RFpos == RFvals(i));
+        fprintf('RF = %d deg: median spatial weight = %.3f, n = %d\n', ...
+            RFvals(i), median(vals,'omitnan'), numel(vals));
+    end
+
+    vals = LLHrel(spatialcells);
+    RFpos_sp = RFpos(spatialcells);
+    
+    group = nan(size(vals));
+    for i = 1:numel(RFvals)
+        group(RFpos_sp == RFvals(i)) = i;
+    end
+    
+    [p_kw, tbl, stats] = kruskalwallis(vals, group, 'off');
+    fprintf('Kruskal-Wallis test: spatial weight vs RF position, p = %.3g\n', p_kw);
+end
+
+%% CORRELATION: FULL MODEL PREDICTION VS MEASURED RESPONSE
+if strcmp(figname,'FullModel-MeasuredVsEstimated-Corr')
+
+    measured = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    full_pred = squeeze(EXP.Maps{mapVSP_idx(1)}.Tuning.meanrespModel(:,1,:));
+
+    measured_gc = measured(goodcells,:);
+    full_gc = full_pred(goodcells,:);
+
+    nCells = size(measured_gc,1);
+    r_full = nan(nCells,1);
+    for i = 1:nCells
+        m = measured_gc(i,:);
+        f = full_gc(i,:);
+        valid = ~isnan(m) & ~isnan(f);
+        if sum(valid) > 2
+            r_full(i) = corr(m(valid)', f(valid)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Full model vs measured: median r = %.3f, MAD = %.3f, n = %d\n', ...
+        median(r_full,'omitnan'), mad(r_full(~isnan(r_full)),1), sum(~isnan(r_full)));
+end
+%% CORRELATION BETWEEN MEASURED AND ESTIMATED LANDMARK/BACKGROUND KERNEL SHAPE
+if strcmp(figname,'VisualKernel-MeasuredVsEstimated-Corr')
+
+    measured  = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    measured_gc  = measured(goodcells,:);
+    landmark_gc  = landmark_est(goodcells,:);
+    bg_gc        = bg_est(goodcells,:);
+
+    nCells = size(measured_gc,1);
+    r_landmark = nan(nCells,1);
+    r_bg = nan(nCells,1);
+
+    for i = 1:nCells
+        m = measured_gc(i,:);
+        l = landmark_gc(i,:);
+        b = bg_gc(i,:);
+        valid_l = ~isnan(m) & ~isnan(l);
+        valid_b = ~isnan(m) & ~isnan(b);
+        if sum(valid_l) > 2
+            r_landmark(i) = corr(m(valid_l)', l(valid_l)', 'type', 'Pearson');
+        end
+        if sum(valid_b) > 2
+            r_bg(i) = corr(m(valid_b)', b(valid_b)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Landmark kernel: median r = %.3f, MAD = %.3f, n = %d\n', ...
+        median(r_landmark,'omitnan'), mad(r_landmark(~isnan(r_landmark)),1), sum(~isnan(r_landmark)));
+    fprintf('Background kernel: median r = %.3f, MAD = %.3f, n = %d\n', ...
+        median(r_bg,'omitnan'), mad(r_bg(~isnan(r_bg)),1), sum(~isnan(r_bg)));
+
+    figure;
+    subplot(1,2,1);
+    histogram(r_landmark, 30, 'FaceColor',[0.8 0.4 0.2], 'EdgeColor','none');
+    xlabel('Correlation (measured vs. estimated landmark kernel)'); ylabel('# cells');
+    title('Landmark kernel validation'); box off; set(gca,'TickDir','out');
+    xlim([-1 1]);
+
+    subplot(1,2,2);
+    histogram(r_bg, 30, 'FaceColor',[0.2 0.6 0.4], 'EdgeColor','none');
+    xlabel('Correlation (measured vs. estimated background kernel)'); ylabel('# cells');
+    title('Background kernel validation'); box off; set(gca,'TickDir','out');
+    xlim([-1 1]);
+end
+
+%% CORRELATION BETWEEN SPATIAL KERNEL AND VISUAL (LANDMARK, BG) KERNEL SHAPE, PER CELL
+if strcmp(figname,'SpatialVsVisual-ShapeCorr_withEgs')
+
+    spatial_est  = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    spatial_sp  = spatial_est(spatialcells,:);
+    landmark_sp = landmark_est(spatialcells,:);
+    bg_sp       = bg_est(spatialcells,:);
+
+    nCells = size(spatial_sp,1);
+    r_landmark = nan(nCells,1);
+    r_bg = nan(nCells,1);
+
+    for i = 1:nCells
+        s = spatial_sp(i,:);
+        l = landmark_sp(i,:);
+        b = bg_sp(i,:);
+        valid_l = ~isnan(s) & ~isnan(l);
+        valid_b = ~isnan(s) & ~isnan(b);
+        if sum(valid_l) > 2
+            r_landmark(i) = corr(s(valid_l)', l(valid_l)', 'type', 'Pearson');
+        end
+        if sum(valid_b) > 2
+            r_bg(i) = corr(s(valid_b)', b(valid_b)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Spatial vs landmark kernel shape: median r = %.3f, MAD = %.3f, n = %d\n', ...
+        median(r_landmark,'omitnan'), mad(r_landmark(~isnan(r_landmark)),1), sum(~isnan(r_landmark)));
+    fprintf('Spatial vs background kernel shape: median r = %.3f, MAD = %.3f, n = %d\n', ...
+        median(r_bg,'omitnan'), mad(r_bg(~isnan(r_bg)),1), sum(~isnan(r_bg)));
+
+    figure;
+    histogram(r_landmark, -0.6:0.05:0.8, 'FaceColor',[0.8 0.4 0.2], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','vs Landmark');
+    hold on;
+    histogram(r_bg, -0.6:0.05:0.8, 'FaceColor',[0.2 0.6 0.4], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','vs Background');
+    xlabel('Correlation with spatial kernel shape'); ylabel('# cells');
+    legend('Location','northeast'); legend boxoff;
+    title('Spatial kernel shape vs visual kernel shape');
+    box off; set(gca,'TickDir','out');
+
+    spatial_est  = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+    xpos = linspace(0,200,size(spatial_est,2));
+
+    spatial_sp  = spatial_est(spatialcells,:);
+    landmark_sp = landmark_est(spatialcells,:);
+    bg_sp       = bg_est(spatialcells,:);
+    sp_idx = find(spatialcells);
+
+    nCells = size(spatial_sp,1);
+    r_landmark = nan(nCells,1);
+    for i = 1:nCells
+        s = spatial_sp(i,:); l = landmark_sp(i,:);
+        valid = ~isnan(s) & ~isnan(l);
+        if sum(valid) > 2
+            r_landmark(i) = corr(s(valid)', l(valid)', 'type', 'Pearson');
+        end
+    end
+
+    % Pick 6 cells spanning the correlation range: low, near-zero, high
+    corrTargets = [-0.4, -0.1, 0.0, 0.1, 0.3, 0.6];
+    exampleCells = nan(1,6);
+    exampleR = nan(1,6);
+    for k = 1:6
+        [~, ix] = min(abs(r_landmark - corrTargets(k)));
+        exampleCells(k) = sp_idx(ix);
+        exampleR(k) = r_landmark(ix);
+    end
+
+    figure;
+    for i = 1:6
+        c = exampleCells(i);
+        subplot(6,1,i); hold on;
+        plot(xpos, spatial_est(c,:), 'b-', 'LineWidth',1.3, 'DisplayName','Spatial kernel');
+        plot(xpos, landmark_est(c,:), 'r-', 'LineWidth',1.1, 'DisplayName','Landmark kernel');
+        plot(xpos, bg_est(c,:), 'g-', 'LineWidth',1.1, 'DisplayName','BG kernel');
+        yline(0,'k:'); xlim([0 200]);
+        title(sprintf('Cell %d (spatial-landmark r = %.2f)', c, exampleR(i)));
+        box off; set(gca,'TickDir','out');
+        if i == 1
+            legend('Location','northeast'); legend boxoff;
+        end
+        if i == 6
+            xlabel('Position (cm)');
+        end
+    end
+    sgtitle('Example cells: spatial, landmark, and background kernel shapes');
+end
+
+%% Example cells at high, medium, and low correlation (2 each),
+% for both landmark and background kernels - plotted with measured
+% response overlaid, each panel on its own y-axis.
+if strcmp(figname,'VisualKernel-CorrExamples')
+
+    measured     = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+    xpos = linspace(0,200,size(measured,2));
+
+    measured_gc  = measured(goodcells,:);
+    landmark_gc  = landmark_est(goodcells,:);
+    bg_gc        = bg_est(goodcells,:);
+    gc_idx = find(goodcells);
+
+    nCells = size(measured_gc,1);
+    r_landmark = nan(nCells,1);
+    r_bg = nan(nCells,1);
+    for i = 1:nCells
+        m = measured_gc(i,:); l = landmark_gc(i,:); b = bg_gc(i,:);
+        vl = ~isnan(m) & ~isnan(l);
+        vb = ~isnan(m) & ~isnan(b);
+        if sum(vl) > 2, r_landmark(i) = corr(m(vl)', l(vl)', 'type','Pearson'); end
+        if sum(vb) > 2, r_bg(i) = corr(m(vb)', b(vb)', 'type','Pearson'); end
+    end
+
+    corrTargets = [0.85, 0.45, 0.10];   % high, medium, low
+    labels = {'High r', 'Medium r', 'Low r'};
+
+    % Pick 2 cells per target, per kernel type (nearest + 2nd nearest)
+    landmarkCells = nan(3,2);
+    bgCells = nan(3,2);
+    for k = 1:3
+        [~, ix] = sort(abs(r_landmark - corrTargets(k)), 'ascend');
+        landmarkCells(k,:) = gc_idx(ix(1:2));
+        [~, ix] = sort(abs(r_bg - corrTargets(k)), 'ascend');
+        bgCells(k,:) = gc_idx(ix(1:2));
+    end
+
+    figure;
+    tl = tiledlayout(6,2, 'TileSpacing','compact','Padding','compact');
+
+    % Landmark examples (left column, rows 1-6 map to high/high/med/med/low/low)
+    row = 1;
+    for k = 1:3
+        for j = 1:2
+            c = landmarkCells(k,j);
+            ax = nexttile(tl, 2*(row-1)+1); hold(ax,'on');
+            plot(ax, xpos, measured(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.3, 'DisplayName','Measured');
+            plot(ax, xpos, landmark_est(c,:), 'r-', 'LineWidth',1.1, 'DisplayName','Landmark kernel');
+            yline(ax,0,'k:'); xlim(ax,[0 200]);
+            title(ax, sprintf('%s: Cell %d (r=%.2f)', labels{k}, c, r_landmark(gc_idx==c)));
+            box(ax,'off'); set(ax,'TickDir','out');
+            if row == 1 && j == 1, legend(ax,'Location','northeast'); legend(ax,'boxoff'); end
+            if row == 6, xlabel(ax,'Position (cm)'); end
+            row = row + 1;
+        end
+    end
+
+    % BG examples (right column)
+    row = 1;
+    for k = 1:3
+        for j = 1:2
+            c = bgCells(k,j);
+            ax = nexttile(tl, 2*row); hold(ax,'on');
+            plot(ax, xpos, measured(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.3, 'DisplayName','Measured');
+            plot(ax, xpos, bg_est(c,:), 'g-', 'LineWidth',1.1, 'DisplayName','BG kernel');
+            yline(ax,0,'k:'); xlim(ax,[0 200]);
+            title(ax, sprintf('%s: Cell %d (r=%.2f)', labels{k}, c, r_bg(gc_idx==c)));
+            box(ax,'off'); set(ax,'TickDir','out');
+            if row == 1, legend(ax,'Location','northeast'); legend(ax,'boxoff'); end
+            if row == 6, xlabel(ax,'Position (cm)'); end
+            row = row + 1;
+        end
+    end
+
+    sgtitle(tl, 'Example cells: high, medium, and low correlation with measured response');
+end
+
+%% 10 INDIVIDUAL EXAMPLE CELLS (not group-averaged): landmark, BG, and
+% measured response, spanning amplitude similarity/difference and
+% correlation strength. Each panel uses its own y-axis range.
+if strcmp(figname,'VisualKernel-IndividualExamples')
+
+    measured     = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+    xpos = linspace(0,200,size(measured,2));
+
+    measured_gc  = measured(goodcells,:);
+    landmark_gc  = landmark_est(goodcells,:);
+    bg_gc        = bg_est(goodcells,:);
+    gc_idx = find(goodcells);
+
+    peak_l = max(abs(landmark_gc),[],2,'omitnan');
+    peak_b = max(abs(bg_gc),[],2,'omitnan');
+    amp_diff = abs(peak_l - peak_b);
+    amp_ratio = peak_l ./ peak_b;
+
+    nCells = size(measured_gc,1);
+    r_landmark = nan(nCells,1);
+    for i = 1:nCells
+        m = measured_gc(i,:); l = landmark_gc(i,:);
+        valid = ~isnan(m) & ~isnan(l);
+        if sum(valid) > 2
+            r_landmark(i) = corr(m(valid)', l(valid)', 'type', 'Pearson');
+        end
+    end
+
+    minAmpThresh = 15;
+
+    % 3 with SIMILAR amplitude (smallest amp_diff)
+    cand = find(peak_l > minAmpThresh & peak_b > minAmpThresh);
+    [~, ix] = sort(amp_diff(cand), 'ascend');
+    cells_similarAmp = gc_idx(cand(ix(1:3)));
+
+    % 3 with DIFFERENT amplitude (largest amp_ratio)
+    cand = find(peak_b > minAmpThresh);
+    [~, ix] = sort(amp_ratio(cand), 'descend');
+    cells_diffAmp = gc_idx(cand(ix(1:3)));
+
+    % 4 spanning a range of correlation strength (low, low-mid, mid, high)
+    [~, ix] = sort(abs(r_landmark - [0.1 0.3 0.5 0.7]), 2);  % not directly usable; do individually below
+    corrTargets = [0.1 0.3 0.5 0.7];
+    cells_corrSpan = nan(1,4);
+    for k = 1:4
+        [~, ix_k] = min(abs(r_landmark - corrTargets(k)));
+        cells_corrSpan(k) = gc_idx(ix_k);
+    end
+
+    exampleCells = [cells_similarAmp(:); cells_diffAmp(:); cells_corrSpan(:)];
+    exampleLabels = [ ...
+        repmat({'Similar landmark/BG amplitude'},3,1); ...
+        repmat({'Different landmark/BG amplitude'},3,1); ...
+        {'Correlation ~0.1'; 'Correlation ~0.3'; 'Correlation ~0.5'; 'Correlation ~0.7'} ];
+
+    figure;
+    for i = 1:10
+        c = exampleCells(i);
+        subplot(10,1,i); hold on;
+        plot(xpos, measured(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.5, 'DisplayName','Measured');
+        plot(xpos, landmark_est(c,:), 'r-', 'LineWidth',1.2, 'DisplayName','Landmark kernel');
+        plot(xpos, bg_est(c,:), 'g-', 'LineWidth',1.2, 'DisplayName','BG kernel');
+        yline(0,'k:');
+        xlim([0 200]);
+        title(sprintf('Cell %d - %s', c, exampleLabels{i}));
+        box off; set(gca,'TickDir','out');
+        if i == 1
+            legend('Location','northeast'); legend boxoff;
+        end
+        if i == 10
+            xlabel('Position (cm)');
+        end
+    end
+    sgtitle('10 individual example cells: amplitude and correlation illustrations');
+end
+%% Landmark/BG correlation with measured response, non-spatial cells only
+if strcmp(figname,'VisualKernel-Corr-NonSpatialOnly')
+
+    measured  = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    nonspatial_mask = goodcells & ~spatialcells;
+
+    measured_ns  = measured(nonspatial_mask,:);
+    landmark_ns  = landmark_est(nonspatial_mask,:);
+    bg_ns        = bg_est(nonspatial_mask,:);
+
+    nCells = size(measured_ns,1);
+    r_landmark = nan(nCells,1);
+    r_bg = nan(nCells,1);
+
+    for i = 1:nCells
+        m = measured_ns(i,:); l = landmark_ns(i,:); b = bg_ns(i,:);
+        valid_l = ~isnan(m) & ~isnan(l);
+        valid_b = ~isnan(m) & ~isnan(b);
+        if sum(valid_l) > 2
+            r_landmark(i) = corr(m(valid_l)', l(valid_l)', 'type', 'Pearson');
+        end
+        if sum(valid_b) > 2
+            r_bg(i) = corr(m(valid_b)', b(valid_b)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Non-spatial cells only:\n');
+    fprintf('Landmark kernel: median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_landmark,'omitnan'), prctile(r_landmark,25), prctile(r_landmark,75), sum(~isnan(r_landmark)));
+    fprintf('Background kernel: median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_bg,'omitnan'), prctile(r_bg,25), prctile(r_bg,75), sum(~isnan(r_bg)));
+end
+
+%% COMPARE AMPLITUDE (RANGE) OF LANDMARK VS BACKGROUND KERNELS
+if strcmp(figname,'VisualKernel-Amplitude-Compare')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    landmark_gc = landmark_est(goodcells,:);
+    bg_gc       = bg_est(goodcells,:);
+
+    range_landmark = max(landmark_gc,[],2,'omitnan') - min(landmark_gc,[],2,'omitnan');
+    range_bg       = max(bg_gc,[],2,'omitnan') - min(bg_gc,[],2,'omitnan');
+
+    fprintf('Landmark kernel range: median = %.2f, IQR = [%.2f, %.2f], n = %d\n', ...
+        median(range_landmark,'omitnan'), prctile(range_landmark,25), prctile(range_landmark,75), sum(~isnan(range_landmark)));
+    fprintf('Background kernel range: median = %.2f, IQR = [%.2f, %.2f], n = %d\n', ...
+        median(range_bg,'omitnan'), prctile(range_bg,25), prctile(range_bg,75), sum(~isnan(range_bg)));
+
+    % Paired comparison (same cells contribute both values)
+    [p_wrs, ~] = signrank(range_landmark, range_bg);
+    fprintf('Wilcoxon signed-rank test (paired, landmark vs BG range): p = %.3g\n', p_wrs);
+
+    figure;
+    histogram(range_landmark, 30, 'FaceColor',[0.8 0.4 0.2], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','Landmark');
+    hold on;
+    histogram(range_bg, 30, 'FaceColor',[0.2 0.6 0.4], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','Background');
+    xlabel('Kernel amplitude (range, deconvolved activity, a.u.)'); ylabel('# cells');
+    legend('Location','northeast'); legend boxoff;
+    title('Landmark vs background kernel amplitude');
+    box off; set(gca,'TickDir','out');
+end
+%% CORRELATION: LANDMARK EXCITATION/SUPPRESSION BALANCE VS SPATIAL WEIGHT
+if strcmp(figname,'LandmarkBalance-vs-SpatialWeight')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_gc  = landmark_est(goodcells,:);
+
+    exc = max(landmark_gc,[],2,'omitnan');
+    supp = -min(landmark_gc,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    weight_gc = LLHrel(goodcells);
+
+    valid = ~isnan(balance) & ~isnan(weight_gc);
+    [r, p] = corr(balance(valid), weight_gc(valid), 'type', 'Pearson');
+    fprintf('Correlation: landmark excitation/suppression balance vs spatial weight, r = %.3f, p = %.3g, n = %d\n', r, p, sum(valid));
+
+    figure;
+    scatter(balance(valid), weight_gc(valid), 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    xlabel('Landmark kernel balance (-1 = suppressive, +1 = excitatory)');
+    ylabel('Spatial weight (LLH_{rel})');
+    title('Landmark excitation/suppression balance vs spatial weight');
+    box off; set(gca,'TickDir','out');
+end
+
+%% Distribution of landmark balance, spatially modulated cells
+if strcmp(figname,'LandmarkBalance-Distribution')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_sp  = landmark_est(spatialcells,:);
+
+    exc = max(landmark_sp,[],2,'omitnan');
+    supp = -min(landmark_sp,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    figure;
+    histogram(balance, -1:0.05:1, 'FaceColor',[0.4 0.4 0.7], 'EdgeColor','none');
+    xlabel('Landmark kernel balance (-1 = suppressive, +1 = excitatory)');
+    ylabel('# cells');
+    title('Distribution of landmark kernel balance (spatially modulated cells)');
+    box off; set(gca,'TickDir','out');
+
+    fprintf('Median balance = %.3f\n', median(balance,'omitnan'));
+    fprintf('%% excitatory (balance > 0): %.1f%%\n', 100*mean(balance>0,'omitnan'));
+    fprintf('%% suppressive (balance < 0): %.1f%%\n', 100*mean(balance<0,'omitnan'));
+end
+
+%% Violin: spatial weight across landmark balance bins
+if strcmp(figname,'LandmarkBalance-vs-SpatialWeight-Violin')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_sp  = landmark_est(spatialcells,:);
+
+    exc = max(landmark_sp,[],2,'omitnan');
+    supp = -min(landmark_sp,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+    weight_sp = LLHrel(spatialcells);
+
+    edges = -1:0.4:1;   % 5 wider bins, since violins need reasonable n per bin
+
+    figure; hold on;
+    plotViolin(gca, balance, weight_sp, edges);
+    xlim([edges(1) edges(end)]);
+    ylim([0.8 2]);
+    xlabel('Landmark kernel balance (-1 = suppressive, +1 = excitatory)');
+    ylabel('Spatial weight (LLH_{rel})');
+    title('Spatial weight across landmark balance (violin)');
+    box off; set(gca,'TickDir','out');
+end
+
+%% CORRELATION BETWEEN SPATIAL KERNEL AND LANDMARK KERNEL SHAPE, PER CELL
+if strcmp(figname,'SpatialVsLandmark-ShapeCorr')
+
+    spatial_est  = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+
+    spatial_sp  = spatial_est(spatialcells,:);
+    landmark_sp = landmark_est(spatialcells,:);
+
+    nCells = size(spatial_sp,1);
+    r_shape = nan(nCells,1);
+    for i = 1:nCells
+        s = spatial_sp(i,:);
+        l = landmark_sp(i,:);
+        valid = ~isnan(s) & ~isnan(l);
+        if sum(valid) > 2
+            r_shape(i) = corr(s(valid)', l(valid)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Spatial vs landmark kernel shape: median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_shape,'omitnan'), prctile(r_shape,25), prctile(r_shape,75), sum(~isnan(r_shape)));
+end
+
+%% CORRELATION BETWEEN SPATIAL KERNEL AND BACKGROUND KERNEL SHAPE, PER CELL
+if strcmp(figname,'SpatialVsBG-ShapeCorr')
+
+    spatial_est = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+    bg_est      = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    spatial_sp = spatial_est(spatialcells,:);
+    bg_sp      = bg_est(spatialcells,:);
+
+    nCells = size(spatial_sp,1);
+    r_shape = nan(nCells,1);
+    for i = 1:nCells
+        s = spatial_sp(i,:);
+        b = bg_sp(i,:);
+        valid = ~isnan(s) & ~isnan(b);
+        if sum(valid) > 2
+            r_shape(i) = corr(s(valid)', b(valid)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Spatial vs BG kernel shape: median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_shape,'omitnan'), prctile(r_shape,25), prctile(r_shape,75), sum(~isnan(r_shape)));
+end
+
+%% PEAK POSITION OF LANDMARK AND BG KERNELS, ACROSS THE POPULATION
+if strcmp(figname,'VisualKernel-PeakPositions')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    xpos = linspace(0,200,size(landmark_est,2));
+
+    landmark_gc = landmark_est(goodcells,:);
+    bg_gc       = bg_est(goodcells,:);
+
+    [~, peak_idx_l] = max(landmark_gc,[],2,'omitnan');
+    [~, peak_idx_b] = max(bg_gc,[],2,'omitnan');
+    peak_pos_landmark = xpos(peak_idx_l)';
+    peak_pos_bg = xpos(peak_idx_b)';
+
+    figure;
+    subplot(1,2,1);
+    histogram(peak_pos_landmark, 0:5:200, 'FaceColor',[0.8 0.4 0.2], 'EdgeColor','none');
+    xlabel('Peak position (cm)'); ylabel('# cells');
+    title('Landmark kernel peak positions');
+    box off; set(gca,'TickDir','out');
+
+    subplot(1,2,2);
+    histogram(peak_pos_bg, 0:5:200, 'FaceColor',[0.2 0.6 0.4], 'EdgeColor','none');
+    xlabel('Peak position (cm)'); ylabel('# cells');
+    title('Background kernel peak positions');
+    box off; set(gca,'TickDir','out');
+
+    fprintf('Landmark peak positions: n = %d\n', numel(peak_pos_landmark));
+    fprintf('BG peak positions: n = %d\n', numel(peak_pos_bg));
+end
+
+%% SPATIAL KERNEL PEAK VS LANDMARK/BG KERNEL PEAK, PER CELL
+if strcmp(figname,'SpatialPeak-vs-VisualPeak')
+
+    spatial_est  = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    xpos = linspace(0,200,size(spatial_est,2));
+
+    spatial_sp  = spatial_est(spatialcells,:);
+    landmark_sp = landmark_est(spatialcells,:);
+    bg_sp       = bg_est(spatialcells,:);
+
+    [~, idx_s] = max(spatial_sp,[],2,'omitnan');
+    [~, idx_l] = max(landmark_sp,[],2,'omitnan');
+    [~, idx_b] = max(bg_sp,[],2,'omitnan');
+
+    peak_spatial  = xpos(idx_s)';
+    peak_landmark = xpos(idx_l)';
+    peak_bg       = xpos(idx_b)';
+
+    figure;
+    subplot(1,2,1);
+    scatter(peak_landmark, peak_spatial, 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    hold on; plot([0 200],[0 200],'r-');
+    xlabel('Landmark kernel peak (cm)'); ylabel('Spatial kernel peak (cm)');
+    title('Spatial vs landmark peak position'); axis square;
+    box off; set(gca,'TickDir','out');
+
+    subplot(1,2,2);
+    scatter(peak_bg, peak_spatial, 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    hold on; plot([0 200],[0 200],'r-');
+    xlabel('Background kernel peak (cm)'); ylabel('Spatial kernel peak (cm)');
+    title('Spatial vs background peak position'); axis square;
+    box off; set(gca,'TickDir','out');
+
+    fprintf('n = %d spatially modulated cells\n', size(spatial_sp,1));
+end
+%% Binned view: landmark balance vs spatial weight, spatial cells only
+if strcmp(figname,'LandmarkBalance-vs-SpatialWeight-Binned')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_sp  = landmark_est(spatialcells,:);
+
+    exc = max(landmark_sp,[],2,'omitnan');
+    supp = -min(landmark_sp,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+    weight_sp = LLHrel(spatialcells);
+
+    valid = ~isnan(balance) & ~isnan(weight_sp);
+    balance = balance(valid);
+    weight_sp = weight_sp(valid);
+
+    % Bin balance into 10 equal-width bins from -1 to 1
+    edges = -1:0.2:1;
+    centers = (edges(1:end-1) + edges(2:end)) / 2;
+    nBins = numel(edges) - 1;
+
+    meanW = nan(1,nBins);
+    seW = nan(1,nBins);
+    nPerBin = nan(1,nBins);
+    for i = 1:nBins
+        inBin = balance >= edges(i) & balance < edges(i+1);
+        if i == nBins, inBin = balance >= edges(i) & balance <= edges(i+1); end
+        vals = weight_sp(inBin);
+        meanW(i) = mean(vals,'omitnan');
+        seW(i) = std(vals,'omitnan') / sqrt(sum(~isnan(vals)));
+        nPerBin(i) = sum(~isnan(vals));
+    end
+
+    figure;
+    errorbar(centers, meanW, seW, 'o-', 'LineWidth', 1.2, 'MarkerFaceColor','auto');
+    xlabel('Landmark kernel balance (-1 = suppressive, +1 = excitatory)');
+    ylabel('Mean spatial weight (LLH_{rel})');
+    title('Spatial weight vs landmark balance (binned)');
+    box off; set(gca,'TickDir','out');
+
+    for i = 1:nBins
+        fprintf('Bin [%.1f, %.1f]: mean weight = %.3f, n = %d\n', edges(i), edges(i+1), meanW(i), nPerBin(i));
+    end
+end
+
+%% CORRELATION: LANDMARK BALANCE VS SPATIAL WEIGHT, SPATIAL CELLS ONLY
+if strcmp(figname,'LandmarkBalance-vs-SpatialWeight-SpatialOnly')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_sp  = landmark_est(spatialcells,:);
+
+    exc = max(landmark_sp,[],2,'omitnan');
+    supp = -min(landmark_sp,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    weight_sp = LLHrel(spatialcells);
+
+    valid = ~isnan(balance) & ~isnan(weight_sp);
+    [r, p] = corr(balance(valid), weight_sp(valid), 'type', 'Pearson');
+    % Same data, but using Spearman's rank correlation instead of Pearson's,
+% to see if the result holds up when outlier influence is reduced
+[r_spearman, p_spearman] = corr(balance(valid), weight_sp(valid), 'type', 'Spearman');
+fprintf('Spearman correlation (spatial cells only): r = %.3f, p = %.3g\n', r_spearman, p_spearman);
+    fprintf('Correlation (spatial cells only): landmark balance vs spatial weight, r = %.3f, p = %.3g, n = %d\n', r, p, sum(valid));
+
+    figure;
+    scatter(balance(valid), weight_sp(valid), 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    xlabel('Landmark kernel balance (-1 = suppressive, +1 = excitatory)');
+    ylabel('Spatial weight (LLH_{rel})');
+    title('Landmark balance vs spatial weight (spatially modulated cells only)');
+    box off; set(gca,'TickDir','out');
+end
+
+%% VISUAL CHECK: cells with balance near zero, to test whether the metric
+% correctly identifies genuinely mixed excitatory/suppressive kernels.
+if strcmp(figname,'LandmarkBalance-NearZeroCheck')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_gc  = landmark_est(goodcells,:);
+    gc_idx = find(goodcells);
+
+    exc = max(landmark_gc,[],2,'omitnan');
+    supp = -min(landmark_gc,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    [~, sortIdx] = sort(abs(balance), 'ascend', 'MissingPlacement','last');
+    nShow = 8;
+    nearZeroCells = gc_idx(sortIdx(1:nShow));
+    nearZeroBalance = balance(sortIdx(1:nShow));
+
+    xpos = linspace(0,200,size(landmark_est,2));
+
+    figure;
+    for i = 1:nShow
+        subplot(2,4,i);
+        k = landmark_est(nearZeroCells(i),:);
+        plot(xpos, k, 'k-', 'LineWidth', 1.2); hold on;
+        yline(0, 'r--');
+        title(sprintf('Cell %d (bal=%.2f)', nearZeroCells(i), nearZeroBalance(i)));
+        box off; set(gca,'TickDir','out');
+    end
+    sgtitle('Cells with balance near zero (should show mixed excitation/suppression)');
+end
+%% VISUAL CHECK: pull the most extreme "suppressive" and "excitatory"
+% cells according to the balance metric, and plot them to confirm the
+% metric is correctly identifying real suppression/excitation.
+if strcmp(figname,'LandmarkBalance-ExtremeCheck')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    landmark_gc  = landmark_est(goodcells,:);
+    gc_idx = find(goodcells);   % map back to original cell indices
+
+    exc = max(landmark_gc,[],2,'omitnan');
+    supp = -min(landmark_gc,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    [~, sortIdx] = sort(balance, 'ascend', 'MissingPlacement','last');
+    nShow = 5;
+    mostSuppressive = gc_idx(sortIdx(1:nShow));
+    mostExcitatory  = gc_idx(sortIdx(end-nShow+1:end));
+
+    xpos = linspace(0,200,size(landmark_est,2));
+
+    figure;
+    for i = 1:nShow
+        subplot(2,nShow,i);
+        k = landmark_est(mostSuppressive(i),:);
+        plot(xpos, k, 'k-', 'LineWidth', 1.2); yline(0,'r--');
+        title(sprintf('Cell %d (bal=%.2f)', mostSuppressive(i), balance(sortIdx(i))));
+        box off; set(gca,'TickDir','out');
+        if i == 1, ylabel('Most suppressive'); end
+    end
+    for i = 1:nShow
+        subplot(2,nShow,nShow+i);
+        k = landmark_est(mostExcitatory(i),:);
+        plot(xpos, k, 'k-', 'LineWidth', 1.2); yline(0,'r--');
+        title(sprintf('Cell %d (bal=%.2f)', mostExcitatory(i), balance(sortIdx(end-nShow+i))));
+        box off; set(gca,'TickDir','out');
+        if i == 1, ylabel('Most excitatory'); end
+    end
+end
+
+%%
 if strcmp(figname, 'LLHi-VSvsVSP-scatter')
     g_Sig = goodcells & signicells;
     g_NS  = goodcells & ~signicells;
 
-    figure; hold on;
+    % Which goodcells actually have valid (non-NaN) values in BOTH axes —
+    % these are the only ones scatter will actually draw.
+    validForPlot = goodcells & ~isnan(LLHi_vis) & ~isnan(LLHi_pos);
 
-    % Identity line first (so points draw on top)
-    allVals = [LLHi_vis(goodcells); LLHi_pos(goodcells)];
+    nTotal    = sum(goodcells);
+    nValid    = sum(validForPlot);
+    nDropped  = nTotal - nValid;
+    fprintf('LLHi VS vs VSP scatter: %d/%d goodcells have valid values (%d dropped due to NaN)\n', ...
+            nValid, nTotal, nDropped);
+
+    g_Sig = validForPlot & signicells;
+    g_NS  = validForPlot & ~signicells;
+
+    nSig = sum(g_Sig);
+    nNS  = sum(g_NS);
+    fprintf('  Of those plotted: %d significant, %d non-significant\n', nSig, nNS);
+
+    figure; hold on;
+    fprintf('First 10 g_NS coordinates:\n');
+    idx = find(g_NS);
+    disp([LLHi_vis(idx(1:10)), LLHi_pos(idx(1:10))]);
+    allVals = [LLHi_vis(validForPlot); LLHi_pos(validForPlot)];
     axLim = [min(allVals, [], 'omitnan'), max(allVals, [], 'omitnan')];
     plot(axLim, axLim, 'k--', 'LineWidth', 1, 'HandleVisibility','off');
 
-    % Non-significant cells (gray)
-    scatter(LLHi_vis(g_NS), LLHi_pos(g_NS), 60, [0.5 0.5 0.5], ...
+    scatter(LLHi_vis(g_NS), LLHi_pos(g_NS), 100, [0.5 0.5 0.5], ...
         'filled', 'MarkerFaceAlpha', ptAlpha, 'MarkerEdgeColor', [1 1 1], ...
         'LineWidth', 0.5, 'DisplayName', 'NS');
-    
-    % Significant cells (darker green, white ring)
-    scatter(LLHi_vis(g_Sig), LLHi_pos(g_Sig), 60, [96 160 61]/255, ...
+    scatter(LLHi_vis(g_Sig), LLHi_pos(g_Sig), 100, [96 160 61]/255, ...
         'filled', 'MarkerFaceAlpha', ptAlpha, 'MarkerEdgeColor', [1 1 1], ...
         'LineWidth', 0.5, 'DisplayName', 'p < 0.05');
-
     xlim(axLim); ylim(axLim);
     xlabel('LLHi - No space (bits/spike)');
     ylabel('LLHi - Space (bits/spike)');
-    title('LLH improvement: VS vs VSP model');
+    title(sprintf('LLH improvement: VS vs VSP model (n=%d)', nValid));
     legend('Location','best'); legend boxoff;
     box off; set(gca,'TickDir','out');
     pbaspect([1 1 1]);
     xticks([0 0.1 0.2 0.3 0.4 0.5]);
     yticks([0 0.1 0.2 0.3 0.4 0.5]);
-    axis square 
+    axis square
+end
+%% Full reclassification check: fraction form, 1% threshold, plus means
+if strcmp(figname,'Reclassify-FractionForm-1pct')
 
+    w_P = 1 - (1 ./ LLHrel);
+
+    goodLLHcells_new = w_P >= 0.01;
+    spatialcells_new = goodcells & signicells & goodLLHcells_new;
+    nonspatial_new   = goodcells & ~(signicells & goodLLHcells_new);
+
+    fprintf('New classification (fraction form, 1%% threshold): %d spatial cells (%.1f%% of goodcells)\n', ...
+        sum(spatialcells_new), 100*sum(spatialcells_new)/sum(goodcells));
+    fprintf('Cells that differ from original (ratio, 1.5%%): %d\n', ...
+        sum(spatialcells_new ~= spatialcells));
+
+    % ---- Mean spatial weight (fraction form) for both groups ----
+    mean_spatial_new = mean(w_P(spatialcells_new), 'omitnan');
+    mean_nonspatial_new = mean(w_P(nonspatial_new), 'omitnan');
+
+    fprintf('\nSpatial cells (fraction form): mean = %.4f (%.1f%%), n = %d\n', ...
+        mean_spatial_new, 100*mean_spatial_new, sum(spatialcells_new));
+    fprintf('Non-spatial cells (fraction form): mean = %.4f (%.1f%%), n = %d\n', ...
+        mean_nonspatial_new, 100*mean_nonspatial_new, sum(nonspatial_new));
+
+    % ---- Also report median, in case mean is unstable for non-spatial ----
+    median_spatial_new = median(w_P(spatialcells_new), 'omitnan');
+    median_nonspatial_new = median(w_P(nonspatial_new), 'omitnan');
+
+    fprintf('\nSpatial cells (fraction form): median = %.4f (%.1f%%)\n', ...
+        median_spatial_new, 100*median_spatial_new);
+    fprintf('Non-spatial cells (fraction form): median = %.4f (%.1f%%)\n', ...
+        median_nonspatial_new, 100*median_nonspatial_new);
 end
 
-%% EXAMPLE OF CELL RESPONSE WITH ACTUAL DATA, VS, AND VSP PREDICTIONS OVERLAYED
-if contains(figname,'Resp-singleCellV2')
+%% Split violin: LLHrel (ratio form) for spatial vs non-spatial, at each
+% RF position, showing BOTH median (solid) and mean (dashed) lines.
+if strcmp(figname,'RFposition-SplitViolin-SpatialVsNonspatial')
 
-    % Select which of the conditions to display: if figname mentions one
-    % or more condition names (e.g. 'Resp-singleCell-base-omit3'), show
-    % only those, in condNames' order; otherwise (just 'Resp-singleCell')
-    % show all conditions in condNames, as before.
-    mask = false(size(condNames));
-    for icond = 1:numel(condNames)
-        if contains(figname, condNames{icond})
-            mask(icond) = true;
-        end
-    end
-    if ~any(mask)
-        mask(:) = true;
-    end
-    cond2disp = find(mask);
-    nCond = numel(cond2disp);
+    spatial_mask    = goodcells & signicells & goodLLHcells;
+    nonspatial_mask = goodcells & ~(signicells & goodLLHcells);
+    col_Spatial     = [145 145 228]/255;
 
-    ncells = numel(singlecell_IDs);
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    RFvals = [35 40 45];
+    RF_edges = -7.5:5:7.5;  
+    %RFvals = [-5 0 5];
 
     figure;
-    for icell = 1:ncells
-        cellidx = singlecell_IDs(icell);
+    tl = tiledlayout(1,3, 'TileSpacing','compact','Padding','compact');
 
-        % Pre-scan to set a common Y limit (start at 0), using only the
-        % selected conditions (cond2disp) so the axis isn't stretched to
-        % accommodate conditions that aren't actually shown.
-        yMax = 0;
-        yAll  = cell(1,nCond);
-        seAll = cell(1,nCond);
-        yGLM  = cell(1,nCond);
-        yVS   = cell(1,nCond);
-        xAll  = cell(1,nCond);
+    for i = 1:numel(RFvals)
+        ax = nexttile(tl); hold(ax,'on');
 
-        for kk = 1:nCond
-            k = cond2disp(kk);
-            y   = squeeze(EXP.Maps{mapDATA_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y = y(:);
-            se  = squeeze(EXP.Maps{mapDATA_idx(k)}.Tuning.SErespModel(cellidx,1,:)); se = se(:);
-            y_g = squeeze(EXP.Maps{mapVSP_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_g = y_g(:);
-            y_vs= squeeze(EXP.Maps{mapVS_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_vs = y_vs(:);
+        vals_ns = LLHrel(nonspatial_mask & RFpos == RFvals(i));
+        vals_sp = LLHrel(spatial_mask & RFpos == RFvals(i));
 
-            x = linspace(0,200,numel(y));
+        yGrid = linspace(0.8, 1.6, 100);
+        [f_ns, ~] = ksdensity(vals_ns, yGrid);
+        [f_sp, ~] = ksdensity(vals_sp, yGrid);
+        f_sp(yGrid < 1.015) = 0;   % clip smoothing artifact below threshold
+        f_ns = f_ns / max([f_ns, f_sp]) * 0.35;
+        f_sp = f_sp / max([f_ns, f_sp]) * 0.35;
 
-            yAll{kk}  = y;
-            seAll{kk} = se;
-            yGLM{kk}  = y_g;
-            yVS{kk}   = y_vs;
-            xAll{kk}  = x;
+        x_ns = [RFvals(i) - f_ns, fliplr(RFvals(i)*ones(1,numel(yGrid)))];
+        y_ns = [yGrid, fliplr(yGrid)];
+        fill(ax, x_ns, y_ns, [0.7 0.7 0.7], 'EdgeColor','none');
 
-            yMax = max([yMax; y + se; y_g; y_vs], [], 'omitnan');
+        x_sp = [RFvals(i) + f_sp, fliplr(RFvals(i)*ones(1,numel(yGrid)))];
+        y_sp = [yGrid, fliplr(yGrid)];
+        fill(ax, x_sp, y_sp, col_Spatial, 'EdgeColor','none');
+
+        % ---- Median (solid) and mean (dashed) lines, both groups ----
+        med_ns = median(vals_ns,'omitnan');
+        med_sp = median(vals_sp,'omitnan');
+        mean_ns = mean(vals_ns,'omitnan');
+        mean_sp = mean(vals_sp,'omitnan');
+
+        plot(ax, [RFvals(i)-0.35, RFvals(i)], [med_ns med_ns], 'k-', 'LineWidth', 1.5);
+        plot(ax, [RFvals(i), RFvals(i)+0.35], [med_sp med_sp], 'k-', 'LineWidth', 1.5);
+        plot(ax, [RFvals(i)-0.35, RFvals(i)], [mean_ns mean_ns], 'k--', 'LineWidth', 1);
+        plot(ax, [RFvals(i), RFvals(i)+0.35], [mean_sp mean_sp], 'k--', 'LineWidth', 1);
+
+        xline(ax, RFvals(i), 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
+
+        [p_wrs, ~] = ranksum(vals_ns, vals_sp);
+
+        ylim(ax, [0.8 1.6]);
+        xlim(ax, [RFvals(i)-0.5, RFvals(i)+0.5]);
+        xlabel(ax, sprintf('RF = %d^\\circ', RFvals(i)));
+        if i == 1
+            ylabel(ax, 'LLH_{rel}');
+            legend(ax, {'','','Median','','Mean',''}, 'Location','northwest'); legend(ax,'boxoff');
         end
-        if ~isfinite(yMax) || yMax <= 0, yMax = 1; end
-        yLim = [0, 1.05*yMax];
+        title(ax, sprintf('p = %.3g', p_wrs));
+        box(ax,'off'); set(ax,'TickDir','out');
 
-        % Colors
-        col_data = [0 0 0];        % black for measured mean
-        col_glm  = col_Spatial;    % blue-ish for VSP (full model) prediction
-        col_vs   = [0.85 0.1 0.1]; % red for VS (reduced model) prediction
+        fprintf('\nRF = %d deg:\n', RFvals(i));
+        fprintf('  Non-spatial: median = %.3f, mean = %.3f, n = %d\n', ...
+            med_ns, mean_ns, numel(vals_ns));
+        fprintf('  Spatial:     median = %.3f, mean = %.3f, n = %d\n', ...
+            med_sp, mean_sp, numel(vals_sp));
+        fprintf('  Wilcoxon rank-sum test: p = %.3g\n', p_wrs);
 
-        % Draw the subplots, one per selected condition, reusing the
-        % shared yLim computed above.
-        for kk = 1:nCond
-            k = cond2disp(kk);
-            ax = subplot(ncells,nCond,nCond * (icell-1) + kk); hold(ax,'on');
+        for i = 1:numel(RFvals)
+            vals = LLHrel(spatialcells & RFpos == RFvals(i));
+            fprintf('RF = %d deg: median spatial weight = %.3f, n = %d\n', ...
+                RFvals(i), median(vals,'omitnan'), numel(vals));
 
-            seplot(ax, xAll{kk}, yAll{kk}, seAll{kk}, 0.25);
-
-            plot(ax, xAll{kk}, yAll{kk}, '-', 'Color', col_data, 'LineWidth', 1.5, 'DisplayName','Data');
-            plot(ax, xAll{kk}, yVS{kk}, '--', 'Color', col_vs, 'LineWidth', 2, 'DisplayName','VS');
-            plot(ax, xAll{kk}, yGLM{kk}, '-', 'Color', col_glm, 'LineWidth', 1.5, 'DisplayName','VSP');
-
-            xlim(ax,[0 200]); ylim(ax,yLim);
-            set(ax,'XTick',[40 80 120 160]);
-            box(ax,'off'); set(ax,'TickDir','out');
-            if icell == 1
-                title(ax, sprintf('%s', condNames{k}));
-            end
-            if kk == 1
-                ylabel(ax, EXP.Spk.CellListString{cellidx}, 'Interpreter', 'none');
-            end
-            if icell == ncells
-                xlabel(ax, 'Position (cm)');
-            end
-            if kk == nCond && icell == 1
-                legend(ax, 'Location','northwest'); legend(ax,'boxoff');
-            end
-            pbaspect([16 9 1])
+            nNonspatial = sum(goodcells & ~spatialcells & RFpos == RFvals(i));
+            fprintf('RF = %d deg: n non-spatial cells = %d\n', RFvals(i), nNonspatial);
         end
     end
 
-    if ncells == 1
-        sgtitle(sprintf('Cell %d - mean responses with SE and GLM overlay', singlecell_IDs(1)));
-    else
-        sgtitle('Mean responses with SE and GLM overlay');
+    sgtitle(tl, 'LLH_{rel}: split distribution (non-spatial | spatial), by RF position');
+end
+
+
+%%
+%% Spatial vs non-spatial LLHrel by RF position — scatter only, no violin
+if strcmp(figname,'RFposition-Scatter-SpatialVsNonspatial')
+    spatial_mask    = goodcells & signicells & goodLLHcells;
+    nonspatial_mask = goodcells & ~(signicells & goodLLHcells);
+    col_Spatial     = [145 145 228]/255;
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    RFvals = [-5 0 5];
+
+    figure;
+    tl = tiledlayout(1,3, 'TileSpacing','compact','Padding','compact');
+
+    % accumulate across RF positions for the pooled tests below
+    n_ns_byRF = zeros(1,numel(RFvals));
+    n_sp_byRF = zeros(1,numel(RFvals));
+    vals_sp_all = [];
+    grp_sp_all  = [];
+
+    for i = 1:numel(RFvals)
+        ax = nexttile(tl); hold(ax,'on');
+        vals_ns = LLHrel(nonspatial_mask & RFpos == RFvals(i));
+        vals_sp = LLHrel(spatial_mask & RFpos == RFvals(i));
+
+        n_ns_byRF(i) = numel(vals_ns);
+        n_sp_byRF(i) = numel(vals_sp);
+        vals_sp_all = [vals_sp_all; vals_sp(:)]; %#ok<AGROW>
+        grp_sp_all  = [grp_sp_all; repmat(RFvals(i), numel(vals_sp), 1)]; %#ok<AGROW>
+
+        % Jittered raw scatter, no violin
+        jitterWidth = 0.15;
+        jitter_ns = -0.1 - jitterWidth*rand(size(vals_ns));
+        jitter_sp = 0.1 + jitterWidth*rand(size(vals_sp));
+        scatter(ax, RFvals(i) + jitter_ns, vals_ns, 30, [0.3 0.3 0.3], ...
+            'filled', 'MarkerFaceAlpha', 0.5);
+        scatter(ax, RFvals(i) + jitter_sp, vals_sp, 30, col_Spatial, ...
+            'filled', 'MarkerFaceAlpha', 0.7);
+
+        % Median (solid) and mean (dashed) lines, both groups
+        med_ns = median(vals_ns,'omitnan');
+        med_sp = median(vals_sp,'omitnan');
+        mean_ns = mean(vals_ns,'omitnan');
+        mean_sp = mean(vals_sp,'omitnan');
+        plot(ax, [RFvals(i)-0.35, RFvals(i)], [med_ns med_ns], 'k-', 'LineWidth', 1.5);
+        plot(ax, [RFvals(i), RFvals(i)+0.35], [med_sp med_sp], 'k-', 'LineWidth', 1.5);
+        plot(ax, [RFvals(i)-0.35, RFvals(i)], [mean_ns mean_ns], 'k--', 'LineWidth', 1);
+        plot(ax, [RFvals(i), RFvals(i)+0.35], [mean_sp mean_sp], 'k--', 'LineWidth', 1);
+        xline(ax, RFvals(i), 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
+
+        [p_wrs, ~] = ranksum(vals_ns, vals_sp);
+
+        ylim(ax, [0.8 1.6]);
+        xlim(ax, [RFvals(i)-0.5, RFvals(i)+0.5]);
+        xlabel(ax, sprintf('RF = %d^\\circ', RFvals(i)));
+        if i == 1
+            ylabel(ax, 'LLH_{rel}');
+            legend(ax, {'Non-spatial','Spatial','Median','','Mean',''}, 'Location','northwest'); legend(ax,'boxoff');
+        end
+        title(ax, sprintf('p = %.3g', p_wrs));
+        box(ax,'off'); set(ax,'TickDir','out');
+
+        fprintf('\nRF = %d deg:\n', RFvals(i));
+        fprintf('  Non-spatial: median = %.3f, mean = %.3f, n = %d\n', ...
+            med_ns, mean_ns, numel(vals_ns));
+        fprintf('  Spatial:     median = %.3f, mean = %.3f, n = %d\n', ...
+            med_sp, mean_sp, numel(vals_sp));
+        fprintf('  Wilcoxon rank-sum test: p = %.3g\n', p_wrs);
     end
+    sgtitle(tl, 'LLH_{rel}: non-spatial vs spatial, by RF position');
+
+    % Chi-square test: RF position x classification
+    contingency = [n_ns_byRF; n_sp_byRF]; % rows: non-spatial, spatial; cols: RF positions
+    n_total = sum(contingency(:));
+    row_tot = sum(contingency,2);
+    col_tot = sum(contingency,1);
+    expected = row_tot * col_tot / n_total;
+    chi2_stat = sum((contingency(:) - expected(:)).^2 ./ expected(:));
+    df_chi2 = (size(contingency,1)-1) * (size(contingency,2)-1);
+    p_chi2 = 1 - chi2cdf(chi2_stat, df_chi2);
+    fprintf('\nChi-square test, RF position x classification:\n');
+    fprintf('  chi2 = %.3f, df = %d, p = %.3g\n', chi2_stat, df_chi2, p_chi2);
+
+    % Kruskal-Wallis test: spatial weight across RF positions, spatially modulated boutons only
+    [p_kw, tbl_kw, stats_kw] = kruskalwallis(vals_sp_all, grp_sp_all, 'off');
+    fprintf('\nKruskal-Wallis test, spatial weight across RF position (spatially modulated boutons only):\n');
+    fprintf('  chi2 = %.3f, df = %d, p = %.3g\n', tbl_kw{2,5}, tbl_kw{2,3}, p_kw);
+    for i = 1:numel(RFvals)
+        fprintf('  RF = %d deg: median = %.3f, n = %d\n', RFvals(i), ...
+            median(vals_sp_all(grp_sp_all==RFvals(i)),'omitnan'), n_sp_byRF(i));
+    end
+end
+
+%% RF=-5 cells, ranked by landmark kernel amplitude AWAY from a landmark position
+if strcmp(figname, 'RFm5-HighAmplitude-OffLandmark')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_idx = find(goodcells & RFpos == -5);
+    fprintf('%d cells with RFpos == -5\n', numel(rfm5_idx));
+
+    mapLandmark_idx = (1:ncond) + 3*ncond; % = 19:24, corridor position, base condition
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+    landmarks = [40 80 120 160];
+
+    M = landmarkTrace(rfm5_idx, :);
+    [peakVals, peakBin] = max(M, [], 2, 'omitnan');
+    peakPos = xpos(peakBin)';
+
+    distToLandmark = nan(size(peakPos));
+    for c = 1:numel(peakPos)
+        [~, closestIdx] = min(abs(peakPos(c) - landmarks));
+        distToLandmark(c) = peakPos(c) - landmarks(closestIdx);
+    end
+
+    cellNamesAll = EXP.Spk.CellListString(rfm5_idx);
+
+    % Rank by peak amplitude among cells whose peak sits meaningfully
+    % away from a landmark (here: more than 10cm from the nearest one)
+    offLandmark_mask = abs(distToLandmark) > 10;
+    fprintf('%d/%d RF=-5 cells peak more than 10cm from the nearest landmark\n', ...
+        sum(offLandmark_mask), numel(rfm5_idx));
+
+    candIdx = find(offLandmark_mask);
+    [~, sortIdx] = sort(peakVals(candIdx), 'descend');
+    candIdx = candIdx(sortIdx);
+
+    fprintf('\n%-30s %10s %12s %10s\n', 'Cell name', 'Peak pos', 'Dist to LM', 'Amplitude');
+    for i = 1:numel(candIdx)
+        idx = candIdx(i);
+        fprintf('%-30s %10.1f %12.1f %10.3f\n', ...
+            cellNamesAll{idx}, peakPos(idx), distToLandmark(idx), peakVals(idx));
+    end
+
+    % Push ranked names to base workspace for the raw-data loop
+    assignin('base', 'cellNames', cellNamesAll(candIdx));
+    assignin('base', 'cellDistances', distToLandmark(candIdx));
+
+    %% Diagnostic: does distance-to-landmark cluster at a fixed value across ALL goodcells?
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+    landmarks = [40 80 120 160];
+
+    M = landmarkTrace(goodcells, :);
+    [peakVals, peakBin] = max(M, [], 2, 'omitnan');
+    peakPos = xpos(peakBin)';
+
+    distToLandmark = nan(size(peakPos));
+    for c = 1:numel(peakPos)
+        [~, closestIdx] = min(abs(peakPos(c) - landmarks));
+        distToLandmark(c) = peakPos(c) - landmarks(closestIdx);
+    end
+
+    figure('Color','w');
+    histogram(distToLandmark, -50:2:50);
+    xline(0, 'k--', 'LineWidth', 1);
+    xlabel('Distance from peak to nearest landmark (cm)');
+    ylabel('# boutons');
+    title(sprintf('Peak-to-landmark distance, ALL goodcells (n=%d)', sum(goodcells)));
+    box off; set(gca,'TickDir','out');
+
+    fprintf('Median |distance|: %.1f cm\n', median(abs(distToLandmark), 'omitnan'));
+    fprintf('Fraction within 8-15cm of a landmark: %.1f%%\n', ...
+        100*mean(abs(distToLandmark) >= 8 & abs(distToLandmark) <= 15));
+
+end
+%% Visual latency split by RF position, all goodcells
+if strcmp(figname,'RFposition-Latency-AllGoodcells')
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    Vislat = EXP.GLMs{1}.Perf.bestVisdelay(:);
+    RFvals = [-5 0 5];
+    LAT_edges = -1000/60 : 2000/60 : 500+1000/60; % same bins as your existing latency figures
+
+    % ---- ADDED: masks for the rank-sum comparison below ----
+    rfm5_mask = goodcells & RFpos == -5;
+    otherRF_mask = goodcells & ismember(RFpos, [0 5]); % restrict "rest" to the other 2 groups shown here
+
+    figure('Color','w'); hold on;
+    cmap = lines(numel(RFvals));
+    for i = 1:numel(RFvals)
+        vals = Vislat(goodcells & RFpos == RFvals(i));
+        histogram(vals, LAT_edges, 'DisplayStyle','stairs', 'EdgeColor', cmap(i,:), ...
+            'LineWidth', 1.5, 'DisplayName', sprintf('RF=%d^\\circ (n=%d)', RFvals(i), numel(vals)));
+    end
+    xlabel('Visual latency (ms)'); ylabel('# cells');
+    legend('Location','northeast'); legend boxoff;
+    box off; set(gca,'TickDir','out');
+    title('Visual latency by RF position, all goodcells');
+
+    % Pairwise comparisons + overall test
+    fprintf('\nVisual latency by RF position (all goodcells):\n');
+    valsByRF = cell(numel(RFvals),1);
+    for i = 1:numel(RFvals)
+        valsByRF{i} = Vislat(goodcells & RFpos == RFvals(i));
+        fprintf('  RF = %d deg: median = %.1f ms, n = %d\n', ...
+            RFvals(i), median(valsByRF{i},'omitnan'), numel(valsByRF{i}));
+    end
+    allVals = cat(1, valsByRF{:});
+    group = cat(1, ...
+        repmat(1, numel(valsByRF{1}), 1), ...
+        repmat(2, numel(valsByRF{2}), 1), ...
+        repmat(3, numel(valsByRF{3}), 1));
+    [p_kw, ~, ~] = kruskalwallis(allVals, group, 'off');
+    fprintf('  Kruskal-Wallis test: latency vs RF position, p = %.3g\n', p_kw);
+
+    % ---- ADDED: rank-sum, RF=-5 vs the other two groups combined ----
+    [p_wrs, ~] = ranksum(Vislat(rfm5_mask), Vislat(otherRF_mask));
+    fprintf('  Wilcoxon rank-sum test (RF=-5 vs RF={0,5}): p = %.3g\n', p_wrs);
+end
+
+%% Visual latency by RF position, all goodcells — scatter, not histogram
+if strcmp(figname,'RFposition-Latency-Scatter')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    Vislat = EXP.GLMs{1}.Perf.bestVisdelay(:);
+    RFvals = [-5 0 5];
+    cmap = lines(numel(RFvals));
+
+    figure('Color','w'); hold on;
+    valsByRF = cell(numel(RFvals),1);
+    for i = 1:numel(RFvals)
+        vals = Vislat(goodcells & RFpos == RFvals(i));
+        valsByRF{i} = vals;
+
+        jitter = (rand(size(vals))-0.5)*0.6;
+        scatter(RFvals(i) + jitter, vals, 12, cmap(i,:), 'filled', 'MarkerFaceAlpha', 0.4);
+
+        med = median(vals,'omitnan');
+        mn  = mean(vals,'omitnan');
+        plot([RFvals(i)-0.35, RFvals(i)+0.35], [med med], 'k-', 'LineWidth', 1.8);
+        plot([RFvals(i)-0.35, RFvals(i)+0.35], [mn mn], 'k--', 'LineWidth', 1.2);
+
+        fprintf('RF = %d deg: median = %.1f ms, mean = %.1f ms, n = %d\n', ...
+            RFvals(i), med, mn, numel(vals));
+    end
+
+    xticks(RFvals); xlabel('RF position (deg)'); ylabel('Visual latency (ms)');
+    box off; set(gca,'TickDir','out');
+    title('Visual latency by RF position (solid=median, dashed=mean)');
+    
+    allVals = cat(1, valsByRF{:});
+    group = cat(1, repmat(1,numel(valsByRF{1}),1), repmat(2,numel(valsByRF{2}),1), repmat(3,numel(valsByRF{3}),1));
+    [p_kw, ~, ~] = kruskalwallis(allVals, group, 'off');
+    [p_wrs, ~] = ranksum(Vislat(rfm5_mask), Vislat(otherRF_mask));
+    fprintf('Corrected Wilcoxon rank-sum test (RF~-5 vs rest latency): p = %.3g\n', p_wrs);
+    fprintf('Kruskal-Wallis test: latency vs RF position, p = %.3g\n', p_kw);
+end
+%% Visual kernels split by RF sign (RF > 0 vs RF < 0)
+if strcmp(figname, 'VisKernel-byRFsign')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+
+    % Visual (landmark) kernel, feature 1 — matches the population-level
+    % convention used elsewhere in this script (line 665)
+    visK = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1)); % [cells x bins]
+    xv = linspace(0, 110, size(visK, 2)); % visual azimuth axis, as in get_vis_se
+
+    RFpos_gt0 = goodcells & RFpos > 0;
+    RFpos_lt0 = goodcells & RFpos < 0;
+
+    fprintf('RF > 0: n = %d cells\n', sum(RFpos_gt0));
+    fprintf('RF < 0: n = %d cells\n', sum(RFpos_lt0));
+
+    % Min-max scale each cell's own kernel to [0,1], matching this
+    % script's existing "min-max-scaled" convention for comparing
+    % kernels across cells with different absolute response magnitudes
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ ...
+                        (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+
+    visK_gt0_scaled = scaleKernel(visK(RFpos_gt0,:));
+    visK_lt0_scaled = scaleKernel(visK(RFpos_lt0,:));
+
+    figure('Color','w','Position',[100 100 500 400]); hold on;
+
+    mean_gt0 = mean(visK_gt0_scaled, 1, 'omitnan');
+    se_gt0   = std(visK_gt0_scaled, 0, 1, 'omitnan') ./ sqrt(sum(RFpos_gt0));
+    mean_lt0 = mean(visK_lt0_scaled, 1, 'omitnan');
+    se_lt0   = std(visK_lt0_scaled, 0, 1, 'omitnan') ./ sqrt(sum(RFpos_lt0));
+
+    fill([xv, fliplr(xv)], [mean_gt0+se_gt0, fliplr(mean_gt0-se_gt0)], ...
+        [0.8 0.2 0.2], 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+    plot(xv, mean_gt0, 'Color', [0.8 0.2 0.2], 'LineWidth', 2, ...
+        'DisplayName', sprintf('RF > 0 (n=%d)', sum(RFpos_gt0)));
+
+    fill([xv, fliplr(xv)], [mean_lt0+se_lt0, fliplr(mean_lt0-se_lt0)], ...
+        [0.2 0.2 0.8], 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+    plot(xv, mean_lt0, 'Color', [0.2 0.2 0.8], 'LineWidth', 2, ...
+        'DisplayName', sprintf('RF < 0 (n=%d)', sum(RFpos_lt0)));
+
+    xlabel('Visual azimuth (deg)');
+    ylabel('Visual kernel (min-max scaled)');
+    legend('Location','best'); legend boxoff;
+    box off; set(gca,'TickDir','out');
+    title('Scaled visual kernels, split by RF sign');
+end
+%% COMPARE AMPLITUDE (RANGE) OF LANDMARK VS BACKGROUND KERNELS - violin version
+if strcmp(figname,'VisualKernel-Amplitude-Compare-Violin')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    landmark_gc = landmark_est(goodcells,:);
+    bg_gc       = bg_est(goodcells,:);
+
+    range_landmark = max(landmark_gc,[],2,'omitnan') - min(landmark_gc,[],2,'omitnan');
+    range_bg       = max(bg_gc,[],2,'omitnan') - min(bg_gc,[],2,'omitnan');
+
+    % Use plotViolin with a categorical x (1 = Landmark, 2 = Background)
+    x_cat = [ones(numel(range_landmark),1); 2*ones(numel(range_bg),1)];
+    y_val = [range_landmark; range_bg];
+
+    figure; hold on;
+    plotViolin(gca, x_cat, y_val, [0.5 1.5 2.5]);
+    xlim([0.5 2.5]);
+    set(gca, 'XTick', [1 2], 'XTickLabel', {'Landmark','Background'});
+    ylim([0 150]);   % zoomed to where the bulk of the data lives
+    ylabel('Kernel amplitude (range, deconvolved activity, a.u.)');
+    title('Landmark vs background kernel amplitude');
+    box off; set(gca,'TickDir','out');
+
+    [p_wrs, ~] = signrank(range_landmark, range_bg);
+    yl = ylim;
+    text(1.5, yl(2)*0.95, sprintf('Wilcoxon signed-rank p = %.2g', p_wrs), ...
+        'HorizontalAlignment','center', 'FontSize', 9);
+end
+%% CORRELATION BETWEEN LANDMARK/BG KERNELS AND THE RESIDUAL RESPONSE
+% AFTER REMOVING THE OTHER MODEL COMPONENTS
+% ---------------------------------------------------------------------
+% For each kernel type (landmark, background), computes the residual
+% response (measured minus the full model fit WITHOUT that component),
+% then correlates that residual against the component's own kernel.
+% This isolates each component's own explanatory power, rather than
+% comparing it against the full measured response (which necessarily
+% includes variance from other components too).
+% ---------------------------------------------------------------------
+if strcmp(figname,'VisualKernel-Residual-Corr')
+
+    measured  = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+
+    noL1L2_pred = squeeze(EXP.GLMs{1}.Tuning(iPosnoL1L2).meanrespModel(:,1,:));
+    noBG_pred   = squeeze(EXP.GLMs{1}.Tuning(iPosnoBG).meanrespModel(:,1,:));
+
+    residual_landmark = measured - noL1L2_pred;
+    residual_bg       = measured - noBG_pred;
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    resid_l_gc = residual_landmark(goodcells,:);
+    resid_b_gc = residual_bg(goodcells,:);
+    landmark_gc = landmark_est(goodcells,:);
+    bg_gc = bg_est(goodcells,:);
+
+    nCells = size(resid_l_gc,1);
+    r_landmark_resid = nan(nCells,1);
+    r_bg_resid = nan(nCells,1);
+
+    for i = 1:nCells
+        rl = resid_l_gc(i,:); l = landmark_gc(i,:);
+        rb = resid_b_gc(i,:); b = bg_gc(i,:);
+        valid_l = ~isnan(rl) & ~isnan(l);
+        valid_b = ~isnan(rb) & ~isnan(b);
+        if sum(valid_l) > 2
+            r_landmark_resid(i) = corr(rl(valid_l)', l(valid_l)', 'type', 'Pearson');
+        end
+        if sum(valid_b) > 2
+            r_bg_resid(i) = corr(rb(valid_b)', b(valid_b)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Landmark kernel (residual-based): median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_landmark_resid,'omitnan'), prctile(r_landmark_resid,25), prctile(r_landmark_resid,75), sum(~isnan(r_landmark_resid)));
+    fprintf('Background kernel (residual-based): median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_bg_resid,'omitnan'), prctile(r_bg_resid,25), prctile(r_bg_resid,75), sum(~isnan(r_bg_resid)));
 end
 
 %% 
@@ -2819,6 +4384,272 @@ if contains(figname,'Ordered-Kernels')
 end
 
 
+%% Mean running-speed kernel, across cells with a significant visual fit
+if strcmp(figname, 'MeanSpeedKernel-VisualCells')
+
+    p_th = 0.05;
+    itex = 3;
+    iSpd = 2;
+
+    % Cells with a significant vision-model fit
+    visualcells = EXP.GLMs{1}.Tuning(itex).pval <= p_th;
+    fprintf('Cells with significant visual fit: n = %d\n', sum(visualcells));
+
+    % Speed kernel, feature 1, all bins
+    spdK = squeeze(EXP.GLMs{1}.Tuning(iSpd).meanrespModel(:,1,:));
+    spdK_sel = spdK(visualcells,:);
+
+    xs = linspace(2,50,size(spdK_sel,2)); % same range used in 'GLM-kernels'
+
+    meanSpd = mean(spdK_sel, 1, 'omitnan');
+    seSpd = std(spdK_sel, 0, 1, 'omitnan') ./ sqrt(sum(~isnan(spdK_sel),1));
+
+    figure('Color','w','Position',[100 100 500 400]); hold on;
+    seplot(gca, xs, meanSpd, seSpd, 0.2);
+    plot(xs, meanSpd, 'k-', 'LineWidth', 1.5);
+    yline(0, 'k--');
+    xlabel('Run speed (cm/s)'); ylabel('Mean speed kernel value');
+    title(sprintf('Mean running-speed kernel, visual cells (n=%d)', sum(visualcells)));
+    box off; set(gca,'TickDir','out');
+
+    visualcells = EXP.GLMs{1}.Tuning(itex).pval <= p_th;
+    visual_idx = find(visualcells);
+
+    nShow = 5;
+    exampleIdx = visual_idx(round(linspace(1, numel(visual_idx), nShow)));
+
+    spdK = squeeze(EXP.GLMs{1}.Tuning(iSpd).meanrespModel(:,1,:));
+    xs = linspace(2,50,size(spdK,2));
+
+    figure('Color','w','Position',[100 100 900 400]);
+    for i = 1:nShow
+        cellidx = exampleIdx(i);
+        subplot(1,nShow,i); hold on;
+        plot(xs, spdK(cellidx,:), 'k-', 'LineWidth', 1.3);
+        yline(0, 'k--');
+        title(sprintf('%s', EXP.Spk.CellListString{cellidx}), 'Interpreter','none','FontSize',7);
+        xlabel('Run speed (cm/s)');
+        if i == 1, ylabel('Speed kernel value'); end
+        box off; set(gca,'TickDir','out');
+    end
+    sgtitle('5 example speed kernels, visual cells');
+end
+
+
+%% Check whether a specific cell exists in the GLM/kernel population, and cross-check its properties
+if strcmp(figname, 'CheckCellInKernel')
+
+    targetName = 'M26003_20260325_cell#83';
+    expectedRawPeak = 112.6; % from the raw-data check
+
+    matchIdx = find(strcmp(EXP.Spk.CellListString, targetName));
+
+    if isempty(matchIdx)
+        fprintf('%s was NOT found in EXP.Spk.CellListString.\n', targetName);
+        fprintf('This could mean it failed goodcells/spatial-fit criteria, or was excluded upstream.\n');
+    else
+        fprintf('%s found at index %d\n', targetName, matchIdx);
+
+        isGood = T.goodcells(matchIdx);
+        isSpatial = T.signicells(matchIdx) & goodLLHcells(matchIdx);
+        RFpos = EXP.GLMs{1}.Perf.bestRFpos(matchIdx);
+
+        fprintf('  goodcells: %d\n', isGood);
+        fprintf('  spatially modulated: %d\n', isSpatial);
+        fprintf('  RF position: %.1f deg\n', RFpos);
+
+        mapLandmark_idx = (1:ncond) + 3*ncond;
+        landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+        xpos = linspace(0, 200, size(landmarkTrace, 2));
+
+        kernelTrace = landmarkTrace(matchIdx, :);
+        [~, peakBin] = max(kernelTrace);
+        kernelPeakPos = xpos(peakBin);
+
+        fprintf('  Kernel-derived peak position: %.1f cm (raw-data peak was %.1f cm)\n', kernelPeakPos, expectedRawPeak);
+        fprintf('  Match: %s\n', string(abs(kernelPeakPos - expectedRawPeak) < 5));
+    end
+end
+
+%% Speed contribution summary: distribution, example shapes, comparison to space, and relation to spatial selectivity
+if strcmp(figname, 'SpeedContribution-FullSummary')
+
+    iSpd = 2;
+    iPos = numel(EXP.GLMs{1}.Tuning);
+
+    % ---- Kernel amplitude relative to overall response range ----
+    spdK = squeeze(EXP.GLMs{1}.Tuning(iSpd).meanrespModel(:,1,:));
+    spdK_gc = spdK(goodcells,:);
+    spdRange = max(spdK_gc,[],2,'omitnan') - min(spdK_gc,[],2,'omitnan');
+
+    posK = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+    posK_gc = posK(goodcells,:);
+    posRange = max(posK_gc,[],2,'omitnan') - min(posK_gc,[],2,'omitnan');
+
+    measured = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    measured_gc = measured(goodcells,:);
+    respRange = max(measured_gc,[],2,'omitnan') - min(measured_gc,[],2,'omitnan');
+
+    relSpeed = spdRange ./ respRange;
+    relSpace = posRange ./ respRange;
+
+    LLHrel_gc = LLHrel(goodcells);
+
+    xs = linspace(2,50,size(spdK,2));
+
+    figure('Color','w','Position',[100 100 1300 700]);
+    tl = tiledlayout(2,3, 'TileSpacing','compact','Padding','compact');
+
+    % ---- Panel 1: distribution of relative speed contribution ----
+    ax1 = nexttile(tl); hold(ax1,'on');
+    histogram(ax1, relSpeed, 30, 'FaceColor',[0.4 0.4 0.7], 'EdgeColor','none');
+    xlabel(ax1,'Speed kernel range / response range'); ylabel(ax1,'# cells');
+    title(ax1, sprintf('Speed contribution, goodcells (n=%d)', sum(goodcells)));
+    fracAbove = mean(relSpeed > 0.2, 'omitnan');
+    text(ax1, max(xlim(ax1))*0.6, max(ylim(ax1))*0.8, sprintf('%.1f%% > 0.2', 100*fracAbove), 'FontSize',9);
+    box(ax1,'off'); set(ax1,'TickDir','out');
+
+    % ---- Panel 2: example speed kernel shapes ----
+    ax2 = nexttile(tl); hold(ax2,'on');
+    gc_idx = find(goodcells);
+    exampleIdx = gc_idx(round(linspace(1, numel(gc_idx), 5)));
+    for i = 1:numel(exampleIdx)
+        plot(ax2, xs, spdK(exampleIdx(i),:), 'LineWidth', 1.2);
+    end
+    yline(ax2, 0, 'k--');
+    xlabel(ax2,'Run speed (cm/s)'); ylabel(ax2,'Speed kernel value');
+    title(ax2,'Example speed kernel shapes');
+    box(ax2,'off'); set(ax2,'TickDir','out');
+
+    % ---- Panel 3: population mean speed kernel ----
+    ax3 = nexttile(tl); hold(ax3,'on');
+    meanSpd = mean(spdK_gc, 1, 'omitnan');
+    seSpd = std(spdK_gc, 0, 1, 'omitnan') ./ sqrt(sum(~isnan(spdK_gc),1));
+    seplot(ax3, xs, meanSpd, seSpd, 0.2);
+    plot(ax3, xs, meanSpd, 'k-', 'LineWidth', 1.5);
+    yline(ax3, 0, 'k--');
+    xlabel(ax3,'Run speed (cm/s)'); ylabel(ax3,'Mean speed kernel value');
+    title(ax3,'Population mean speed kernel');
+    box(ax3,'off'); set(ax3,'TickDir','out');
+
+    % ---- Panel 4: speed vs space contribution, paired ----
+    ax4 = nexttile(tl); hold(ax4,'on');
+    histogram(ax4, relSpeed, 0:0.05:1.5, 'FaceColor',[0.4 0.4 0.7], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','Speed');
+    histogram(ax4, relSpace, 0:0.05:1.5, 'FaceColor',col_Spatial, 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','Space');
+    xlabel(ax4,'Kernel range / response range'); ylabel(ax4,'# cells');
+    title(ax4,'Speed vs space contribution');
+    legend(ax4,'Location','northeast'); legend(ax4,'boxoff');
+    [p_wrs,~] = ranksum(relSpeed, relSpace);
+    text(ax4, max(xlim(ax4))*0.5, max(ylim(ax4))*0.8, sprintf('p = %.3g', p_wrs), 'FontSize',9);
+    box(ax4,'off'); set(ax4,'TickDir','out');
+
+    % ---- Panel 5: speed contribution vs spatial selectivity (LLHrel) ----
+    ax5 = nexttile(tl); hold(ax5,'on');
+    scatter(ax5, LLHrel_gc, relSpeed, 20, 'filled', 'MarkerFaceAlpha', 0.3);
+    valid = ~isnan(LLHrel_gc) & ~isnan(relSpeed);
+    [r,p] = corr(LLHrel_gc(valid), relSpeed(valid), 'type','Spearman');
+    xlabel(ax5,'LLH_{rel} (spatial)'); ylabel(ax5,'Relative speed contribution');
+    title(ax5, sprintf('Speed vs spatial selectivity (r=%.2f, p=%.3g)', r, p));
+    box(ax5,'off'); set(ax5,'TickDir','out');
+
+    sgtitle(tl, 'Speed contribution to response, goodcells');
+
+    fprintf('Median relative speed contribution: %.3f\n', median(relSpeed,'omitnan'));
+    fprintf('Median relative space contribution: %.3f\n', median(relSpace,'omitnan'));
+    fprintf('Wilcoxon rank-sum (speed vs space): p = %.3g\n', p_wrs);
+    fprintf('Speed contribution vs LLHrel: Spearman r = %.3f, p = %.3g\n', r, p);
+end
+
+%% Speed contribution, kernel amplitude relative to overall response range
+if strcmp(figname, 'SpeedContribution-Amplitude')
+
+    iSpd = 2;
+    spdK = squeeze(EXP.GLMs{1}.Tuning(iSpd).meanrespModel(:,1,:));
+    spdK_gc = spdK(goodcells,:);
+    spdRange = max(spdK_gc,[],2,'omitnan') - min(spdK_gc,[],2,'omitnan');
+
+    measured = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    measured_gc = measured(goodcells,:);
+    respRange = max(measured_gc,[],2,'omitnan') - min(measured_gc,[],2,'omitnan');
+
+    relSpeedContribution = spdRange ./ respRange;
+
+    fprintf('Speed kernel range relative to response range, goodcells:\n');
+    fprintf('  Median = %.3f, n = %d\n', median(relSpeedContribution,'omitnan'), sum(goodcells));
+
+    figure('Color','w','Position',[100 100 500 400]);
+    histogram(relSpeedContribution, 30, 'FaceColor',[0.4 0.4 0.7], 'EdgeColor','none');
+    xlabel('Speed kernel range / response range'); ylabel('# cells');
+    title(sprintf('Speed contribution (amplitude-based), goodcells (n=%d)', sum(goodcells)));
+    box off; set(gca,'TickDir','out');
+end
+
+%% Speed contribution to overall response (LLHrel_Spd), goodcells
+if strcmp(figname, 'SpeedContribution-Summary')
+
+    % goodcells already includes the visual-fit significance check
+    % (Tuning(itex).pval <= p_th), plus non-flat landmark/BG kernels,
+    % same mask used throughout the landmark/BG kernel blocks.
+    vals = LLHrel_Spd(goodcells);
+
+    fprintf('Speed contribution (LLHrel_Spd), goodcells:\n');
+    fprintf('  Median = %.3f, n = %d\n', median(vals,'omitnan'), sum(~isnan(vals)));
+    fprintf('  %% of cells with LLHrel_Spd > 1.015 (meaningful contribution): %.1f%%\n', ...
+        100*mean(vals > 1+LLHrel_th, 'omitnan'));
+
+    proportionSpeed = 1 - (1 ./ vals);
+    fprintf('  Median proportion of response attributable to speed: %.3f (%.1f%%)\n', ...
+        median(proportionSpeed,'omitnan'), 100*median(proportionSpeed,'omitnan'));
+
+    figure('Color','w','Position',[100 100 500 400]);
+    histogram(vals, 30, 'FaceColor',[0.4 0.4 0.7], 'EdgeColor','none');
+    xline(1, 'k--');
+    xlabel('LLH_{rel} (speed)'); ylabel('# cells');
+    title(sprintf('Speed contribution to model fit, goodcells (n=%d)', sum(goodcells)));
+    box off; set(gca,'TickDir','out');
+end
+
+%% CORRELATION BETWEEN MEASURED AND ESTIMATED SPATIAL KERNEL SHAPE
+% ---------------------------------------------------------------------
+% Computes Pearson's r between each spatially modulated neuron's
+% estimated spatial kernel and its measured (base-condition) response,
+% mirroring the validation method used in Morimoto et al. 2025 (Fig 3D).
+% Prints summary stats and draws a histogram of per-cell correlations.
+% ---------------------------------------------------------------------
+if strcmp(figname,'SpaceKernel-MeasuredVsEstimated-Corr')
+
+    measured  = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    estimated = squeeze(EXP.GLMs{1}.Tuning(iPos).meanrespModel(:,1,:));
+
+    measured_sp  = measured(spatialcells,:);
+    estimated_sp = estimated(spatialcells,:);
+
+    nCells = size(measured_sp,1);
+    r_vals = nan(nCells,1);
+    for i = 1:nCells
+        m = measured_sp(i,:);
+        e = estimated_sp(i,:);
+        valid = ~isnan(m) & ~isnan(e);
+        if sum(valid) > 2
+            r_vals(i) = corr(m(valid)', e(valid)', 'type', 'Pearson');
+        end
+    end
+
+    fprintf('Median r = %.3f, IQR = [%.3f, %.3f], n = %d\n', ...
+        median(r_vals,'omitnan'), ...
+        prctile(r_vals,25), prctile(r_vals,75), sum(~isnan(r_vals)));
+
+    figure;
+    histogram(r_vals, 30, 'FaceColor',[0.6 0.6 0.9], 'EdgeColor','none');
+    xlabel('Pearson correlation (measured vs. estimated kernel)');
+    ylabel('# cells');
+    box off; set(gca,'TickDir','out');
+
+    fprintf('Skewness: %.3f\n', skewness(r_vals));
+    fprintf('Min: %.3f, Max: %.3f\n', min(r_vals), max(r_vals));
+    fprintf('%% of cells with r > 0.5: %.1f%%\n', 100*mean(r_vals > 0.5));
+    fprintf('%% of cells with r > 0.8: %.1f%%\n', 100*mean(r_vals > 0.8));
+end
 
 %% =====================================================================
 %  'ExampleTraces-Kernels-<order_ref>-<display1>-<display2>-...'
@@ -2847,8 +4678,8 @@ end
 % =====================================================================
 if contains(figname,'ExampleTraces-Kernels')
 
-    n_groups_to_show = 8;
-    Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
+    n_groups_to_show = 10;
+    Kn_local = [3 3];          % group size, same convention as 'Ordered-Kernels-*'
 
     S = strsplit(figname, '-');
     S = S(3:end);
@@ -3089,7 +4920,7 @@ if contains(figname,'ExampleTraces-Kernels')
         for s = 1:n_animals
             vals = find(sess_vals(sess_ord) == sess_vals(s));
             x_lane = s;   % this animal's own lane/column position
-            scatter(ax_sess, x_lane*ones(size(vals)), vals, 8, 'filled', ...
+            scatter(ax_sess, x_lane*ones(size(vals)), vals, 30, 'filled', ...
                 'MarkerFaceColor', sess_cmap(s,:), 'MarkerEdgeColor','none');
         end
         xlim(ax_sess, [0.3, n_animals+0.7]); ylim(ax_sess, [1 N]);
@@ -3254,6 +5085,386 @@ if contains(figname,'ExampleTraces-Kernels')
     % cutting off content in the exported file.
 end
 
+
+
+%% Find where specific example cells land within the landmark-kernel heatmap's ordering
+if strcmp(figname, 'LocateExamplesInKernelHeatmap')
+
+    % ---- Same population/ordering as the 638-bouton kernel heatmap ----
+    spatial_mask = goodcells;  % matches "638 boutons" (no further spatial restriction)
+
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    M = landmarkTrace(spatial_mask, :);
+    N = size(M, 1);
+
+    % Same z-score + hierarchical clustering ordering used to build the figure
+    mu_row = mean(M, 2, 'omitnan');
+    sd_row = std(M, 0, 2, 'omitnan');
+    Mz = (M - mu_row) ./ sd_row;
+    valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
+    nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
+    Y = pdist(Mz(valid_idx,:), dist_metric);
+    Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
+    optiorder_valid = optimalleaforder(Z, Y);
+    optiorder = cat(1, valid_idx(optiorder_valid), nan_idx);
+
+    cellNamesInMask = EXP.Spk.CellListString(spatial_mask);
+    cellNamesOrdered = cellNamesInMask(optiorder);
+
+    % ---- Cells you want to locate ----
+    targetNames = {
+        'M26003_20260325_cell#83';
+        'M25132_20260228_cell#140'; 
+        'M26003_20260324_cell#39';
+        'M26003_20260325_cell#4';
+
+        % add more example cell names here
+    };
+
+    fprintf('%-30s %12s %12s\n', 'Cell name', 'Row in heatmap', '%% down (0=top)');
+    for i = 1:numel(targetNames)
+        rowIdx = find(strcmp(cellNamesOrdered, targetNames{i}));
+        if isempty(rowIdx)
+            fprintf('%-30s %12s\n', targetNames{i}, 'NOT FOUND');
+        else
+            pctDown = 100 * rowIdx / N;
+            fprintf('%-30s %12d %11.1f%%\n', targetNames{i}, rowIdx, pctDown);
+        end
+    end
+end
+
+%% =====================================================================
+%  'ExampleTraces-KernelsOnly-<order_ref>-<display1>-<display2>-...'
+%
+%  Same as 'ExampleTraces-Kernels-*', but WITHOUT the measured-response
+%  overlay: example trace panels show ONLY the kernel(s) requested, no
+%  gray "Data" background line, and 'Data' is never loaded unless it's
+%  itself one of the requested display tags.
+%
+%  ADDED: specific example cells (targetNames) are marked directly on
+%  each heatmap with a horizontal line + name label, so you can see
+%  exactly where they sit within the population's similarity ordering.
+% =====================================================================
+if contains(figname,'ExampleTraces-KernelsOnly')
+
+    n_groups_to_show = 15;
+    Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
+
+    S = strsplit(figname, '-');
+    S = S(3:end);
+    show_all  = any(contains(S, 'all'));
+    show_omit = any(contains(S, 'omission'));
+    valid_tags = {'Space','Landmarks','BG','Data'};
+    S_tags = S(ismember(S, valid_tags));
+    if isempty(S_tags)
+        error('ExampleTraces-KernelsOnly: no recognized tag found in figname. Use one of: Space, Landmarks, BG, Data.');
+    end
+    order_ref = S_tags{1};        % ordering ALWAYS uses the first requested tag
+
+    % HEATMAPS show exactly the requested kernel tag(s) - nothing auto-added.
+    display_tags = S_tags;
+
+    getMap = @(tag) local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx);
+
+    % ---- Cell selection mask ----
+    spatial_mask = goodcells;
+    if show_omit
+        spatial_mask = spatial_mask & goodOmitcells;
+    elseif ~show_all && any(strcmp(display_tags, 'Space'))
+        spatial_mask = spatial_mask & signicells & goodLLHcells;
+    end
+
+    % ---- Build display maps (row-masked): ONLY the requested tags -
+    % 'Data' is NOT auto-added here, unlike 'ExampleTraces-Kernels' ----
+    all_needed_tags = display_tags;
+    X = struct();
+    for t = 1:numel(all_needed_tags)
+        rawMap = getMap(all_needed_tags{t});
+        X.(all_needed_tags{t}).raw = rawMap(spatial_mask,:);
+    end
+    N = size(X.(display_tags{1}).raw, 1);
+    Nbins = size(X.(display_tags{1}).raw, 2);
+    x_pos = linspace(0, 200, Nbins);
+
+    % ---- Animal identity, for the LEFT-side colored ticks ----
+    if isfield(EXP.Spk, 'animal')
+        animalid = EXP.Spk.animal;
+    else
+        animalid = EXP.Spk.series;
+    end
+    [sess_vals, ~, sess_uniq] = unique(animalid);
+    sess_sel = sess_uniq(spatial_mask);
+
+    % ---- Order rows by similarity of order_ref ----
+    M_order = X.(order_ref).raw;
+    mu_row = mean(M_order, 2, 'omitnan');
+    sd_row = std(M_order, 0, 2, 'omitnan');
+    Mz = (M_order - mu_row) ./ sd_row;
+    valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
+    nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
+    Y = pdist(Mz(valid_idx,:), dist_metric);
+    Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
+    optiorder_valid = optimalleaforder(Z, Y);
+    optiorder = cat(1, valid_idx(optiorder_valid), nan_idx);
+    Mz_ord = Mz(optiorder,:);
+    sess_ord = sess_sel(optiorder);
+
+    % ---- Track cell names in the SAME order as the heatmap rows, so
+    % target example cells can be marked directly on the plot ----
+    cellNamesInMask = EXP.Spk.CellListString(spatial_mask);
+    cellNamesOrdered = cellNamesInMask(optiorder);
+
+    % ---- Example cells to mark on the heatmap ----
+    targetNames = {
+        'M26003_20260325_cell#83';
+        'M25132_20260228_cell#140';
+        'M26003_20260324_cell#39';
+        'M26003_20260325_cell#4';
+    };
+    targetRows = nan(numel(targetNames),1);
+    for i = 1:numel(targetNames)
+        rowIdx = find(strcmp(cellNamesOrdered, targetNames{i}));
+        if ~isempty(rowIdx)
+            targetRows(i) = rowIdx;
+        else
+            fprintf('WARNING: %s not found in this heatmap''s population.\n', targetNames{i});
+        end
+    end
+
+    % ---- Apply ordering, normalize EACH CELL (row) to [0,1] for heatmap ----
+    for t = 1:numel(all_needed_tags)
+        tag = all_needed_tags{t};
+        M_ord = X.(tag).raw(optiorder,:);
+        mn = min(M_ord, [], 2, 'omitnan');
+        mx = max(M_ord, [], 2, 'omitnan');
+        X.(tag).norm = (M_ord - mn) ./ max(mx - mn, eps);
+    end
+
+    % ---- RAW (unnormalized) values for example panels ----
+    for t = 1:numel(all_needed_tags)
+        tag = all_needed_tags{t};
+        X.(tag).raw_ord = X.(tag).raw(optiorder,:);
+    end
+
+    % ---- Find similarity GROUPS, spread across the ordered list ----
+    segment_edges = round(linspace(1, N+1, n_groups_to_show+1));
+    groups = {};
+    for seg = 1:n_groups_to_show
+        seg_range = segment_edges(seg):(segment_edges(seg+1)-1);
+        if numel(seg_range) < min(Kn_local)
+            continue;
+        end
+        best_sse = inf; best_window = [];
+        for k = Kn_local(1):Kn_local(2)
+            for s = 1:(numel(seg_range)-k+1)
+                win_idx = seg_range(s:s+k-1);
+                Mw = Mz_ord(win_idx,:);
+                muW = mean(Mw,1,'omitnan');
+                sse = mean(sum((Mw - muW).^2, 2, 'omitnan'), 'omitnan') / numel(win_idx)^0.5;
+                if sse < best_sse
+                    best_sse = sse;
+                    best_window = win_idx;
+                end
+            end
+        end
+        if ~isempty(best_window)
+            groups{end+1} = best_window; %#ok<AGROW>
+        end
+    end
+
+    n_groups_actual = numel(groups);
+
+    if n_groups_actual <= 7
+        grp_cmap = lines(n_groups_actual);
+    else
+        cmap_full = hsv(64);
+        grp_cmap = cmap_full(round(linspace(1, 64, n_groups_actual)), :);
+    end
+
+    if numel(sess_vals) <= 7
+        sess_cmap = lines(numel(sess_vals));
+    else
+        cmap_full = hsv(64);
+        sess_cmap = cmap_full(round(linspace(1, 64, numel(sess_vals))), :);
+    end
+
+    % ---- Group-mean traces: RAW values, kernel tag(s) only ----
+    group_mean = struct();
+    for t = 1:numel(all_needed_tags)
+        tag = all_needed_tags{t};
+        group_mean.(tag) = cell(n_groups_actual,1);
+        for g = 1:n_groups_actual
+            idx = groups{g};
+            group_mean.(tag){g} = mean(X.(tag).raw_ord(idx,:), 1, 'omitnan');
+        end
+    end
+
+    %% ===================== PLOTTING =====================
+    n_disp = numel(display_tags);
+    fig_width_in = 6 * n_disp + 2;
+    fig_height_in = 10;
+    figHandle = figure('Color','w', 'Units','inches', ...
+        'Position', [0.5 0.5 fig_width_in fig_height_in], ...
+        'PaperUnits','inches', 'PaperSize', [fig_width_in fig_height_in], ...
+        'PaperPosition', [0 0 fig_width_in fig_height_in], ...
+        'PaperPositionMode','manual');
+
+    left0 = 0.03;
+    right_margin = 0.02;
+    gap = 0.03;
+    n_animals = numel(sess_vals);
+    animal_strip_width = 0.008*n_animals*1.5;
+
+    available_width = 1 - left0 - right_margin - (n_disp-1)*gap;
+    block_width = available_width / n_disp;
+    per_block_fixed = animal_strip_width + 0.015;
+    heat_width  = (block_width - per_block_fixed) * 0.62;
+    trace_width = (block_width - per_block_fixed) * 0.38 - gap*0.6;
+
+    trace_height = 0.84 / n_groups_actual;
+
+    % ---- Fixed scale-bar reference, computed once for the whole figure ----
+    all_amps = [];
+    for t = 1:numel(all_needed_tags)
+        for g = 1:n_groups_actual
+            all_amps = [all_amps, range(group_mean.(all_needed_tags{t}){g})]; %#ok<AGROW>
+        end
+    end
+    typical_amp = median(all_amps, 'omitnan');
+    if typical_amp > 0 && isfinite(typical_amp)
+        exp10 = floor(log10(typical_amp));
+        base = typical_amp / 10^exp10;
+        nice_vals = [1 2 5 10];
+        [~, idx_nice] = min(abs(nice_vals - base));
+        scale_ref = nice_vals(idx_nice) * 10^exp10;
+    else
+        scale_ref = 1;
+    end
+
+    for t = 1:n_disp
+        tag = display_tags{t};
+        block_left = left0 + (t-1)*(block_width + gap);
+
+        % ---- LEFT: one scatter column per animal ----
+        ax_sess = axes('Position', [block_left 0.08 animal_strip_width 0.84]); hold(ax_sess,'on');
+        for s = 1:n_animals
+            vals = find(sess_vals(sess_ord) == sess_vals(s));
+            x_lane = s;
+            scatter(ax_sess, x_lane*ones(size(vals)), vals, 30, 'filled', ...
+                'MarkerFaceColor', sess_cmap(s,:), 'MarkerEdgeColor','none');
+        end
+        xlim(ax_sess, [0.3, n_animals+0.7]); ylim(ax_sess, [1 N]);
+        axis(ax_sess, 'off');
+        if t == 1
+            text(ax_sess, (n_animals+1)/2, -N*0.03, 'Animal', 'FontSize', 8, ...
+                'HorizontalAlignment','center');
+        end
+
+        % ---- MIDDLE: heatmap ----
+        heat_left = block_left + animal_strip_width + 0.015;
+        ax_heat = axes('Position', [heat_left 0.08 heat_width 0.84]); hold(ax_heat,'on');
+        imagesc(ax_heat, x_pos, 1:N, X.(tag).norm, [0 1]);
+        colormap(ax_heat, RedWhiteBlue);
+        set(ax_heat, 'YDir','normal');
+        ylim(ax_heat, [1 N]);
+        set(ax_heat, 'XTick', [40 80 120 160]);
+        xlabel(ax_heat, 'Position (cm)');
+        title(ax_heat, sprintf('%s kernel (N=%d)', tag, N));
+        box(ax_heat,'off'); set(ax_heat,'TickDir','out');
+
+        % ---- Mark target example cells directly on this heatmap ----
+        for i = 1:numel(targetNames)
+            if isnan(targetRows(i)), continue; end
+            yline(ax_heat, targetRows(i), 'k-', 'LineWidth', 1.2, 'Alpha', 0.7, 'HandleVisibility','off');
+            x0 = x_pos(1) - range(x_pos)*0.03;
+            text(ax_heat, x0, targetRows(i), strrep(targetNames{i}, '_', '\_'), ...
+                'FontSize', 6, 'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
+                'Clipping','off');
+        end
+
+        % ---- Independent colorbar strip ----
+        ax_cbar = axes('Position', [heat_left, 0.02, heat_width, 0.02]);
+        imagesc(ax_cbar, [0 1], [0 1], linspace(0,1,256));
+        colormap(ax_cbar, RedWhiteBlue);
+        set(ax_cbar, 'YTick', [], 'XTick', [0 0.5 1], 'XTickLabel', {'0','0.5','1'});
+        xlabel(ax_cbar, 'Activity (norm.)', 'FontSize', 8);
+        box(ax_cbar, 'on'); set(ax_cbar, 'TickDir','out', 'FontSize', 7);
+
+        % ---- RIGHT edge: colored brackets + dots per group ----
+        for g = 1:n_groups_actual
+            idx = groups{g};
+            y1 = min(idx); y2 = max(idx);
+            x0 = x_pos(end) + range(x_pos)*0.02;
+            plot(ax_heat, [x0 x0], [y1 y2], '-', 'Color', grp_cmap(g,:), 'LineWidth', 1.5);
+            for m = 1:numel(idx)
+                plot(ax_heat, x0, idx(m), 'o', 'MarkerFaceColor', grp_cmap(g,:), ...
+                    'MarkerEdgeColor', 'none', 'MarkerSize', 5, 'Clipping','off');
+            end
+        end
+
+        % ---- FAR RIGHT: group-mean example trace panels — KERNEL ONLY ----
+        trace_left = heat_left + heat_width + gap*0.6;
+        annotation('textbox', [trace_left, 0.93, trace_width, 0.04], ...
+            'String', sprintf('Examples: %s kernel', tag), ...
+            'HorizontalAlignment','center', 'FontWeight','bold', 'FontSize', 9, ...
+            'EdgeColor','none', 'VerticalAlignment','middle');
+        for g = 1:n_groups_actual
+            bottom = 0.08 + (g - 1) * trace_height;
+            axT = axes('Position', [trace_left bottom trace_width trace_height*0.85]); hold(axT,'on');
+            idx = groups{g};
+
+            panel_vals = group_mean.(tag){g};
+
+            % Kernel only — no measured-response overlay
+            plot(axT, x_pos, group_mean.(tag){g}, '-', 'LineWidth', 1.8, 'Color', grp_cmap(g,:));
+
+            M = max(scale_ref, max(abs(panel_vals), [], 'omitnan'));
+            yPad = 0.05 * M;
+            ylim(axT, [-(M+yPad), M+yPad]);
+            xlim(axT, [x_pos(1) x_pos(end)]);
+            set(axT, 'XTick', [40 80 120 160]);
+            box(axT,'off'); set(axT,'TickDir','out'); set(axT,'FontSize',7);
+            set(axT, 'YTick', []);
+            yline(axT, 0, 'Color',[0.8 0.8 0.8], 'LineStyle',':', 'HandleVisibility','off');
+
+            y_bottom = -scale_ref; y_top = scale_ref;
+            xb = x_pos(1) - range(x_pos)*0.05;
+            plot(axT, [xb xb], [y_bottom y_top], 'k-', 'LineWidth', 1.5, 'Clipping','off');
+            label_pts = [-scale_ref, 0, scale_ref];
+            tick_len = range(x_pos)*0.015;
+            for lp = label_pts
+                plot(axT, [xb-tick_len, xb+tick_len], [lp lp], 'k-', ...
+                    'LineWidth', 1.2, 'Clipping','off');
+                text(axT, xb - range(x_pos)*0.02 - tick_len, lp, sprintf('%.3g', lp), ...
+                    'FontSize', 7, 'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
+                    'Clipping','off');
+            end
+
+            if g == 1
+                xlabel(axT, 'Position (cm)', 'FontSize', 7);
+            else
+                set(axT, 'XTickLabel', []);
+            end
+            text(axT, x_pos(1), max(ylim(axT)), sprintf('n=%d', numel(idx)), 'FontSize', 7, ...
+                'VerticalAlignment','bottom');
+        end
+
+        % Leader lines: dot cluster (heatmap) -> trace panel
+        for g = 1:n_groups_actual
+            idx = groups{g};
+            r_center = mean(idx);
+            heat_dot_norm  = [heat_left + heat_width + 0.005, 0.08 + (r_center/N)*0.84];
+            trace_dot_norm = [trace_left, 0.08 + (g - 0.5)*trace_height];
+            annotation('line', [heat_dot_norm(1) trace_dot_norm(1)], [heat_dot_norm(2) trace_dot_norm(2)], ...
+                'LineStyle', '--', 'Color', grp_cmap(g,:), 'LineWidth', 1);
+        end
+    end
+
+    sgtitle(sprintf('Ordered by %s kernel similarity - heatmap(s) & examples: %s only (%d groups of %d-%d similar cells, N=%d total)', ...
+        order_ref, strjoin(display_tags, ', '), n_groups_actual, Kn_local(1), Kn_local(2), N));
+end
+
 % ---- Helper: fetch either a fitted GLM kernel or the actual measured
 % response, by name tag ----
 function M = local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx)
@@ -3271,6 +5482,412 @@ function M = local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx)
     end
 end
 
+
+
+%% Pull cell names from the bottom of the landmark-kernel heatmap ordering
+if strcmp(figname, 'BottomOfKernelHeatmap')
+
+    spatial_mask = goodcells;  % same population as the 638-bouton heatmap
+
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    M = landmarkTrace(spatial_mask, :);
+    N = size(M, 1);
+
+    % Same z-score + hierarchical clustering ordering used to build the figure
+    mu_row = mean(M, 2, 'omitnan');
+    sd_row = std(M, 0, 2, 'omitnan');
+    Mz = (M - mu_row) ./ sd_row;
+    valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
+    nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
+    Y = pdist(Mz(valid_idx,:), dist_metric);
+    Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
+    optiorder_valid = optimalleaforder(Z, Y);
+    optiorder = cat(1, valid_idx(optiorder_valid), nan_idx);
+
+    cellNamesInMask = EXP.Spk.CellListString(spatial_mask);
+    cellNamesOrdered = cellNamesInMask(optiorder);
+    M_ordered = M(optiorder, :);
+
+    nBottom = 15;
+    bottomRows = (N - nBottom + 1):N;
+
+    fprintf('%-30s %10s %10s %12s\n', 'Cell name', 'Row', 'Max val', 'Min val');
+    for i = bottomRows
+        rowVals = M_ordered(i, :);
+        fprintf('%-30s %10d %10.2f %12.2f\n', cellNamesOrdered{i}, i, max(rowVals), min(rowVals));
+    end
+end
+
+%% Quantify whether amplitude underestimation scales with response size
+if strcmp(figname,'AmplitudeUnderestimation-vs-ResponseSize')
+
+    measured  = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+
+    measured_gc = measured(goodcells,:);
+    landmark_gc = landmark_est(goodcells,:);
+
+    measured_peak = max(measured_gc,[],2,'omitnan');
+    estimated_peak = max(landmark_gc,[],2,'omitnan');
+    underestimation = measured_peak - estimated_peak;  % positive = underestimated
+
+    valid = ~isnan(measured_peak) & ~isnan(estimated_peak);
+    [r, p] = corr(measured_peak(valid), underestimation(valid), 'type', 'Spearman');
+    fprintf('Correlation: measured peak amplitude vs underestimation, r = %.3f, p = %.3g, n = %d\n', r, p, sum(valid));
+end
+%% COMPARE MEAN ABSOLUTE AMPLITUDE OF LANDMARK VS BACKGROUND KERNELS
+if strcmp(figname,'VisualKernel-MeanAbsAmplitude-Compare')
+
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+
+    landmark_gc = landmark_est(goodcells,:);
+    bg_gc       = bg_est(goodcells,:);
+
+    mean_abs_landmark = mean(abs(landmark_gc), 2, 'omitnan');
+    mean_abs_bg       = mean(abs(bg_gc), 2, 'omitnan');
+
+    fprintf('Landmark kernel mean abs amplitude: median = %.2f, MAD = %.2f, n = %d\n', ...
+        median(mean_abs_landmark,'omitnan'), mad(mean_abs_landmark(~isnan(mean_abs_landmark)),1), sum(~isnan(mean_abs_landmark)));
+    fprintf('Background kernel mean abs amplitude: median = %.2f, MAD = %.2f, n = %d\n', ...
+        median(mean_abs_bg,'omitnan'), mad(mean_abs_bg(~isnan(mean_abs_bg)),1), sum(~isnan(mean_abs_bg)));
+
+    [p_wrs, ~] = signrank(mean_abs_landmark, mean_abs_bg);
+    fprintf('Wilcoxon signed-rank test (paired, mean abs amplitude): p = %.3g\n', p_wrs);
+
+    figure;
+    histogram(mean_abs_landmark, 30, 'FaceColor',[0.8 0.4 0.2], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','Landmark');
+    hold on;
+    histogram(mean_abs_bg, 30, 'FaceColor',[0.2 0.6 0.4], 'EdgeColor','none', 'FaceAlpha',0.6, 'DisplayName','Background');
+    xlabel('Mean absolute kernel amplitude (deconvolved activity, a.u.)'); ylabel('# cells');
+    legend('Location','northeast'); legend boxoff;
+    title('Landmark vs background kernel mean absolute amplitude');
+    box off; set(gca,'TickDir','out');
+
+    peak_landmark = max(landmark_gc,[],2,'omitnan');  % just the max, not range
+    peak_bg = max(bg_gc,[],2,'omitnan');
+
+    fprintf('Landmark kernel peak: median = %.2f, MAD = %.2f, n = %d\n', ...
+    median(peak_landmark,'omitnan'), mad(peak_landmark(~isnan(peak_landmark)),1), sum(~isnan(peak_landmark)));
+    fprintf('Background kernel peak: median = %.2f, MAD = %.2f, n = %d\n', ...
+    median(peak_bg,'omitnan'), mad(peak_bg(~isnan(peak_bg)),1), sum(~isnan(peak_bg)));
+
+    [p_wrs, ~] = signrank(peak_landmark, peak_bg);
+    fprintf('Wilcoxon signed-rank test (paired, peak amplitude): p = %.3g\n', p_wrs);
+end
+
+%% VISUALISE OMISSION-SELECTIVE CELLS: example traces for goodOmitcells
+if strcmp(figname,'OmitCells-Examples')
+
+    % iOmit kernel has a 4th dimension indexing which omission type
+    % (need to confirm: omit2idx/omit3idx/omit4idx as seen in the
+    % Ordered-Kernels code - these index condNames, confirm they map
+    % correctly onto the 4th dim of iOmit's meanrespModel)
+    omit2idx = find(strcmp('omit2', condNames));
+    omit3idx = find(strcmp('omit3', condNames));
+    omit4idx = find(strcmp('omit4', condNames));
+
+    omit2_est = squeeze(EXP.GLMs{1}.Tuning(iOmit).meanrespModel(:,1,:,omit2idx));
+    omit3_est = squeeze(EXP.GLMs{1}.Tuning(iOmit).meanrespModel(:,1,:,omit3idx));
+    omit4_est = squeeze(EXP.GLMs{1}.Tuning(iOmit).meanrespModel(:,1,:,omit4idx));
+
+    measured_omit2 = squeeze(EXP.Maps{mapDATA_idx(4)}.Tuning.meanrespModel(:,1,:)); % condition 4 = omit2, per your earlier condNames confirmation
+    xpos = linspace(0,200,size(omit2_est,2));
+
+    goodOmit_idx = find(goodOmitcells);
+    nShow = min(10, numel(goodOmit_idx));
+    exampleCells = goodOmit_idx(1:nShow);
+
+    figure;
+    for i = 1:nShow
+        c = exampleCells(i);
+        subplot(nShow,1,i); hold on;
+        plot(xpos, measured_omit2(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.3, 'DisplayName','Measured (Omit2)');
+        plot(xpos, omit2_est(c,:), 'm-', 'LineWidth',1.1, 'DisplayName','Omit2 kernel');
+        yline(0,'k:'); xlim([0 200]);
+        title(sprintf('Cell %d', c));
+        box off; set(gca,'TickDir','out');
+        if i == 1
+            legend('Location','northeast'); legend boxoff;
+        end
+        if i == nShow
+            xlabel('Position (cm)');
+        end
+    end
+    sgtitle('Example goodOmitcells: measured response vs Omit2 kernel');
+end
+
+%%
+
+if strcmp(figname, 'LateResponse-Examples')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+
+    candidateCells = find(goodcells & RFpos < 0);
+    fprintf('%d candidate cells with RFpos < 0\n', numel(candidateCells));
+    fprintf('RFpos range for these cells: %.1f to %.1f deg\n', ...
+        min(RFpos(candidateCells)), max(RFpos(candidateCells)));
+
+    % Raw per-lap activity (Base condition), sorted by peak position — same
+    % data source used for the population "tiling" heatmaps elsewhere in
+    % this script (see 'plotFinalFigures_Sonali_JF.m' getLapPositionActivity)
+    figure('Color', 'w', 'Position', [100 100 900 700]);
+    for i = 1:min(9, numel(candidateCells))
+        cellidx = candidateCells(i);
+        rawTrace = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(cellidx,1,:));
+        subplot(3,3,i)
+        plot(linspace(0,200,numel(rawTrace)), rawTrace, 'k', 'LineWidth', 1.5);
+        title(sprintf('%s (RF=%.1f)', EXP.Spk.CellListString{cellidx}, RFpos(cellidx)), ...
+            'Interpreter', 'none', 'FontSize', 8);
+        xlabel('Position (cm)'); box off; set(gca,'TickDir','out');
+    end
+
+    % Export the candidate cell NAMES (not raw indices) so you can pull up
+    % full per-predictor kernel detail for specific ones. Note: GLM-kernels
+    % requires a SINGLE-SESSION EXP struct, not the concatenated EXP_all —
+    % run this on whichever single-session EXP each cell actually came from.
+    candidateCellNames = EXP.Spk.CellListString(candidateCells);
+    fprintf('Candidate cell names:\n');
+    for i = 1:numel(candidateCellNames)
+        fprintf('  %s\n', candidateCellNames{i});
+    end
+end
+
+%% Plot goodOmitcells: measured response vs Omit2/3/4 model prediction
+if strcmp(figname,'OmitCells-Model-Predictions')
+
+    omit2idx = find(strcmp('omit2', condNames));
+    omit3idx = find(strcmp('omit3', condNames));
+    omit4idx = find(strcmp('omit4', condNames));
+
+    % Full VSP model prediction, per condition (base=1, swap23=2,
+    % swap34=3, omit2=4, omit3=5, omit4=6 per condNames)
+    pred_omit2 = squeeze(EXP.Maps{mapVSP_idx(omit2idx)}.Tuning.meanrespModel(:,1,:));
+    pred_omit3 = squeeze(EXP.Maps{mapVSP_idx(omit3idx)}.Tuning.meanrespModel(:,1,:));
+    pred_omit4 = squeeze(EXP.Maps{mapVSP_idx(omit4idx)}.Tuning.meanrespModel(:,1,:));
+
+    meas_omit2 = squeeze(EXP.Maps{mapDATA_idx(omit2idx)}.Tuning.meanrespModel(:,1,:));
+    meas_omit3 = squeeze(EXP.Maps{mapDATA_idx(omit3idx)}.Tuning.meanrespModel(:,1,:));
+    meas_omit4 = squeeze(EXP.Maps{mapDATA_idx(omit4idx)}.Tuning.meanrespModel(:,1,:));
+
+    xpos = linspace(0,200,size(pred_omit2,2));
+
+    goodOmit_idx = find(goodOmitcells);
+    nShow = min(5, numel(goodOmit_idx));
+    exampleCells = goodOmit_idx(1:nShow);
+
+    figure;
+    for i = 1:nShow
+        c = exampleCells(i);
+
+        subplot(nShow,3,3*(i-1)+1); hold on;
+        plot(xpos, meas_omit2(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.2, 'DisplayName','Measured');
+        plot(xpos, pred_omit2(c,:), 'm-', 'LineWidth',1.1, 'DisplayName','Model (VSP)');
+        title(sprintf('Cell %d - Omit2', c)); xlim([0 200]);
+        box off; set(gca,'TickDir','out');
+        if i == 1, legend('Location','northeast'); legend boxoff; end
+
+        subplot(nShow,3,3*(i-1)+2); hold on;
+        plot(xpos, meas_omit3(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.2);
+        plot(xpos, pred_omit3(c,:), 'm-', 'LineWidth',1.1);
+        title(sprintf('Cell %d - Omit3', c)); xlim([0 200]);
+        box off; set(gca,'TickDir','out');
+
+        subplot(nShow,3,3*(i-1)+3); hold on;
+        plot(xpos, meas_omit4(c,:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.2);
+        plot(xpos, pred_omit4(c,:), 'm-', 'LineWidth',1.1);
+        title(sprintf('Cell %d - Omit4', c)); xlim([0 200]);
+        box off; set(gca,'TickDir','out');
+    end
+    sgtitle('goodOmitcells: measured vs full model prediction, Omit2/3/4');
+end
+
+
+
+%% Identify suppressive boutons at the bottom of the kernel ordering, THEN pull their raw data
+if strcmp(figname, 'BottomOfKernel_Suppressive_RawData')
+
+    spatial_mask = goodcells;
+
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    M = landmarkTrace(spatial_mask, :);
+    N = size(M, 1);
+    xpos = linspace(0, 200, size(M, 2));
+    landmarks = [40 80 120 160];
+
+    mu_row = mean(M, 2, 'omitnan');
+    sd_row = std(M, 0, 2, 'omitnan');
+    Mz = (M - mu_row) ./ sd_row;
+    valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
+    nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
+    Y = pdist(Mz(valid_idx,:), dist_metric);
+    Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
+    optiorder_valid = optimalleaforder(Z, Y);
+    optiorder = cat(1, valid_idx(optiorder_valid), nan_idx);
+
+    cellNamesInMask = EXP.Spk.CellListString(spatial_mask);
+    cellNamesOrdered = cellNamesInMask(optiorder);
+
+    % ---- FIX: with YDir='normal' in the actual heatmap, row 1 is at the
+    % VISUAL BOTTOM and row N is at the visual TOP. So "bottom of the
+    % heatmap" = the FIRST rows of the ordering, not the last. ----
+    nBottom = 50;
+    bottomRows = 1:nBottom;
+    M_bottom = M(optiorder(bottomRows), :);
+    names_bottom = cellNamesOrdered(bottomRows);
+
+    isSuppressive = false(nBottom, 1);
+    suppLandmark = nan(nBottom, 1);
+    for i = 1:nBottom
+        row = M_bottom(i, :);
+        [minVal, minBin] = min(row);
+        minPos = xpos(minBin);
+        [~, closestLmIdx] = min(abs(minPos - landmarks));
+        nearLandmark = abs(minPos - landmarks(closestLmIdx)) <= 10;
+        maxVal = max(row);
+        if nearLandmark && abs(minVal) > abs(maxVal)
+            isSuppressive(i) = true;
+            suppLandmark(i) = landmarks(closestLmIdx);
+        end
+    end
+
+    suppNames = names_bottom(isSuppressive);
+    suppLandmarkFiltered = suppLandmark(isSuppressive);
+    fprintf('%d/%d bottom-ordering boutons are suppressive at a landmark:\n', numel(suppNames), nBottom);
+    for i = 1:numel(suppNames)
+        fprintf('  %s (suppressed near %d cm)\n', suppNames{i}, suppLandmarkFiltered(i));
+    end
+
+    if isempty(suppNames)
+        fprintf('None found — try increasing nBottom.\n');
+        return
+    end
+
+    rawTraces = cell(numel(suppNames), 1);
+    rawXpos = [];
+
+    for i = 1:numel(suppNames)
+        parts = strsplit(suppNames{i}, '_');
+        mousenumber = parts{1};
+        sessionName = parts{2};
+        neuronIdx = str2double(regexprep(parts{3}, 'cell#', ''));
+
+        try
+            infoPath = findSessionFileInfoFilePath(mousenumber, sessionName);
+            loadedInfo = load(infoPath, 'sessionFileInfo');
+            sessionFileInfo = loadedInfo.sessionFileInfo;
+            stimNames = {sessionFileInfo.stimFiles.name};
+            targetIdx = find(contains(stimNames, "Corridor") & contains(stimNames, "CombinedRuns"), 1);
+            if isempty(targetIdx)
+                fprintf('  %s: no corridor stim found, skipping\n', suppNames{i});
+                continue
+            end
+
+            response = load(sessionFileInfo.stimFiles(targetIdx).Response);
+            data = response.lapPositionActivity.spks;
+            baseline_idx = response.trialIndicesByCondition.Baseline;
+
+            cell_spks_all = squeeze(data(neuronIdx, :, :));
+            cell_spks = cell_spks_all(baseline_idx, :);
+            mean_trace = mean(cell_spks, 1, 'omitnan');
+
+            if isempty(rawXpos)
+                rawXpos = linspace(0, 200, size(cell_spks, 2));
+            end
+            rawTraces{i} = mean_trace;
+        catch ME
+            fprintf('  %s: SKIPPED — %s\n', suppNames{i}, ME.message);
+        end
+    end
+
+    validTraces = ~cellfun(@isempty, rawTraces);
+    rawMatrix = cell2mat(rawTraces(validTraces));
+    rawNames = suppNames(validTraces);
+
+    figure('Color','w','Position',[100 100 900 700]);
+    tiledlayout(1,2,'TileSpacing','compact');
+
+    nexttile;
+    imagesc(xpos, 1:sum(isSuppressive), M_bottom(isSuppressive,:));
+    colormap(gca, RedWhiteBlue);
+    cmax = max(abs(M_bottom(isSuppressive,:)), [], 'all', 'omitnan');
+    clim([-cmax cmax]);
+    hold on; for L = landmarks, xline(L,'k--','Alpha',0.4); end
+    yticks(1:numel(suppNames)); yticklabels(strrep(suppNames,'_','\_')); set(gca,'FontSize',6);
+    xlabel('Position (cm)'); title('Fitted landmark KERNEL');
+    box off; set(gca,'TickDir','out');
+
+    nexttile;
+    imagesc(rawXpos, 1:size(rawMatrix,1), rawMatrix);
+    colormap(gca, flipud(gray));
+    hold on; for L = landmarks, xline(L,'b--','Alpha',0.4); end
+    yticks(1:numel(rawNames)); yticklabels(strrep(rawNames,'_','\_')); set(gca,'FontSize',6);
+    xlabel('Position (cm)'); title('RAW measured data (Baseline)');
+    box off; set(gca,'TickDir','out');
+end
+
+%% RF-direction split (delayed vs anticipatory) + within-cell kernel edge bias
+if strcmp(figname, 'RFdirection-KernelBias')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+
+    % Discrete groups, by direction of RF extrapolation beyond the
+    % sampled 0-110 deg kernel domain (0 = front/closest approach,
+    % 110 = periphery/furthest entry point, per the flipud convention
+    % used elsewhere in this script for visual-space kernels)
+    delayed_cells      = goodcells & RFpos < 0;    % extrapolated past front — no peak yet at closest approach ("post-passage")
+    anticipatory_cells = goodcells & RFpos > 110;  % extrapolated past periphery — no peak yet at furthest entry ("pre-entry")
+    onscreen_cells     = goodcells & RFpos >= 0 & RFpos <= 110;
+
+    fprintf('Delayed (RF<0): n = %d\n', sum(delayed_cells));
+    fprintf('Anticipatory (RF>110): n = %d\n', sum(anticipatory_cells));
+    fprintf('On-screen: n = %d\n', sum(onscreen_cells));
+
+    % Within-cell: kernel amplitude at the "in" (near 0/front) vs
+    % "out" (near 110/periphery) edge of the sampled kernel, for every
+    % goodcell — a continuous measure, not just the extrapolated extremes
+    visK = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:)); % [cells x bins]
+    visK = flipud(visK')'; % match the flip convention used elsewhere (0 azimuth = front)
+    nBins = size(visK, 2);
+    edgeWidth = round(nBins * 0.2); % outer 20% of bins on each side — adjust as needed
+
+    inFieldAmp  = mean(visK(:, 1:edgeWidth), 2, 'omitnan');           % near 0 deg (front)
+    outFieldAmp = mean(visK(:, end-edgeWidth+1:end), 2, 'omitnan');   % near 110 deg (periphery)
+    edgeBias = outFieldAmp - inFieldAmp; % positive = more amplitude at periphery ("anticipatory"-leaning)
+                                          % negative = more amplitude near front ("delayed"-leaning)
+
+    figure('Color','w','Position',[100 100 900 400]);
+
+    subplot(1,2,1); hold on;
+    histogram(edgeBias(onscreen_cells), 40, 'FaceColor',[0.6 0.6 0.6], 'EdgeColor','none', 'DisplayName',sprintf('On-screen (n=%d)',sum(onscreen_cells)));
+    xline(0,'k--','HandleVisibility','off');
+    xlabel('Peripheral - Frontal kernel amplitude'); ylabel('# cells');
+    legend('Location','best'); legend boxoff; box off; set(gca,'TickDir','out');
+    title('Within-cell edge bias, on-screen RF cells');
+
+    % Consistency check: do the discrete extrapolated groups sit at the
+    % expected extremes of this continuous edgeBias measure?
+    subplot(1,2,2); hold on;
+    grps = {onscreen_cells, delayed_cells, anticipatory_cells};
+    grpNames = {'On-screen','Delayed (RF<0)','Anticipatory (RF>110)'};
+    grpColors = [0.6 0.6 0.6; 0.8 0.2 0.2; 0.2 0.4 0.8];
+    for g = 1:numel(grps)
+        jitter = (rand(sum(grps{g}),1)-0.5)*0.3 + g;
+        scatter(jitter, edgeBias(grps{g}), 20, grpColors(g,:), 'filled', 'MarkerFaceAlpha',0.4);
+    end
+    xticks(1:3); xticklabels(grpNames); xtickangle(15);
+    ylabel('Peripheral - Frontal kernel amplitude');
+    yline(0,'k--');
+    box off; set(gca,'TickDir','out');
+    title('Edge bias by RF-extrapolation group');
+
+    fprintf('\nMedian edgeBias — On-screen: %.3f, Delayed: %.3f, Anticipatory: %.3f\n', ...
+        median(edgeBias(onscreen_cells),'omitnan'), ...
+        median(edgeBias(delayed_cells),'omitnan'), ...
+        median(edgeBias(anticipatory_cells),'omitnan'));
+end
 
 %% =====================================================================
 %  'ScaledExamples-Kernels-<display1>-<display2>-...'
@@ -3294,7 +5911,7 @@ end
 % =====================================================================
 if contains(figname,'ScaledExamples-Kernels')
 
-    n_groups_to_show = 10;
+    n_groups_to_show = 5;
     Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
 
     S = strsplit(figname, '-');
@@ -3320,6 +5937,44 @@ if contains(figname,'ScaledExamples-Kernels')
         spatial_mask = spatial_mask & goodOmitcells;
     elseif ~show_all && any(strcmp(display_tags, 'Space'))
         spatial_mask = spatial_mask & signicells & goodLLHcells;
+    end
+        
+        
+       % ---- Optional RF-sign restriction: 'RFneg' or 'RFnonneg' tags ----
+    % RFneg:    only cells with RFpos < 0 (the "late-responding" cells
+    %           identified earlier).
+    % RFnonneg: only cells with RFpos >= 0.
+    show_RFneg    = any(contains(S, 'RFneg'));
+    show_RFnonneg = any(contains(S, 'RFnonneg'));
+    if show_RFneg && show_RFnonneg
+        error('ScaledExamples-Kernels: specify at most one of RFneg / RFnonneg, not both.');
+    end
+    if show_RFneg || show_RFnonneg
+        RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+        if show_RFneg
+            spatial_mask = spatial_mask & (RFpos < 0);
+            fprintf('RF-restricted: keeping %d cells with RFpos < 0\n', sum(spatial_mask));
+        else
+            spatial_mask = spatial_mask & (RFpos >= 0);
+            fprintf('RF-restricted: keeping %d cells with RFpos >= 0\n', sum(spatial_mask));
+        end
+    end
+
+        % ---- Optional RF-value restriction: 'RFm5' tag (RF centered on -5) ----
+    show_RFm5 = any(contains(S, 'RFm5'));
+    if show_RFm5
+        RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    
+        % Option A: exact match (only correct if RFpos is discretized)
+        % rfMask = RFpos == -5;
+    
+        % Option B: within the -5-centered bin, using your existing RF_edges
+        % convention (-7.5 to -2.5)
+        rfMask = RFpos >= -7.5 & RFpos < -2.5;
+    
+        spatial_mask = spatial_mask & rfMask;
+        fprintf('RF-restricted: keeping %d cells with RFpos in [-7.5,-2.5) (RF ~ -5)\n', ...
+            sum(spatial_mask));
     end
 
     % ---- Build raw maps for every requested tag (row-masked) ----
@@ -3590,7 +6245,1070 @@ if contains(figname,'ScaledExamples-Kernels')
 
     sgtitle(sprintf('Each tag ordered/grouped independently: %s (N=%d cells each, own similarity clusters, shared scale)', ...
         strjoin(display_tags, ', '), N));
+
+
+    %% Print cell names ranked by distance to nearest landmark, from the landmark kernel
+    mapLandmark_idx = (1:ncond) + 3*ncond; % = 19:24, corridor position, base condition
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace, 2));
+    landmarks = [40 80 120 160];
+    exclude_cm = 10;
+
+    M = landmarkTrace(goodcells, :);
+    cellNamesAll = EXP.Spk.CellListString(goodcells);
+
+    [peakVals, peakBin] = max(M, [], 2, 'omitnan');
+    peakPos = xpos(peakBin)';
+
+    distToLandmark = nan(size(peakPos));
+    for c = 1:numel(peakPos)
+        [~, closestIdx] = min(abs(peakPos(c) - landmarks));
+        distToLandmark(c) = peakPos(c) - landmarks(closestIdx);
+    end
+
+    % Exclude peaks in the first/last 10cm (matching your existing convention)
+    validMask = peakPos >= exclude_cm & peakPos <= (200 - exclude_cm);
+
+    earlyMask = validMask & distToLandmark < -5;
+    lateMask  = validMask & distToLandmark > 5;
+
+    [~, sortEarly] = sort(peakVals(earlyMask), 'descend');
+    earlyIdx = find(earlyMask); earlyIdx = earlyIdx(sortEarly);
+
+    [~, sortLate] = sort(peakVals(lateMask), 'descend');
+    lateIdx = find(lateMask); lateIdx = lateIdx(sortLate);
+
+    fprintf('=== EARLY (peak before nearest landmark), top 15 by amplitude ===\n');
+    fprintf('%-30s %10s %10s %10s\n', 'Cell name', 'PeakPos', 'Dist', 'Amplitude');
+    for i = 1:min(15, numel(earlyIdx))
+        idx = earlyIdx(i);
+        fprintf('%-30s %10.1f %10.1f %10.3f\n', cellNamesAll{idx}, peakPos(idx), distToLandmark(idx), peakVals(idx));
+    end
+
+    fprintf('\n=== LATE (peak after nearest landmark), top 15 by amplitude ===\n');
+    fprintf('%-30s %10s %10s %10s\n', 'Cell name', 'PeakPos', 'Dist', 'Amplitude');
+    for i = 1:min(15, numel(lateIdx))
+        idx = lateIdx(i);
+        fprintf('%-30s %10.1f %10.1f %10.3f\n', cellNamesAll{idx}, peakPos(idx), distToLandmark(idx), peakVals(idx));
+    end
+
 end
+
+%% Landmarks + BG, corridor coordinates, RFpos<0, sorted by distance to a single landmark, with example traces
+if strcmp(figname, 'ScaledExamples-CorridorCoords-NegRF-LandmarkDist-v2')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    spatial_mask = goodcells & RFpos < 0;
+    N = sum(spatial_mask);
+    fprintf('%d cells with RFpos < 0\n', N);
+
+    n_groups_to_show = min(10, N); % cap at N so this can't overshoot at low N
+
+    mapLandmark_idx = (1:ncond) + 3*ncond; % = 19:24, corridor position, base condition
+    mapBG_idx       = (1:ncond) + 4*ncond; % = 25:30
+
+    tagMap.Landmarks = EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel;
+    tagMap.BG        = EXP.Maps{mapBG_idx(1)}.Tuning.meanrespModel;
+    display_tags = {'Landmarks','BG'};
+
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ ...
+                        (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+
+    % Ordering: restrict peak search to a SINGLE landmark window (first
+    % landmark, ~40cm), not the whole corridor — a plain whole-corridor
+    % max() picks whichever of the 4 repeating bumps happens to be
+    % tallest, which is driven by amplitude noise between repeats, not
+    % delay, and produces spurious sort-order spread with no real drift
+    % in the underlying pattern.
+    M_ref = tagMap.Landmarks(spatial_mask, :);
+    xpos = linspace(0, 200, size(M_ref,2));
+
+    landmarkCenter = 40;
+    landmarkWindow = xpos >= (landmarkCenter-15) & xpos <= (landmarkCenter+15); % adjust width if needed
+    M_ref_windowed = M_ref(:, landmarkWindow);
+    xpos_windowed = xpos(landmarkWindow);
+
+    [~, peakBin] = max(M_ref_windowed, [], 2, 'omitnan');
+    peakPos = xpos_windowed(peakBin)';
+    distToLandmark = peakPos - landmarkCenter; % signed distance from this specific landmark's center
+
+    [sortedDist, sortIdx] = sort(distToLandmark, 'ascend', 'MissingPlacement', 'last');
+    fprintf('Distance-to-landmark range (single-landmark window): %.1f to %.1f cm\n', min(sortedDist), max(sortedDist));
+
+    % Simple rank-based grouping for example traces — no clustering, no
+    % windowing search, just N equal-ish contiguous chunks of the sorted order
+    group_edges = round(linspace(1, N+1, n_groups_to_show+1));
+
+    
+
+    figure('Color','w','Position',[100 100 1000 700]);
+    for t = 1:numel(display_tags)
+        tag = display_tags{t};
+        M = tagMap.(tag)(spatial_mask, :);
+        M_sorted = M(sortIdx, :);
+        M_scaled = scaleKernel(M_sorted);
+
+        % Heatmap
+        subplot(1, 4, (t-1)*2 + 1);
+        imagesc(xpos, 1:N, M_scaled, [0 1]);
+        colormap(gca, parula); colorbar;
+        xlabel('Position (cm)'); ylabel('Cell (sorted by distance to landmark)');
+        title(sprintf('%s (n=%d)', tag, N));
+        box off; set(gca,'TickDir','out');
+
+        % Example group-mean traces, stacked
+        subplot(1, 4, (t-1)*2 + 2); hold on;
+        cmap = lines(n_groups_to_show);
+        for g = 1:n_groups_to_show
+            rows = group_edges(g):(group_edges(g+1)-1);
+            if isempty(rows), continue; end
+            grp_mean = mean(M_sorted(rows,:), 1, 'omitnan');
+            offset = (n_groups_to_show - g) * (max(abs(grp_mean(:)))*1.2 + eps);
+            plot(xpos, grp_mean + offset, 'Color', cmap(g,:), 'LineWidth', 1.5);
+        end
+        xlabel('Position (cm)'); ylabel('Group mean (stacked)');
+        title(sprintf('%s examples, dist-sorted', tag));
+        box off; set(gca,'TickDir','out');
+    end
+end
+
+%% Landmarks, corridor coordinates, RFpos<0, sorted by distance from peak to landmark
+if strcmp(figname, 'NegRF-LandmarkDist-Visualise')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    spatial_mask = goodcells & RFpos < 0;
+    N = sum(spatial_mask);
+    fprintf('%d cells with RFpos < 0\n', N);
+
+    mapLandmark_idx = (1:ncond) + 3*ncond; % = 19:24, corridor position, base condition
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+
+    % Restrict peak search to a single landmark window (~40cm), not the
+    % whole corridor, to avoid picking between the 4 repeating bumps
+    landmarkCenter = 40;
+    landmarkWindow = xpos >= (landmarkCenter-15) & xpos <= (landmarkCenter+15);
+    xpos_windowed = xpos(landmarkWindow);
+
+    M = landmarkTrace(spatial_mask, landmarkWindow);
+    [~, peakBin] = max(M, [], 2, 'omitnan');
+    distToLandmark = xpos_windowed(peakBin)' - landmarkCenter;
+
+    [sortedDist, sortIdx] = sort(distToLandmark, 'ascend', 'MissingPlacement', 'last');
+    fprintf('Distance-to-landmark range: %.1f to %.1f cm\n', min(sortedDist), max(sortedDist));
+
+    % Full corridor trace, sorted, scaled per-cell for display
+    M_full = landmarkTrace(spatial_mask, :);
+    M_sorted = M_full(sortIdx, :);
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+    M_scaled = scaleKernel(M_sorted);
+
+    figure('Color','w','Position',[100 100 700 700]);
+
+    subplot(1,5,1:4);
+    imagesc(xpos, 1:N, M_scaled, [0 1]);
+    colormap(parula); colorbar;
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance from peak to landmark)');
+    title(sprintf('Landmark kernel, RFpos<0 (n=%d)', N));
+    box off; set(gca,'TickDir','out');
+
+    % Sidebar showing each row's actual distance value, so it's visible
+    % directly on the figure, not just implicit in sort order
+    subplot(1,5,5);
+    plot(sortedDist, 1:N, 'k.-', 'MarkerSize', 8);
+    xlabel('Distance (cm)'); ylim([1 N]); set(gca,'YDir','reverse');
+    title('Peak-to-landmark distance');
+    box off; set(gca,'TickDir','out');
+
+
+
+    %% Does distance-to-landmark replicate across all 4 landmark repeats, per cell?
+    landmarks = [40 80 120 160];
+    distByLandmark = nan(N, 4);
+
+    for L = 1:4
+        win = xpos >= (landmarks(L)-15) & xpos <= (landmarks(L)+15);
+        xpos_win = xpos(win);
+        Mwin = M_full(:, win); % M_full = landmarkTrace(spatial_mask,:), from the previous block
+        [~, pk] = max(Mwin, [], 2, 'omitnan');
+        distByLandmark(:,L) = xpos_win(pk)' - landmarks(L);
+    end
+
+    figure('Color','w','Position',[100 100 900 250]);
+    for L = 2:4
+        subplot(1,3,L-1);
+        scatter(distByLandmark(:,1), distByLandmark(:,L), 20, 'filled', 'MarkerFaceAlpha',0.4);
+        xlabel('Dist. at landmark 1 (cm)'); ylabel(sprintf('Dist. at landmark %d (cm)', L));
+        [r,p] = corr(distByLandmark(:,1), distByLandmark(:,L), 'rows','complete');
+        title(sprintf('r=%.2f, p=%.3g', r, p));
+        box off; set(gca,'TickDir','out'); axis equal;
+    end
+end
+
+
+%% Rank RFpos<0 cells by consistent landmark distance, push names to base workspace
+if strcmp(figname, 'NegRF-GetCandidateNames')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    spatial_mask = goodcells & RFpos < 0;
+    negRF_idx = find(spatial_mask);
+    N = numel(negRF_idx);
+    fprintf('%d cells with RFpos < 0\n', N);
+
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+    M_full = landmarkTrace(spatial_mask, :);
+
+    landmarks = [40 80 120 160];
+    distByLandmark = nan(N, 4);
+    for L = 1:4
+        win = xpos >= (landmarks(L)-15) & xpos <= (landmarks(L)+15);
+        xpos_win = xpos(win);
+        Mwin = M_full(:, win);
+        [~, pk] = max(Mwin, [], 2, 'omitnan');
+        distByLandmark(:,L) = xpos_win(pk)' - landmarks(L);
+    end
+    meanDist = mean(distByLandmark, 2, 'omitnan');
+
+    cellNamesAll = EXP.Spk.CellListString(negRF_idx);
+    [sortedMeanDist, sortIdx] = sort(meanDist, 'descend');
+    cellNames = cellNamesAll(sortIdx);
+
+    % Push to base workspace so they're usable after this call returns
+    assignin('base', 'cellNames', cellNames);
+    assignin('base', 'cellDistances', sortedMeanDist);
+    fprintf('Pushed %d cell names to base workspace as "cellNames"\n', numel(cellNames));
+end
+%% Landmarks + BG, corridor coordinates, RFpos<0 cells, sorted by distance from nearest landmark
+if strcmp(figname, 'ScaledExamples-CorridorCoords-NegRF-LandmarkDist')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    spatial_mask = goodcells & RFpos < 0;
+    fprintf('%d cells with RFpos < 0\n', sum(spatial_mask));
+
+    landmarks = [40 80 120 160];
+
+    mapLandmark_idx = (1:ncond) + 3*ncond; % = 19:24, corridor position, base condition
+    mapBG_idx       = (1:ncond) + 4*ncond; % = 25:30
+
+    tagMap.Landmarks = EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel;
+    tagMap.BG        = EXP.Maps{mapBG_idx(1)}.Tuning.meanrespModel;
+
+    display_tags = {'Landmarks','BG'};
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ ...
+                        (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+
+    % Ordering computed from the Landmarks kernel specifically, then
+    % applied to both panels, so both share the same row order
+    M_ref = tagMap.Landmarks(spatial_mask, :);
+    xpos = linspace(0, 200, size(M_ref,2));
+    [~, peakBin] = max(M_ref, [], 2, 'omitnan');
+    peakPos = xpos(peakBin)';
+
+    distToLandmark = nan(size(peakPos));
+    for c = 1:numel(peakPos)
+        [~, closestIdx] = min(abs(peakPos(c) - landmarks));
+        distToLandmark(c) = peakPos(c) - landmarks(closestIdx);
+    end
+    [~, sortIdx] = sort(distToLandmark, 'ascend', 'MissingPlacement', 'last');
+
+    figure('Color','w','Position',[100 100 900 700]);
+    for t = 1:numel(display_tags)
+        tag = display_tags{t};
+        M = tagMap.(tag)(spatial_mask, :);
+        M_sorted = scaleKernel(M(sortIdx,:));
+
+        subplot(1,2,t)
+        imagesc(xpos, 1:size(M_sorted,1), M_sorted, [0 1]);
+        colormap(parula); colorbar;
+        xlabel('Position (cm)'); ylabel('Cell (sorted by distance to nearest landmark)');
+        title(sprintf('%s, corridor coords, RFpos<0 (n=%d)', tag, sum(spatial_mask)));
+        box off; set(gca,'TickDir','out');
+    end
+end
+%%
+if contains(figname,'ScaledExamples-Kernels-LLHr')
+
+    n_groups_to_show = 20;
+    Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
+
+    S = strsplit(figname, '-');
+    S = S(3:end);
+    show_all  = any(contains(S, 'all'));
+    show_omit = any(contains(S, 'omission'));
+    valid_tags = {'Space','Landmarks','BG','Data'};
+    S_tags = S(ismember(S, valid_tags));
+    if isempty(S_tags)
+        error('ScaledExamples-Kernels: no recognized tag found in figname. Use one of: Space, Landmarks, BG, Data.');
+    end
+
+    display_tags = S_tags;
+
+    getMap = @(tag) local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx);
+
+    % ---- Cell selection mask ----
+    spatial_mask = goodcells;
+    if show_omit
+        spatial_mask = spatial_mask & goodOmitcells;
+    elseif ~show_all && any(strcmp(display_tags, 'Space'))
+        spatial_mask = spatial_mask & signicells & goodLLHcells;
+    end
+
+    % ---- Build raw maps for every requested tag (row-masked) ----
+    X = struct();
+    for t = 1:numel(display_tags)
+        rawMap = getMap(display_tags{t});
+        X.(display_tags{t}).raw = rawMap(spatial_mask,:);
+    end
+    N = size(X.(display_tags{1}).raw, 1);
+    Nbins = size(X.(display_tags{1}).raw, 2);
+    x_pos = linspace(0, 200, Nbins);
+
+    % ---- Animal identity ----
+    if isfield(EXP.Spk, 'animal')
+        animalid = EXP.Spk.animal;
+    else
+        animalid = EXP.Spk.series;
+    end
+    [sess_vals, ~, sess_uniq] = unique(animalid);
+    sess_sel = sess_uniq(spatial_mask);
+    n_animals = numel(sess_vals);
+    if n_animals <= 7
+        sess_cmap = lines(n_animals);
+    else
+        cmap_full = hsv(64);
+        sess_cmap = cmap_full(round(linspace(1, 64, n_animals)), :);
+    end
+    
+
+    
+    % =====================================================================
+    % INDEPENDENT ordering + grouping, PER REQUESTED TAG.
+    % =====================================================================
+    ord = struct();
+    for t = 1:numel(display_tags)
+        tag = display_tags{t};
+        M_this = X.(tag).raw;
+        mu_row = mean(M_this, 2, 'omitnan');
+        sd_row = std(M_this, 0, 2, 'omitnan');
+        Mz = (M_this - mu_row) ./ sd_row;
+        valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
+        nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
+        Y = pdist(Mz(valid_idx,:), dist_metric);
+        Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
+        optiorder_valid = optimalleaforder(Z, Y);
+        optiorder_t = cat(1, valid_idx(optiorder_valid), nan_idx);
+        Mz_ord_t = Mz(optiorder_t,:);
+
+        segment_edges = round(linspace(1, N+1, n_groups_to_show+1));
+        groups_t = {};
+        for seg = 1:n_groups_to_show
+            seg_range = segment_edges(seg):(segment_edges(seg+1)-1);
+            if numel(seg_range) < min(Kn_local)
+                continue;
+            end
+            best_sse = inf; best_window = [];
+            for k = Kn_local(1):Kn_local(2)
+                for s = 1:(numel(seg_range)-k+1)
+                    win_idx = seg_range(s:s+k-1);
+                    Mw = Mz_ord_t(win_idx,:);
+                    muW = mean(Mw,1,'omitnan');
+                    sse = mean(sum((Mw - muW).^2, 2, 'omitnan'), 'omitnan') / numel(win_idx)^0.5;
+                    if sse < best_sse
+                        best_sse = sse;
+                        best_window = win_idx;
+                    end
+                end
+            end
+            if ~isempty(best_window)
+                groups_t{end+1} = best_window; %#ok<AGROW>
+            end
+        end
+
+        ord.(tag).optiorder = optiorder_t;
+        ord.(tag).groups = groups_t;
+        ord.(tag).n_groups = numel(groups_t);
+        ord.(tag).sess_ord = sess_sel(optiorder_t);
+
+        % NEW: LLHrel (spatial weight), reordered to match THIS tag's own
+        % cell ordering, so it can be shown as a sidebar strip.
+        LLHrel_this = LLHrel(spatial_mask);
+        ord.(tag).llhrel_ord = LLHrel_this(optiorder_t);
+
+        M_ord_disp = M_this(optiorder_t,:);
+        mn = min(M_ord_disp, [], 2, 'omitnan');
+        mx = max(M_ord_disp, [], 2, 'omitnan');
+        ord.(tag).norm = (M_ord_disp - mn) ./ max(mx - mn, eps);
+
+        if ord.(tag).n_groups <= 7
+            ord.(tag).grp_cmap = lines(ord.(tag).n_groups);
+        else
+            cmap_full = hsv(64);
+            ord.(tag).grp_cmap = cmap_full(round(linspace(1, 64, ord.(tag).n_groups)), :);
+        end
+
+        group_mean = cell(ord.(tag).n_groups,1);
+        for g = 1:ord.(tag).n_groups
+            orig_rows = optiorder_t(groups_t{g});
+            group_mean{g} = mean(M_this(orig_rows,:), 1, 'omitnan');
+        end
+        ord.(tag).group_mean = group_mean;
+    end
+
+    % ---- ONE single, shared y-axis range for EVERY panel across EVERY
+    % requested tag ----
+    all_vals_global = [];
+    for t = 1:numel(display_tags)
+        tag = display_tags{t};
+        for g = 1:ord.(tag).n_groups
+            all_vals_global = [all_vals_global, ord.(tag).group_mean{g}];
+        end
+    end
+    global_max_abs = max(abs(all_vals_global), [], 'omitnan');
+    if ~isfinite(global_max_abs) || global_max_abs <= 0
+        global_max_abs = 1;
+    end
+    exp10 = floor(log10(global_max_abs));
+    base = global_max_abs / 10^exp10;
+    nice_vals = [1 2 5 10];
+    [~, idx_nice] = min(abs(nice_vals - base));
+    scale_ref = nice_vals(idx_nice) * 10^exp10;
+    global_ylim = [-scale_ref*1.1, scale_ref*1.1];
+
+    fprintf('\n--- ScaledExamples-Kernels scale diagnostic ---\n');
+    fprintf('Raw max abs value across all groups/tags: %.2f\n', global_max_abs);
+    fprintf('Rounded scale_ref used for every panel:    %.2f\n', scale_ref);
+    fprintf('(A single large-amplitude group anywhere in the dataset sets this\n');
+    fprintf(' shared scale - if suppressive/modest examples look flat, it is\n');
+    fprintf(' likely because one much larger group elsewhere is driving this number)\n');
+
+    %% ===================== PLOTTING =====================
+    n_disp = numel(display_tags);
+    fig_width_in = 6 * n_disp + 2;
+    fig_height_in = 10;
+    figHandle = figure('Color','w', 'Units','inches', ...
+        'Position', [0.5 0.5 fig_width_in fig_height_in], ...
+        'PaperUnits','inches', 'PaperSize', [fig_width_in fig_height_in], ...
+        'PaperPosition', [0 0 fig_width_in fig_height_in], ...
+        'PaperPositionMode','manual');
+
+    left0 = 0.03;
+    right_margin = 0.02;
+    gap = 0.03;
+    animal_strip_width = 0.008*n_animals*1.5;
+    llh_strip_width = 0.012;   % NEW: width of the LLHrel sidebar
+
+    available_width = 1 - left0 - right_margin - (n_disp-1)*gap;
+    block_width = available_width / n_disp;
+    per_block_fixed = animal_strip_width + llh_strip_width + 0.019;   % UPDATED
+    heat_width  = (block_width - per_block_fixed) * 0.62;
+    trace_width = (block_width - per_block_fixed) * 0.38 - gap*0.6;
+
+    first_panel_done = false;
+
+    for t = 1:n_disp
+        tag = display_tags{t};
+        n_groups_t = ord.(tag).n_groups;
+        trace_height = 0.84 / n_groups_t;
+        block_left = left0 + (t-1)*(block_width + gap);
+
+        % ---- LEFT: one scatter column per animal, in THIS tag's own order ----
+        ax_sess = axes('Position', [block_left 0.08 animal_strip_width 0.84]); hold(ax_sess,'on');
+        for s = 1:n_animals
+            vals = find(sess_vals(ord.(tag).sess_ord) == sess_vals(s));
+            scatter(ax_sess, s*ones(size(vals)), vals, 8, 'filled', ...
+                'MarkerFaceColor', sess_cmap(s,:), 'MarkerEdgeColor','none');
+        end
+        xlim(ax_sess, [0.3, n_animals+0.7]); ylim(ax_sess, [1 N]);
+        axis(ax_sess, 'off');
+        if t == 1
+            text(ax_sess, (n_animals+1)/2, -N*0.03, 'Animal', 'FontSize', 8, ...
+                'HorizontalAlignment','center');
+        end
+
+               
+        % NEW: spatial classification, reordered the same way
+        % NEW: LLHrel (spatial weight), reordered to match THIS tag's own
+        % cell ordering, so it can be shown as a sidebar strip.
+        LLHrel_this = LLHrel(spatial_mask);
+        ord.(tag).llhrel_ord = LLHrel_this(ord.(tag).optiorder);
+        
+        % NEW: spatial classification, reordered the same way
+        Spatialcells_this = signicells(spatial_mask) & goodLLHcells(spatial_mask);
+        ord.(tag).spatialcells_ord = Spatialcells_this(ord.(tag).optiorder);
+
+        llh_left = block_left + animal_strip_width + 0.004;
+        ax_llh = axes('Position', [llh_left 0.08 llh_strip_width 0.84]); hold(ax_llh,'on');
+        
+        is_spatial_ord = ord.(tag).spatialcells_ord;   % logical, [N x 1], reordered to match this tag
+        
+        % Build a simple two-color image: 0 = non-spatial (black), 1 = spatial (purple)
+        class_img = double(is_spatial_ord(:));   % Nx1, values 0 or 1
+        imagesc(ax_llh, 1, 1:N, class_img);
+        colormap(ax_llh, [0 0 0; col_Spatial]);   % row 1 = black (0), row 2 = col_Spatial (1)
+        set(ax_llh, 'YDir','normal');
+        xlim(ax_llh, [0.5 1.5]);
+        ylim(ax_llh, [1 N]);
+        axis(ax_llh, 'off');
+        if t == 1
+            text(ax_llh, 1, -N*0.03, 'Spatial', 'FontSize', 8, 'HorizontalAlignment','center');
+        end
+       
+
+        % ---- MIDDLE: heatmap, in THIS tag's own order ----
+        heat_left = block_left + animal_strip_width + llh_strip_width + 0.019;   % UPDATED
+        ax_heat = axes('Position', [heat_left 0.08 heat_width 0.84]); hold(ax_heat,'on');
+        imagesc(ax_heat, x_pos, 1:N, ord.(tag).norm, [0 1]);
+        colormap(ax_heat, RedWhiteBlue);
+        set(ax_heat, 'YDir','normal');
+        ylim(ax_heat, [1 N]);
+        set(ax_heat, 'XTick', [40 80 120 160]);
+        xlabel(ax_heat, 'Position (cm)');
+        if strcmp(tag,'Data')
+            title(ax_heat, sprintf('Measured response (N=%d, own ordering)', N));
+        else
+            title(ax_heat, sprintf('%s kernel (N=%d, own ordering)', tag, N));
+        end
+        box(ax_heat,'off'); set(ax_heat,'TickDir','out');
+
+        % ---- Independent colorbar strip ----
+        ax_cbar = axes('Position', [heat_left, 0.02, heat_width, 0.02]);
+        imagesc(ax_cbar, [0 1], [0 1], linspace(0,1,256));
+        colormap(ax_cbar, RedWhiteBlue);
+        set(ax_cbar, 'YTick', [], 'XTick', [0 0.5 1], 'XTickLabel', {'0','0.5','1'});
+        xlabel(ax_cbar, 'Activity (norm.)', 'FontSize', 8);
+        box(ax_cbar, 'on'); set(ax_cbar, 'TickDir','out', 'FontSize', 7);
+
+        % ---- RIGHT edge of heatmap: brackets + dots for THIS tag's groups ----
+        for g = 1:n_groups_t
+            idx = ord.(tag).groups{g};
+            y1 = min(idx); y2 = max(idx);
+            x0 = x_pos(end) + range(x_pos)*0.02;
+            plot(ax_heat, [x0 x0], [y1 y2], '-', 'Color', ord.(tag).grp_cmap(g,:), 'LineWidth', 1.5);
+            for m = 1:numel(idx)
+                plot(ax_heat, x0, idx(m), 'o', 'MarkerFaceColor', ord.(tag).grp_cmap(g,:), ...
+                    'MarkerEdgeColor', 'none', 'MarkerSize', 5, 'Clipping','off');
+            end
+        end
+
+        % ---- FAR RIGHT: group-mean example trace panels ----
+        trace_left = heat_left + heat_width + gap*0.6;
+        annotation('textbox', [trace_left, 0.93, trace_width, 0.04], ...
+            'String', sprintf('Examples: %s', tag), ...
+            'HorizontalAlignment','center', 'FontWeight','bold', 'FontSize', 9, ...
+            'EdgeColor','none', 'VerticalAlignment','middle');
+        for g = 1:n_groups_t
+            bottom = 0.08 + (g - 1) * trace_height;
+            axT = axes('Position', [trace_left bottom trace_width trace_height*0.85]); hold(axT,'on');
+            idx = ord.(tag).groups{g};
+
+            plot(axT, x_pos, ord.(tag).group_mean{g}, '-', 'LineWidth', 1.8, ...
+                'Color', ord.(tag).grp_cmap(g,:));
+
+            ylim(axT, global_ylim);
+            xlim(axT, [x_pos(1) x_pos(end)]);
+            box(axT,'off'); set(axT,'TickDir','out'); set(axT,'FontSize',7);
+            set(axT, 'YTick', []);
+            yline(axT, 0, 'Color',[0.8 0.8 0.8], 'LineStyle',':', 'HandleVisibility','off');
+
+            if ~first_panel_done
+                xb = x_pos(1) - range(x_pos)*0.05;
+                tick_len = range(x_pos)*0.015;
+                plot(axT, [xb xb], global_ylim, 'k-', 'LineWidth', 1.5, 'Clipping','off');
+                label_pts = [-scale_ref, 0, scale_ref];
+                for lp = label_pts
+                    plot(axT, [xb-tick_len, xb+tick_len], [lp lp], 'k-', ...
+                        'LineWidth', 1.2, 'Clipping','off');
+                    text(axT, xb - range(x_pos)*0.02 - tick_len, lp, sprintf('%.3g', lp), ...
+                        'FontSize', 7, 'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
+                        'Clipping','off');
+                end
+                first_panel_done = true;
+            end
+
+            if g == 1
+                xlabel(axT, 'Position (cm)', 'FontSize', 7);
+            else
+                set(axT, 'XTickLabel', []);
+            end
+            text(axT, x_pos(1), max(ylim(axT)), sprintf('n=%d', numel(idx)), 'FontSize', 7, ...
+                'VerticalAlignment','bottom');
+        end
+
+        % Leader lines: dot cluster (heatmap) -> trace panel
+        for g = 1:n_groups_t
+            idx = ord.(tag).groups{g};
+            r_center = mean(idx);
+            heat_dot_norm  = [heat_left + heat_width + 0.005, 0.08 + (r_center/N)*0.84];
+            trace_dot_norm = [trace_left, 0.08 + (g - 0.5)*trace_height];
+            annotation('line', [heat_dot_norm(1) trace_dot_norm(1)], [heat_dot_norm(2) trace_dot_norm(2)], ...
+                'LineStyle', '--', 'Color', ord.(tag).grp_cmap(g,:), 'LineWidth', 1);
+        end
+    end
+
+    sgtitle(sprintf('Each tag ordered/grouped independently: %s (N=%d cells each, own similarity clusters, shared scale)', ...
+        strjoin(display_tags, ', '), N));
+end
+
+
+%% RF position distribution across all goodcells, binned at -5/0/5 deg
+if strcmp(figname, 'RFposition-AllGoodcells-Histogram')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    RF_edges = -7.5:5:7.5;  % same convention as the RF-LLHr blocks
+    RFvals = [-5 0 5];
+
+    figure('Color','w');
+    histogram(RFpos(goodcells), RF_edges);
+    xlim([RF_edges(1) RF_edges(end)]);
+    set(gca, 'XTick', RFvals);
+    xlabel('RF position (deg)'); ylabel('# boutons');
+    title(sprintf('RF position, all goodcells (n=%d)', sum(goodcells)));
+    box off; set(gca,'TickDir','out');
+
+    for i = 1:numel(RFvals)
+        n_here = sum(goodcells & RFpos == RFvals(i));
+        fprintf('RF = %d deg: n = %d\n', RFvals(i), n_here);
+    end
+
+    nOutside = sum(goodcells & (RFpos == -5 | RFpos == 5));
+    nTotal = sum(goodcells & ismember(RFpos, RFvals));
+    fprintf('%d/%d (%.1f%%) boutons have RF outside the screen (RF = -5 or +5)\n', ...
+        nOutside, nTotal, 100*nOutside/nTotal);
+end
+%%
+if contains(figname,'NotScaled-Kernels-LLHr')
+
+    n_groups_to_show = 20;
+    Kn_local = [4 4];          % group size, same convention as 'Ordered-Kernels-*'
+
+    S = strsplit(figname, '-');
+    S = S(3:end);
+    show_all  = any(contains(S, 'all'));
+    show_omit = any(contains(S, 'omission'));
+    valid_tags = {'Space','Landmarks','BG','Data'};
+    S_tags = S(ismember(S, valid_tags));
+    if isempty(S_tags)
+        error('NotScaled-Kernels: no recognized tag found in figname. Use one of: Space, Landmarks, BG, Data.');
+    end
+
+    display_tags = S_tags;
+
+    getMap = @(tag) local_getMap(tag, EXP, iPos, itex, iBG, mapDATA_idx);
+
+    % ---- Cell selection mask ----
+    spatial_mask = goodcells;
+    if show_omit
+        spatial_mask = spatial_mask & goodOmitcells;
+    elseif ~show_all && any(strcmp(display_tags, 'Space'))
+        spatial_mask = spatial_mask & signicells & goodLLHcells;
+    end
+
+    % ---- Build raw maps for every requested tag (row-masked) ----
+    X = struct();
+    for t = 1:numel(display_tags)
+        rawMap = getMap(display_tags{t});
+        X.(display_tags{t}).raw = rawMap(spatial_mask,:);
+    end
+    N = size(X.(display_tags{1}).raw, 1);
+    Nbins = size(X.(display_tags{1}).raw, 2);
+    x_pos = linspace(0, 200, Nbins);
+
+    % ---- Animal identity ----
+    if isfield(EXP.Spk, 'animal')
+        animalid = EXP.Spk.animal;
+    else
+        animalid = EXP.Spk.series;
+    end
+    [sess_vals, ~, sess_uniq] = unique(animalid);
+    sess_sel = sess_uniq(spatial_mask);
+    n_animals = numel(sess_vals);
+    if n_animals <= 7
+        sess_cmap = lines(n_animals);
+    else
+        cmap_full = hsv(64);
+        sess_cmap = cmap_full(round(linspace(1, 64, n_animals)), :);
+    end
+
+    % =====================================================================
+    % INDEPENDENT ordering + grouping, PER REQUESTED TAG.
+    % =====================================================================
+    ord = struct();
+    for t = 1:numel(display_tags)
+        tag = display_tags{t};
+        M_this = X.(tag).raw;
+        mu_row = mean(M_this, 2, 'omitnan');
+        sd_row = std(M_this, 0, 2, 'omitnan');
+        Mz = (M_this - mu_row) ./ sd_row;
+        valid_idx = find(~isnan(mean(Mz,2,'omitnan')));
+        nan_idx   = find(isnan(mean(Mz,2,'omitnan')));
+        Y = pdist(Mz(valid_idx,:), dist_metric);
+        Z = linkage(Mz(valid_idx,:), dist_method, dist_metric);
+        optiorder_valid = optimalleaforder(Z, Y);
+        optiorder_t = cat(1, valid_idx(optiorder_valid), nan_idx);
+        Mz_ord_t = Mz(optiorder_t,:);
+
+        segment_edges = round(linspace(1, N+1, n_groups_to_show+1));
+        groups_t = {};
+        for seg = 1:n_groups_to_show
+            seg_range = segment_edges(seg):(segment_edges(seg+1)-1);
+            if numel(seg_range) < min(Kn_local)
+                continue;
+            end
+            best_sse = inf; best_window = [];
+            for k = Kn_local(1):Kn_local(2)
+                for s = 1:(numel(seg_range)-k+1)
+                    win_idx = seg_range(s:s+k-1);
+                    Mw = Mz_ord_t(win_idx,:);
+                    muW = mean(Mw,1,'omitnan');
+                    sse = mean(sum((Mw - muW).^2, 2, 'omitnan'), 'omitnan') / numel(win_idx)^0.5;
+                    if sse < best_sse
+                        best_sse = sse;
+                        best_window = win_idx;
+                    end
+                end
+            end
+            if ~isempty(best_window)
+                groups_t{end+1} = best_window; %#ok<AGROW>
+            end
+        end
+
+        ord.(tag).optiorder = optiorder_t;
+        ord.(tag).groups = groups_t;
+        ord.(tag).n_groups = numel(groups_t);
+        ord.(tag).sess_ord = sess_sel(optiorder_t);
+
+        LLHrel_this = LLHrel(spatial_mask);
+        ord.(tag).llhrel_ord = LLHrel_this(optiorder_t);
+
+        M_ord_disp = M_this(optiorder_t,:);
+        mn = min(M_ord_disp, [], 2, 'omitnan');
+        mx = max(M_ord_disp, [], 2, 'omitnan');
+        ord.(tag).norm = (M_ord_disp - mn) ./ max(mx - mn, eps);
+
+        if ord.(tag).n_groups <= 7
+            ord.(tag).grp_cmap = lines(ord.(tag).n_groups);
+        else
+            cmap_full = hsv(64);
+            ord.(tag).grp_cmap = cmap_full(round(linspace(1, 64, ord.(tag).n_groups)), :);
+        end
+
+        group_mean = cell(ord.(tag).n_groups,1);
+        for g = 1:ord.(tag).n_groups
+            orig_rows = optiorder_t(groups_t{g});
+            group_mean{g} = mean(M_this(orig_rows,:), 1, 'omitnan');
+        end
+        ord.(tag).group_mean = group_mean;
+    end
+
+    % ---- CHANGED: PER-TAG y-axis scale, NOT pooled across all tags. ----
+    % Each tag now gets its own scale_ref/global_ylim, sized to its own
+    % amplitude, so a smaller-amplitude tag (e.g. BG) isn't forced onto a
+    % larger tag's (e.g. Landmarks) scale and squashed to near-invisible.
+    scale_ref = struct();
+    global_ylim = struct();
+    for t = 1:numel(display_tags)
+        tag = display_tags{t};
+        tag_vals = [];
+        for g = 1:ord.(tag).n_groups
+            tag_vals = [tag_vals, ord.(tag).group_mean{g}];
+        end
+        tag_max_abs = max(abs(tag_vals), [], 'omitnan');
+        if ~isfinite(tag_max_abs) || tag_max_abs <= 0
+            tag_max_abs = 1;
+        end
+        exp10 = floor(log10(tag_max_abs));
+        base = tag_max_abs / 10^exp10;
+        nice_vals = [1 2 5 10];
+        [~, idx_nice] = min(abs(nice_vals - base));
+        scale_ref.(tag) = nice_vals(idx_nice) * 10^exp10;
+        global_ylim.(tag) = [-scale_ref.(tag)*1.1, scale_ref.(tag)*1.1];
+
+        fprintf('Tag %s: scale_ref = %.2f\n', tag, scale_ref.(tag));
+    end
+
+    %% ===================== PLOTTING =====================
+    n_disp = numel(display_tags);
+    fig_width_in = 6 * n_disp + 2;
+    fig_height_in = 10;
+    figHandle = figure('Color','w', 'Units','inches', ...
+        'Position', [0.5 0.5 fig_width_in fig_height_in], ...
+        'PaperUnits','inches', 'PaperSize', [fig_width_in fig_height_in], ...
+        'PaperPosition', [0 0 fig_width_in fig_height_in], ...
+        'PaperPositionMode','manual');
+
+    left0 = 0.03;
+    right_margin = 0.02;
+    gap = 0.03;
+    animal_strip_width = 0.008*n_animals*1.5;
+    llh_strip_width = 0.012;
+
+    available_width = 1 - left0 - right_margin - (n_disp-1)*gap;
+    block_width = available_width / n_disp;
+    per_block_fixed = animal_strip_width + llh_strip_width + 0.019;
+    heat_width  = (block_width - per_block_fixed) * 0.62;
+    trace_width = (block_width - per_block_fixed) * 0.38 - gap*0.6;
+
+    first_panel_done_per_tag = struct(); % CHANGED: one flag per tag, not one global flag
+
+    for t = 1:n_disp
+        tag = display_tags{t};
+        n_groups_t = ord.(tag).n_groups;
+        trace_height = 0.84 / n_groups_t;
+        block_left = left0 + (t-1)*(block_width + gap);
+
+        % ---- LEFT: one scatter column per animal, in THIS tag's own order ----
+        ax_sess = axes('Position', [block_left 0.08 animal_strip_width 0.84]); hold(ax_sess,'on');
+        for s = 1:n_animals
+            vals = find(sess_vals(ord.(tag).sess_ord) == sess_vals(s));
+            scatter(ax_sess, s*ones(size(vals)), vals, 8, 'filled', ...
+                'MarkerFaceColor', sess_cmap(s,:), 'MarkerEdgeColor','none');
+        end
+        xlim(ax_sess, [0.3, n_animals+0.7]); ylim(ax_sess, [1 N]);
+        axis(ax_sess, 'off');
+        if t == 1
+            text(ax_sess, (n_animals+1)/2, -N*0.03, 'Animal', 'FontSize', 8, ...
+                'HorizontalAlignment','center');
+        end
+
+        LLHrel_this = LLHrel(spatial_mask);
+        ord.(tag).llhrel_ord = LLHrel_this(ord.(tag).optiorder);
+
+        Spatialcells_this = signicells(spatial_mask) & goodLLHcells(spatial_mask);
+        ord.(tag).spatialcells_ord = Spatialcells_this(ord.(tag).optiorder);
+
+        llh_left = block_left + animal_strip_width + 0.004;
+        ax_llh = axes('Position', [llh_left 0.08 llh_strip_width 0.84]); hold(ax_llh,'on');
+
+        is_spatial_ord = ord.(tag).spatialcells_ord;
+
+        class_img = double(is_spatial_ord(:));
+        imagesc(ax_llh, 1, 1:N, class_img);
+        colormap(ax_llh, [0 0 0; col_Spatial]);
+        set(ax_llh, 'YDir','normal');
+        xlim(ax_llh, [0.5 1.5]);
+        ylim(ax_llh, [1 N]);
+        axis(ax_llh, 'off');
+        if t == 1
+            text(ax_llh, 1, -N*0.03, 'Spatial', 'FontSize', 8, 'HorizontalAlignment','center');
+        end
+
+        % ---- MIDDLE: heatmap, in THIS tag's own order ----
+        heat_left = block_left + animal_strip_width + llh_strip_width + 0.019;
+        ax_heat = axes('Position', [heat_left 0.08 heat_width 0.84]); hold(ax_heat,'on');
+        imagesc(ax_heat, x_pos, 1:N, ord.(tag).norm, [0 1]);
+        colormap(ax_heat, RedWhiteBlue);
+        set(ax_heat, 'YDir','normal');
+        ylim(ax_heat, [1 N]);
+        set(ax_heat, 'XTick', [40 80 120 160]);
+        xlabel(ax_heat, 'Position (cm)');
+        if strcmp(tag,'Data')
+            title(ax_heat, sprintf('Measured response (N=%d, own ordering)', N));
+        else
+            title(ax_heat, sprintf('%s kernel (N=%d, own ordering)', tag, N));
+        end
+        box(ax_heat,'off'); set(ax_heat,'TickDir','out');
+
+        % ---- Independent colorbar strip ----
+        ax_cbar = axes('Position', [heat_left, 0.02, heat_width, 0.02]);
+        imagesc(ax_cbar, [0 1], [0 1], linspace(0,1,256));
+        colormap(ax_cbar, RedWhiteBlue);
+        set(ax_cbar, 'YTick', [], 'XTick', [0 0.5 1], 'XTickLabel', {'0','0.5','1'});
+        xlabel(ax_cbar, 'Activity (norm.)', 'FontSize', 8);
+        box(ax_cbar, 'on'); set(ax_cbar, 'TickDir','out', 'FontSize', 7);
+
+        % ---- RIGHT edge of heatmap: brackets + dots for THIS tag's groups ----
+        for g = 1:n_groups_t
+            idx = ord.(tag).groups{g};
+            y1 = min(idx); y2 = max(idx);
+            x0 = x_pos(end) + range(x_pos)*0.02;
+            plot(ax_heat, [x0 x0], [y1 y2], '-', 'Color', ord.(tag).grp_cmap(g,:), 'LineWidth', 1.5);
+            for m = 1:numel(idx)
+                plot(ax_heat, x0, idx(m), 'o', 'MarkerFaceColor', ord.(tag).grp_cmap(g,:), ...
+                    'MarkerEdgeColor', 'none', 'MarkerSize', 5, 'Clipping','off');
+            end
+        end
+
+        % ---- FAR RIGHT: group-mean example trace panels ----
+        trace_left = heat_left + heat_width + gap*0.6;
+        annotation('textbox', [trace_left, 0.93, trace_width, 0.04], ...
+            'String', sprintf('Examples: %s', tag), ...
+            'HorizontalAlignment','center', 'FontWeight','bold', 'FontSize', 9, ...
+            'EdgeColor','none', 'VerticalAlignment','middle');
+        for g = 1:n_groups_t
+            bottom = 0.08 + (g - 1) * trace_height;
+            axT = axes('Position', [trace_left bottom trace_width trace_height*0.85]); hold(axT,'on');
+            idx = ord.(tag).groups{g};
+
+            plot(axT, x_pos, ord.(tag).group_mean{g}, '-', 'LineWidth', 1.8, ...
+                'Color', ord.(tag).grp_cmap(g,:));
+
+            ylim(axT, global_ylim.(tag));   % CHANGED: per-tag
+            xlim(axT, [x_pos(1) x_pos(end)]);
+            box(axT,'off'); set(axT,'TickDir','out'); set(axT,'FontSize',7);
+            set(axT, 'YTick', []);
+            yline(axT, 0, 'Color',[0.8 0.8 0.8], 'LineStyle',':', 'HandleVisibility','off');
+
+            if ~isfield(first_panel_done_per_tag, tag) || ~first_panel_done_per_tag.(tag)  % CHANGED: per tag
+                xb = x_pos(1) - range(x_pos)*0.05;
+                tick_len = range(x_pos)*0.015;
+                plot(axT, [xb xb], global_ylim.(tag), 'k-', 'LineWidth', 1.5, 'Clipping','off');
+                label_pts = [-scale_ref.(tag), 0, scale_ref.(tag)];   % CHANGED: per-tag
+                for lp = label_pts
+                    plot(axT, [xb-tick_len, xb+tick_len], [lp lp], 'k-', ...
+                        'LineWidth', 1.2, 'Clipping','off');
+                    text(axT, xb - range(x_pos)*0.02 - tick_len, lp, sprintf('%.3g', lp), ...
+                        'FontSize', 7, 'HorizontalAlignment','right', 'VerticalAlignment','middle', ...
+                        'Clipping','off');
+                end
+                first_panel_done_per_tag.(tag) = true;
+            end
+
+            if g == 1
+                xlabel(axT, 'Position (cm)', 'FontSize', 7);
+            else
+                set(axT, 'XTickLabel', []);
+            end
+            text(axT, x_pos(1), max(ylim(axT)), sprintf('n=%d', numel(idx)), 'FontSize', 7, ...
+                'VerticalAlignment','bottom');
+        end
+
+        % Leader lines: dot cluster (heatmap) -> trace panel
+        for g = 1:n_groups_t
+            idx = ord.(tag).groups{g};
+            r_center = mean(idx);
+            heat_dot_norm  = [heat_left + heat_width + 0.005, 0.08 + (r_center/N)*0.84];
+            trace_dot_norm = [trace_left, 0.08 + (g - 0.5)*trace_height];
+            annotation('line', [heat_dot_norm(1) trace_dot_norm(1)], [heat_dot_norm(2) trace_dot_norm(2)], ...
+                'LineStyle', '--', 'Color', ord.(tag).grp_cmap(g,:), 'LineWidth', 1);
+        end
+    end
+
+    sgtitle(sprintf('Each tag ordered/grouped independently: %s (N=%d cells each, own similarity clusters, own scale per tag)', ...
+        strjoin(display_tags, ', '), N));
+end
+%%
+if strcmp(figname,'Latency-RFm5VsRest-Corrected')
+
+    % Masks
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask   = goodcells & RFpos >= -7.5 & RFpos < -2.5;   % RF ~ -5
+    otherRF_mask = goodcells & ~rfm5_mask;                     % remaining goodcells
+
+    % Visual latencies (milliseconds)
+    Vislat = EXP.GLMs{1}.Perf.bestVisdelay(:);
+
+    % Latency bins (milliseconds) — same as Latency-NonspatialVsSpatial-Corrected
+    lat_min = -1000/60; lat_max = 500+1000/60;
+    LAT_edges = lat_min:2000/60:lat_max;
+
+    % Sanity check: confirm masks are correctly sized/populated
+    fprintf('CHECK: sum(rfm5_mask) = %d\n', sum(rfm5_mask));
+    fprintf('CHECK: sum(otherRF_mask) = %d\n', sum(otherRF_mask));
+    fprintf('CHECK: sum(goodcells) = %d\n', sum(goodcells));
+
+    figure; hold on;
+    histogram(Vislat(otherRF_mask), LAT_edges, 'DisplayStyle','stairs', 'EdgeColor',[0.3 0.3 0.3], 'LineWidth',1.5, 'DisplayName',sprintf('Other RF (n=%d)',sum(otherRF_mask)));
+    histogram(Vislat(rfm5_mask), LAT_edges, 'DisplayStyle','stairs', 'EdgeColor',[0.8 0.2 0.2], 'LineWidth',1.5, 'DisplayName',sprintf('RF ~ -5 (n=%d)',sum(rfm5_mask)));
+    xlabel('Visual latency (ms)'); ylabel('# cells');
+    legend('Location','northeast'); legend boxoff;
+    box off; set(gca,'TickDir','out');
+    title('Corrected: latency distribution, RF ~ -5 vs rest');
+
+    [p_wrs, ~] = ranksum(Vislat(rfm5_mask), Vislat(otherRF_mask));
+    fprintf('Corrected Wilcoxon rank-sum test (RF~-5 vs rest latency): p = %.3g\n', p_wrs);
+end
+
+
+
+
+%% Check proportion (fraction-form spatial weight) for non-spatial cells
+if strcmp(figname,'ProportionCheck-NonSpatial')
+
+    proportionSpatial = 1 - (1 ./ LLHrel);
+    nonspatial_group = goodcells & ~spatialcells;
+    
+    % Exclude cells with LLHi_VSP too close to zero (the source of instability)
+    % Using a simple, stated threshold: exclude if |LLHi_VSP| < some small value
+    valid_denom = abs(LLHi_pos) > 0.01;  % adjust threshold as appropriate, check against your LLHi_pos values first
+    vals = proportionSpatial(nonspatial_group & valid_denom);
+    fprintf('Non-spatial cells (excluding near-zero denominator): mean = %.3f (%.1f%%), n = %d (excluded %d)\n', ...
+        mean(vals,'omitnan'), 100*mean(vals,'omitnan'), numel(vals), sum(nonspatial_group)-numel(vals));
+
+    %% Median proportion (fraction-form spatial weight) for BOTH groups
+
+    median_spatial = median(proportionSpatial(spatialcells), 'omitnan');
+    n_spatial = sum(~isnan(proportionSpatial(spatialcells)));
+
+    nonspatial_group = goodcells & ~spatialcells;
+    median_nonspatial = median(proportionSpatial(nonspatial_group), 'omitnan');
+    n_nonspatial = sum(~isnan(proportionSpatial(nonspatial_group)));
+
+    fprintf('Spatial cells: median proportion = %.3f (%.1f%%), n = %d\n', ...
+        median_spatial, 100*median_spatial, n_spatial);
+    fprintf('Non-spatial cells: median proportion = %.3f (%.1f%%), n = %d\n', ...
+        median_nonspatial, 100*median_nonspatial, n_nonspatial);
+
+end
+%% 10 EXAMPLE CELLS SPANNING THE SUPPRESSION-EXCITATION BALANCE SCALE,
+% measured response overlaid on both estimated LANDMARK and BG kernels,
+% all on one shared, FIXED axis scale.
+if strcmp(figname,'LandmarkBGBalance-SpannedExamples')
+
+    measured     = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    landmark_est = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(:,1,:,1));
+    bg_est       = squeeze(EXP.GLMs{1}.Tuning(iBG).meanrespModel(:,1,:,1));
+    xpos = linspace(0,200,size(landmark_est,2));
+
+    landmark_gc = landmark_est(goodcells,:);
+    bg_gc       = bg_est(goodcells,:);
+    measured_gc = measured(goodcells,:);
+    gc_idx = find(goodcells);
+
+    exc  = max(landmark_gc,[],2,'omitnan');
+    supp = -min(landmark_gc,[],2,'omitnan');
+    balance = (exc - supp) ./ (exc + supp);
+
+    [sortedBal, sortIdx] = sort(balance, 'ascend', 'MissingPlacement','last');
+    validN = sum(~isnan(sortedBal));
+    pickFrac = linspace(0.02, 0.98, 10);
+    pickPos = round(pickFrac * validN);
+    pickPos(pickPos < 1) = 1;
+    pickPos(pickPos > validN) = validN;
+
+    exampleLocalIdx = sortIdx(pickPos);
+    exampleCellIdx  = gc_idx(exampleLocalIdx);
+    exampleBalance  = balance(exampleLocalIdx);
+
+    global_ylim = [-150 150];
+
+    % Larger figure window, sized generously for 10 rows x 2 columns
+    figure('Units','normalized','Position',[0.25 0.02 0.35 0.96]);
+    tl = tiledlayout(10, 2, 'TileSpacing','loose', 'Padding','compact');
+
+    for i = 1:10
+        ax1 = nexttile(tl); hold(ax1,'on');
+        plot(ax1, xpos, measured_gc(exampleLocalIdx(i),:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.2, 'DisplayName','Measured');
+        plot(ax1, xpos, landmark_gc(exampleLocalIdx(i),:), 'r-', 'LineWidth',1.2, 'DisplayName','Landmark kernel');
+        yline(ax1,0,'k:'); ylim(ax1,global_ylim); xlim(ax1,[0 200]);
+        title(ax1, sprintf('Cell %d (bal=%.2f) - Landmark', exampleCellIdx(i), exampleBalance(i)));
+        box(ax1,'off'); set(ax1,'TickDir','out');
+        if i == 1, legend(ax1,'Location','northeast'); legend(ax1,'boxoff'); end
+        if i == 10, xlabel(ax1,'Position (cm)'); end
+
+        ax2 = nexttile(tl); hold(ax2,'on');
+        plot(ax2, xpos, measured_gc(exampleLocalIdx(i),:), 'Color',[0.5 0.5 0.5], 'LineWidth',1.2, 'DisplayName','Measured');
+        plot(ax2, xpos, bg_gc(exampleLocalIdx(i),:), 'g-', 'LineWidth',1.2, 'DisplayName','BG kernel');
+        yline(ax2,0,'k:'); ylim(ax2,global_ylim); xlim(ax2,[0 200]);
+        title(ax2, sprintf('Cell %d (bal=%.2f) - BG', exampleCellIdx(i), exampleBalance(i)));
+        box(ax2,'off'); set(ax2,'TickDir','out');
+        if i == 1, legend(ax2,'Location','northeast'); legend(ax2,'boxoff'); end
+        if i == 10, xlabel(ax2,'Position (cm)'); end
+    end
+    sgtitle(tl, 'Example cells (ordered by landmark balance): landmark (left) vs background (right)');
+end
+
 
 % % ---- Helper: fetch either a fitted GLM kernel or the actual measured
 % % response, by name tag ----
@@ -3996,8 +7714,339 @@ function m = orderby_default_for_hclust(S)
 end
 
 
+%% Out-dominant RF=-5 cells: LANDMARK KERNEL + MEASURED DATA, side by side
+%% Out-dominant RF=-5 cells: LANDMARK KERNEL + MEASURED DATA, side by side,
+% sorted by distance from each cell's peak to landmark 1 (40 cm)
+if strcmp(figname, 'RFm5-InOutSplit-KernelAndData')
+
+    % ---- Recompute RF=-5 selection and edge bias ----
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx  = find(rfm5_mask);
+
+    visK_raw = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK_raw,2);
+    visK_flip = fliplr(visK_raw);
+
+    edgeWidth = max(1, round(nBins*0.2));
+    outBins = 1:edgeWidth;
+    inBins  = (edgeWidth+1):nBins;
+    outAmp = mean(visK_flip(:,outBins), 2, 'omitnan');
+    inAmp  = mean(visK_flip(:,inBins),  2, 'omitnan');
+    edgeBias = outAmp - inAmp;
+    isOutDominant = edgeBias > 0;
+
+    outDominant_idx = rfm5_idx(isOutDominant);
+    edgeBias_sel = edgeBias(isOutDominant);
+    Nsel = numel(outDominant_idx);
+    fprintf('%d out-dominant RF=-5 cells\n', Nsel);
+
+    % ---- Landmark kernel, corridor coordinates ----
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+
+    % ---- Sort by distance from peak to landmark 1 (40 cm) ----
+    landmarkCenter = 40;
+    landmarkWindow = xpos >= (landmarkCenter-15) & xpos <= (landmarkCenter+15);
+    xpos_windowed = xpos(landmarkWindow);
+
+    K_sel = landmarkTrace(outDominant_idx, :);
+    K_windowed = K_sel(:, landmarkWindow);
+    [~, peakBin] = max(K_windowed, [], 2, 'omitnan');
+    peakPos = xpos_windowed(peakBin)';
+    distToLandmark1 = peakPos - landmarkCenter;
+
+    [sortedDist, sortIdx] = sort(distToLandmark1, 'ascend', 'MissingPlacement', 'last');
+    sortedCellIdx = outDominant_idx(sortIdx);
+    edgeBias_sorted = edgeBias_sel(sortIdx);
+
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+
+    % ---- Panel 1: LANDMARK KERNEL ----
+    K_sorted = landmarkTrace(sortedCellIdx, :);
+    K_scaled = scaleKernel(K_sorted);
+
+    % ---- Panel 2: MEASURED DATA ----
+    measured = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    D_sorted = measured(sortedCellIdx, :);
+    D_scaled = scaleKernel(D_sorted);
+
+    figure('Color','w','Position',[100 100 900 700]);
+
+        subplot(1,2,1);
+    imagesc(xpos, 1:Nsel, K_scaled, [0 1]);
+    colormap(gca, RedWhiteBlue); colorbar;
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance to landmark 1)');
+    title('Landmark kernel (model)');
+    box off; set(gca,'TickDir','out');
+    xticks([40 80 120 160]);
+    for lm = [40 80 120 160], xline(lm, '--k', 'HandleVisibility', 'off'); end
+
+    subplot(1,2,2);
+    imagesc(xpos, 1:Nsel, D_scaled, [0 1]);
+    colormap(gca, flipud(gray(256))); colorbar;
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance to landmark 1)');
+    title('Measured data');
+    box off; set(gca,'TickDir','out');
+    xticks([40 80 120 160]);
+    for lm = [40 80 120 160], xline(lm, '--k', 'HandleVisibility', 'off'); end
+
+    sgtitle(sprintf('RF=-5 out-dominant cells (n=%d): kernel vs measured data, sorted by distance to landmark 1', Nsel));
+
+        % ---- Choose examples: EDIT this list ----
+    exampleRows = [1, 5, 10, 20, 60, 70]; % row numbers in the sorted order (top to bottom)
+    % OR by cell name instead:
+    % exampleNames = {'M26004_20260318_cell#17', 'M26004_20260318_cell#43'};
+    % exampleRows = find(ismember(EXP.Spk.CellListString(sortedCellIdx), exampleNames));
+
+    nEx = numel(exampleRows);
+
+    figure('Color','w','Position',[100 100 1300 700]);
+
+    subplot(1,3,1);
+    imagesc(xpos, 1:Nsel, K_scaled, [0 1]);
+    colormap(gca, RedWhiteBlue); colorbar;
+    hold on;
+    for r = exampleRows, yline(r, 'k-', 'LineWidth', 1); end
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance to landmark 1)');
+    title('Landmark kernel (model)');
+    box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+
+    subplot(1,3,2);
+    imagesc(xpos, 1:Nsel, D_scaled, [0 1]);
+    colormap(gca, flipud(gray(256))); colorbar;
+    hold on;
+    for r = exampleRows, yline(r, 'k-', 'LineWidth', 1); end
+    xlabel('Position (cm)'); ylabel('Cell (sorted by distance to landmark 1)');
+    title('Measured data');
+    box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+
+    % ---- Example traces: measured data for chosen rows ----
+    for i = 1:nEx
+        r = exampleRows(i);
+        cellidx = sortedCellIdx(r);
+        subplot(nEx, 3, 3*i); hold on;
+        plot(xpos, measured(cellidx,:), 'k-', 'LineWidth', 1.3);
+        title(sprintf('Row %d: %s', r, EXP.Spk.CellListString{cellidx}), ...
+            'Interpreter','none','FontSize',7);
+        xlabel('Position (cm)');
+        box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+    end
+
+    sgtitle(sprintf('RF=-5 out-dominant cells (n=%d): kernel, data, and selected examples', Nsel));
+end
+
+%% Check RF=-5 peak direction: front edge vs periphery
+if strcmp(figname, 'RFm5-PeakDirectionCheck')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx  = find(rfm5_mask);
+    fprintf('RF = -5 cells: n = %d / %d goodcells\n', numel(rfm5_idx), sum(goodcells));
+
+    visK_raw = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK_raw,2);
+    visK_flip = fliplr(visK_raw); % 0 = front, after flip
+
+    [~, peakBin] = max(visK_flip, [], 2, 'omitnan');
+
+    edgeWidth = round(nBins*0.2);
+    peaksNearFront     = peakBin <= edgeWidth;
+    peaksNearPeriphery = peakBin > (nBins - edgeWidth);
+
+    fprintf('Peak near FRONT (bins 1-%d): n = %d\n', edgeWidth, sum(peaksNearFront));
+    fprintf('Peak near PERIPHERY (bins %d-%d): n = %d\n', nBins-edgeWidth+1, nBins, sum(peaksNearPeriphery));
+
+    xv = linspace(0,110,nBins);
+
+    figure('Color','w','Position',[100 100 900 400]);
+
+    subplot(1,2,1); hold on;
+    idx = find(peaksNearFront, 5);
+    for i = 1:numel(idx)
+        plot(xv, visK_flip(idx(i),:), 'LineWidth', 1.2);
+    end
+    xline(xv(edgeWidth), 'k--');
+    xlabel('Visual angle (deg)'); title('Peak near FRONT');
+    box off; set(gca,'TickDir','out');
+
+    subplot(1,2,2); hold on;
+    idx = find(peaksNearPeriphery, 5);
+    for i = 1:numel(idx)
+        plot(xv, visK_flip(idx(i),:), 'LineWidth', 1.2);
+    end
+    xline(xv(nBins-edgeWidth+1), 'k--');
+    xlabel('Visual angle (deg)'); title('Peak near PERIPHERY');
+    box off; set(gca,'TickDir','out');
+end
+
+%% RF=-5 candidate groups: check in CORRIDOR SPACE
+if strcmp(figname, 'RFm5-CorridorCheck')
+
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx  = find(rfm5_mask);
+
+    visK_raw = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK_raw,2);
+    xv = linspace(0,110,nBins);
+
+    [~, peakBin] = max(visK_raw, [], 2, 'omitnan');
+    peakAngle = xv(peakBin)';
+
+    peaksPast80 = peakAngle > 80;
+    peaksNear0  = peakAngle >= 0 & peakAngle <= 20;
+
+    group1_idx = rfm5_idx(peaksPast80);
+    group2_idx = rfm5_idx(peaksNear0);
+    fprintf('Group 1 (peaks beyond 80 deg): n = %d\n', numel(group1_idx));
+    fprintf('Group 2 (peaks 0-20 deg): n = %d\n', numel(group2_idx));
+
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    measured = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+
+    groups = {group1_idx, group2_idx};
+    groupNames = {'Peaks beyond 80 deg', 'Peaks 0-20 deg'};
+
+    for g = 1:2
+        cellIdx = groups{g};
+        N = numel(cellIdx);
+        if N == 0, continue; end
+
+        K_scaled = scaleKernel(landmarkTrace(cellIdx,:));
+        D_scaled = scaleKernel(measured(cellIdx,:));
+
+        figure('Color','w','Position',[100 100 900 700]);
+
+        subplot(1,2,1);
+        imagesc(xpos, 1:N, K_scaled, [0 1]);
+        colormap(gca, RedWhiteBlue); colorbar;
+        xlabel('Position (cm)'); ylabel('Cell');
+        title('Landmark kernel (model)');
+        box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+
+        subplot(1,2,2);
+        imagesc(xpos, 1:N, D_scaled, [0 1]);
+        colormap(gca, flipud(gray(256))); colorbar;
+        xlabel('Position (cm)'); ylabel('Cell');
+        title('Measured data');
+        box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+
+        sgtitle(sprintf('%s (n=%d)', groupNames{g}, N));
+    end
+end
 
 
+%% RF=-5 cells split by edge bias: out-dominant vs in-dominant, 50/50 split
+if strcmp(figname, 'RFm5-InOutSplit-BothGroups')
+
+    sortMethod = 'landmarkDist'; % 'edgeBias' or 'landmarkDist'
+
+    % ---- RF=-5 selection and edge bias (azimuth space) ----
+    RFpos = EXP.GLMs{1}.Perf.bestRFpos(:);
+    rfm5_mask = goodcells & RFpos == -5;
+    rfm5_idx  = find(rfm5_mask);
+
+    visK_raw = squeeze(EXP.GLMs{1}.Tuning(itex).meanrespModel(rfm5_idx,1,:));
+    nBins = size(visK_raw,2);
+    visK_flip = fliplr(visK_raw);
+
+    % 50/50 split: front half = "out" (off-screen side), back half = "in"
+    halfBin = round(nBins/2);
+    outAmp = mean(visK_flip(:,1:halfBin), 2, 'omitnan');
+    inAmp  = mean(visK_flip(:,halfBin+1:end), 2, 'omitnan');
+    edgeBias = outAmp - inAmp;
+
+    % ---- Two groups ----
+    outMask = edgeBias > 0;
+    inMask  = ~outMask;
+
+    outCellIdx = rfm5_idx(outMask);
+    outBias    = edgeBias(outMask);
+    inCellIdx  = rfm5_idx(inMask);
+    inBias     = edgeBias(inMask);
+
+    fprintf('Out-dominant: n = %d\n', numel(outCellIdx));
+    fprintf('In-dominant (leftover): n = %d\n', numel(inCellIdx));
+
+    % ---- Landmark kernel + measured data, corridor coords ----
+    mapLandmark_idx = (1:ncond) + 3*ncond;
+    landmarkTrace = squeeze(EXP.Maps{mapLandmark_idx(1)}.Tuning.meanrespModel);
+    measured = squeeze(EXP.Maps{mapDATA_idx(1)}.Tuning.meanrespModel(:,1,:));
+    xpos = linspace(0, 200, size(landmarkTrace,2));
+    scaleKernel = @(K) (K - min(K,[],2,'omitnan')) ./ (max(K,[],2,'omitnan') - min(K,[],2,'omitnan'));
+
+    landmarkCenter = 40;
+    landmarkWindow = xpos >= (landmarkCenter-15) & xpos <= (landmarkCenter+15);
+    xpos_windowed = xpos(landmarkWindow);
+
+    groups = {outCellIdx, inCellIdx};
+    groupBias = {outBias, inBias};
+    groupNames = {'Out-dominant', 'In-dominant (leftover)'};
+    exampleRows = {[1 5 10 20 40 70 83], [1 10 20 30 40 80 120]}; % edit per group, row numbers after sorting
+
+    for g = 1:2
+        cellIdx = groups{g};
+        bias = groupBias{g};
+        N = numel(cellIdx);
+
+        if strcmp(sortMethod, 'edgeBias')
+            sortVal = bias;
+            sortDir = 'descend';
+            sortLabel = 'edge bias';
+        else % 'landmarkDist'
+            K_this = landmarkTrace(cellIdx, :);
+            K_windowed = K_this(:, landmarkWindow);
+            [~, peakBin] = max(K_windowed, [], 2, 'omitnan');
+            sortVal = xpos_windowed(peakBin)' - landmarkCenter;
+            sortDir = 'ascend';
+            sortLabel = 'distance to landmark 1';
+        end
+        [~, sortIdx] = sort(sortVal, sortDir);
+        sortedCellIdx = cellIdx(sortIdx);
+
+        K_sorted = scaleKernel(landmarkTrace(sortedCellIdx, :));
+        D_sorted = scaleKernel(measured(sortedCellIdx, :));
+
+        exRows = exampleRows{g}(exampleRows{g} <= N);
+        nEx = numel(exRows);
+
+        figure('Color','w','Position',[100 100 1300 700]);
+
+        subplot(1,3,1);
+        imagesc(xpos, 1:N, K_sorted, [0 1]);
+        colormap(gca, RedWhiteBlue); colorbar;
+        hold on; for r = exRows, yline(r,'k-','LineWidth',1); end
+        xlabel('Position (cm)'); ylabel(sprintf('Cell (sorted by %s)', sortLabel));
+        title('Landmark kernel (model)');
+        box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+
+        subplot(1,3,2);
+        imagesc(xpos, 1:N, D_sorted, [0 1]);
+        colormap(gca, flipud(gray(256))); colorbar;
+        hold on; for r = exRows, yline(r,'k-','LineWidth',1); end
+        xlabel('Position (cm)'); ylabel(sprintf('Cell (sorted by %s)', sortLabel));
+        title('Measured data');
+        box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+
+        for i = 1:nEx
+            r = exRows(i);
+            cellidx = sortedCellIdx(r);
+            subplot(nEx, 3, 3*i); hold on;
+            plot(xpos, measured(cellidx,:), 'k-', 'LineWidth', 1.3);
+            title(sprintf('Row %d: %s', r, EXP.Spk.CellListString{cellidx}), ...
+                'Interpreter','none','FontSize',7);
+            xlabel('Position (cm)');
+            box off; set(gca,'TickDir','out'); xticks([40 80 120 160]);
+        end
+
+        sgtitle(sprintf('%s RF=-5 cells (n=%d), sorted by %s', groupNames{g}, N, sortLabel));
+    end
+end
 %% =====================================================================
 %  'SpeedVsSpatial-correlations'  (new figname)
 %

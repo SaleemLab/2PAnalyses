@@ -1,5 +1,5 @@
 function siMetric = getSpatialInfo_WithShuffle(sessionFileInfo, response, signalToUse, plotFlag)
-% Calculates Spatial Mutual Information (Skaggs et al. 1993) 
+% Calculates Spatial Information (Skaggs et al. 1993) 
 % and corrects it using a shuffled null distribution.
 
 %% 1. Setup

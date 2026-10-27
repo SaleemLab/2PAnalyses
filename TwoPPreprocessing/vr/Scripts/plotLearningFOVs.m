@@ -1,6 +1,6 @@
 %% Plot learning FOVs 
 % Load RSP sessions 
-RSPSessions = filterMasterTable('MouseID', {'M25132', 'M25133', 'M26003'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', [1 2 3 4 5]);
+RSPSessions = filterMasterTable('MouseID', {'M25132', 'M25133', 'M26003'}, 'Suite2PPreprocessing', 1, 'DayOfExperience', [1 2 3 4 5 200]);
 
 
 uniqueMice = unique(RSPSessions.MouseID);

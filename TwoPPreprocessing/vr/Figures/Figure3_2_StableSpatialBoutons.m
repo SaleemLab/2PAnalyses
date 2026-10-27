@@ -1,16 +1,24 @@
 % Figure3.2: Responsive boutons from day 5 onwards
 
 pairs=struct;
-pairs.M25132 = ['20260226', '20260228', '20260313'];
-pairs.M25133 = '20260224';
-pairs.M26003 = ['20260322', '20260324', '20260325'];
+% pairs.M25132 = ['20260226', '20260228', '20260313'];
+% pairs.M25133 = '20260224';
+% pairs.M26003 = ['20260322', '20260324', '20260325'];
+
+% compute across all sessions because this chapter now includes the
+% learning days as well. 
+pairs.M25132 = ['20260219','20260220','20260221','20260223', '20260226','20260228', '20260313']; %
+pairs.M25133 = ['20260220','20260221','20260223''20260219','20260224'];
+pairs.M26003 = ['20260316','20260317', '20260320','20260321','20260322', '20260324', '20260325']; %
 
 
 ExpRSPSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
 RSPData = getTuningDataByCondition(ExpRSPSessions);
+RSPDataSpks = getTuningDataByCondition(ExpRSPSessions, 'signalToUse', 'spks'); 
 % bin data by condition and load inclusion critera
 
 %% ev
+trueEVThreshold = 0.1;
 pooled_true_EV = [];
 pooled_null_EV = [];
 pooled_null_max_per_ROI = []; % Track the highest null value an ROI achieved across shuffles

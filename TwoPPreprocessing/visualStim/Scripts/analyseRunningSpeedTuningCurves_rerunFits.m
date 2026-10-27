@@ -3,29 +3,32 @@
 clear; clc;
 
 pairs = struct; 
-% pairs.M26005 = {'20260305', '20260306', '20260311', '20260318', '20260321', '20260322'};
-% pairs.M26004 = {'20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'};
-% pairs.M25131 = {'20260312', '20260313', '20260314', '20260318', '20260321', '20260322'};
-% pairs.M25126 = {'20260311', '20260312', '20260313'};
+
 % pairs.M25132 = {'20260226', '20260228', '20260313'};
 % pairs.M26003 = {'20260322', '20260324', '20260325'};
 % pairs.M25133 = {'20260224'};
 
-% pairs.M25132 = {'20260219', '20260220', '20260221', '20260223', '20260228', '20260303', '20260306', '20260312', '20260226', '20260228', '20260313'};
-% pairs.M26003 = {'20260316', '20260317', '20260320', '20260321', '20260322', '20260324', '20260325'};
-% pairs.M25133 = {'20260219', '20260220', '20260221', '20260223', '20260224'};
+pairs.M25132 = {'20260219', '20260220', '20260221', '20260223', '20260228', '20260303', '20260306', '20260312', '20260226', '20260228', '20260313'};
+pairs.M26003 = {'20260316', '20260317', '20260320', '20260321', '20260322', '20260324', '20260325'};
+pairs.M25133 = {'20260219', '20260220', '20260221', '20260223', '20260224'};
 
-pairs.M25132 = {'20260306', '20260219'};
+
+pairs.M26005 = {'20260305', '20260306', '20260311', '20260318', '20260321', '20260322'};
+pairs.M26004 = {'20260305', '20260307', '20260312', '20260313', '20260314', '20260318', '20260321', '20260322'};
+pairs.M25131 = {'20260312', '20260313', '20260314', '20260318', '20260321', '20260322'};
+pairs.M25126 = {'20260311', '20260312', '20260313'};
+
+% pairs.M25132 = {'20260306', '20260219'};
 
 paramsBoutons.signalName = 'dFFNeuropilCorrected';
 paramsBoutons.useZScoredProcessedSignals = false; 
-paramsSomas.signalName   = 'spks'; 
+paramsSomas.signalName   = 'dFFNeuropilCorrected'; 
 paramsSomas.useZScoredProcessedSignals = false; 
 
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'Darkness', 'GrayScreen'});
 mouseInfo = sessionsToProcess(filteredTable);
 
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'DarkGary_20260620_VISpAndRSpDay5_200.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'DarkGary_20260924_allsessions.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 
 if ~exist(logFilePath, 'file')

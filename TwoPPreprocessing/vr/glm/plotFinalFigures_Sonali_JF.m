@@ -4,7 +4,8 @@ function plotFinalFigures_Sonali_JF(EXP, figname, singlecell_IDs)
 % concatenated multi-session EXP structure (GLM + Maps).
 %
 % EXAMPLE USAGE
-%   EXP_all = load('path_to_batch_file\batch_file.mat');
+%   EXP_all = load("C:\Users\sonali.sriranga\Desktop\V1\batch\SpkLin_batch_SpkLin_VisSpkLinParams.mat");
+%   EXP_all = load("C:\Users\sonali.sriranga\Desktop\RSP\batch\SpkLinRSP_batch_SpkLinRSP_VisSpkLinParams.mat")
 %   plotFinalFigures_Sonali(EXP_all, 'Ordered-Kernels-Space-Landmarks-BG-FullMap-all')
 %   plotFinalFigures_Sonali(EXP_all, 'Resp-snake-base-omit2-omit3')
 %   plotFinalFigures_Sonali(EXP_all, 'Resp-singleCell', {'M26004_20260318_cell#17', 'M26004_20260318_cell#43'})
@@ -1366,15 +1367,23 @@ if strcmp(figname,'Resp-singleCell')
             se = squeeze(EXP.Maps{k}.Tuning.SErespModel(cellidx,1,:)); se = se(:);
             % y_g: full-model (VSP) GLM-predicted mean response, same condition
             y_g = squeeze(EXP.Maps{mapVSP_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_g = y_g(:);
-
+            % y_vs: reduced-model (VS, no position) GLM-predicted mean response, same condition
+            y_vs = squeeze(EXP.Maps{mapVS_idx(k)}.Tuning.meanrespModel(cellidx,1,:)); y_vs = y_vs(:);
+            
+            
+            
             x = linspace(0,200,numel(y));
 
             yAll{k}  = y;
             seAll{k} = se;
             yGLM{k}  = y_g;
+            yVS{k}   = y_vs;
             xAll{k}  = x;
+            
 
-            yMax = max([yMax; y + se; y_g], [], 'omitnan');
+            yMax = max([yMax; y + se; y_g; y_vs], [], 'omitnan');
+
+%             yMax = max([yMax; y + se; y_g], [], 'omitnan');
         end
         if ~isfinite(yMax) || yMax <= 0, yMax = 1; end
         yLim = [0, 1.05*yMax];
@@ -1382,6 +1391,7 @@ if strcmp(figname,'Resp-singleCell')
         % Colors
         col_data = [0 0 0];        % black for measured mean
         col_glm  = col_Spatial; % blue-ish for GLM prediction
+        col_vs   = [0.85 0.1 0.1]; % red for VS (reduced model) prediction
 
         % Now draw the actual subplots, one per condition, reusing the
         % shared yLim computed above.
@@ -1393,6 +1403,9 @@ if strcmp(figname,'Resp-singleCell')
 
             % Mean response (data)
             plot(ax, xAll{k}, yAll{k}, '-', 'Color', col_data, 'LineWidth', 1.5, 'DisplayName','Data');
+
+            % VS predicted mean (reduced model, no position)
+            plot(ax, xAll{k}, yVS{k}, '--', 'Color', col_vs, 'LineWidth', 2, 'DisplayName','VS');
 
             % GLM predicted mean
             plot(ax, xAll{k}, yGLM{k}, '-', 'Color', col_glm, 'LineWidth', 1.5, 'DisplayName','GLM');

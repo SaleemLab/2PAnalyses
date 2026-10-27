@@ -48,3 +48,9 @@ for s = 1:length(RSPDataAcrossDays)
     nLaps = RSPDataAcrossDays(s).ConditionData.Baseline.NumLaps;  % or whatever your lap field is
     fprintf('Day %d: %d laps | Mouse %s \n', RSPDataAcrossDays(s).Day, nLaps, RSPDataAcrossDays(s).MouseID);
 end
+
+
+
+%% Quantify negative Rp/Rn and SMI range, pooled across sessions (RSPData)
+
+

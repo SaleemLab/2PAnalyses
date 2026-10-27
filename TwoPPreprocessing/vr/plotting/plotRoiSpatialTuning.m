@@ -37,11 +37,11 @@ function fig = plotRoiSpatialTuning(RSPData, sessionIdx, roiIdx, targetName)
 
     
     colormap(ax_heatmap, flipud(gray));
-    clim([0.25 0.75]); 
+%     clim([0.25 0.75]); 
     
     cb = colorbar('Location', 'eastoutside');
-    cb.Ticks = [0.25 0.50 0.75];
-    cb.TickLabels = {'0.25', '0.50', '0.75'};
+%     cb.Ticks = [0.25 0.50 0.75];
+%     cb.TickLabels = {'0.25', '0.50', '0.75'};
     cb.TickDirection = 'out';
     cb.Box = 'off';
     cb.FontName = 'Arial'; 

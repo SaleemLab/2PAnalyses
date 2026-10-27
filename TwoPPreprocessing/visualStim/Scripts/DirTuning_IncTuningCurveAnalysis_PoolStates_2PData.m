@@ -1,4 +1,4 @@
-% DirTuning_IncTuningCurveAnalysis_CompareStates_2PData.m
+% DirTuning_IncTuningCurveAnalysis_poolstates_2PData.m
 %
 % Compare-states version of the DirTuning pooling script: classifies
 % EVERY trial (per direction) as stationary or running, following the
@@ -32,6 +32,7 @@ statSpeedThresh = 0.5;  % mean speed below this = candidate "stationary"
 propThresh      = 0.75;
 
 alpha  = 0.05;
+numSD  = 1;             % ADDED: needed for ANOVA+threshold responsiveness criterion
 r2_thresh  = 0.1;
 r2p_thresh = 0.05;
 
@@ -43,6 +44,8 @@ r2opts.nShuffle   = 100;
 seed = 1;
 
 nTrialsTarget = 5; % minimum trials/direction required (after pooling stat+run) to attempt cvR2 for a bouton -- ADJUST based on the trial-count distribution printed below
+
+baseWin = [-0.75 0];   % ADDED: pre-stimulus baseline window
 
 %%
 DirTuningTable = filterMasterTable_usingNameSessionPairs('MouseID', ...
@@ -57,6 +60,7 @@ allDirTuning     = struct('fullTrace_stat', {}, 'fullTrace_run', {}, 'timeVec', 
                            'stimOnDuration', {}, ...
                            'meanDirResponse_stat', {}, 'meanDirResponse_run', {}, ...
                            'trialRawResp_stat', {}, 'trialRawResp_run', {}, ...
+                           'trialBaselineVals_stat', {}, 'trialBaselineVals_run', {}, ... % ADDED
                            'nTrialsStatPerDir', {}, 'nTrialsRunPerDir', {}, ...
                            'stimValues', {}, 'stimVariant', {}, 'sessionLabel', {});
 sessionLabels    = {};
@@ -123,6 +127,7 @@ for iMouse = 1:length(uniqueMice)
         nDir      = numel(response.psthData);
         timeVec   = response.psthData(1).timeVector(:)';
         respIdx   = timeVec >= respWin(1) & timeVec <= respWin(2);
+        baseIdx   = timeVec >= baseWin(1) & timeVec <= baseWin(2);   % ADDED
         stimVals  = arrayfun(@(s) s.stimValue, response.psthData);
 
         nBoutons = size(response.psthData(1).alignedResponses, 1);
@@ -140,7 +145,7 @@ for iMouse = 1:length(uniqueMice)
         nTrialsStatPerDir = nan(1, nDir);
         nTrialsRunPerDir  = nan(1, nDir);
 
-        for thisDir = 1:nDir
+                for thisDir = 1:nDir
             grpWheel    = response.wheelData(thisDir);
             speedMatrix = grpWheel.alignedResponses;      % [nWheelSamples x nTrials]
             tVecWheel   = grpWheel.timeVector(:)';
@@ -169,73 +174,80 @@ for iMouse = 1:length(uniqueMice)
             runTrialIdx{thisDir}      = find(thisDirFlag == 1);
             nTrialsStatPerDir(thisDir) = numel(statTrialIdx{thisDir});
             nTrialsRunPerDir(thisDir)  = numel(runTrialIdx{thisDir});
-        end
-
-        fprintf('  Stationary trials per direction: %s\n', mat2str(nTrialsStatPerDir));
-        fprintf('  Running trials per direction:    %s\n', mat2str(nTrialsRunPerDir));
-
-        if any(nTrialsStatPerDir == 0) || any(nTrialsRunPerDir == 0)
-            warning('  At least one direction has zero trials in one state for %s -- skipping session.', thisSessionName);
-            continue;
-        end
-
-        if isempty(sessionStatCounts)
-            sessionStatCounts = nTrialsStatPerDir;
-            sessionRunCounts  = nTrialsRunPerDir;
-        elseif size(sessionStatCounts, 2) == nDir
-            sessionStatCounts = [sessionStatCounts; nTrialsStatPerDir]; %#ok<AGROW>
-            sessionRunCounts  = [sessionRunCounts; nTrialsRunPerDir]; %#ok<AGROW>
-        else
-            warning('  nDir (%d) differs from previous sessions -- skipping this session''s counts in the summary table.', nDir);
-        end
-
-        %% per-bouton, RAW (no baseline subtraction), split by state
-        for iBouton = 1:nBoutons
-            fullTrace_stat = cell(nDir, 1);
-            fullTrace_run  = cell(nDir, 1);
-            meanDirResponse_stat = nan(nDir, 1);
-            meanDirResponse_run  = nan(nDir, 1);
-            trialRawResp_stat = cell(nDir, 1);
-            trialRawResp_run  = cell(nDir, 1);
-
-            for thisDir = 1:nDir
-                traceMat = squeeze(response.psthData(thisDir).alignedResponses(iBouton, :, :));
-                if isvector(traceMat)
-                    traceMat = traceMat(:);
                 end
-                traceMat = double(traceMat)'; % [nTrials x nTimepoints]
 
-                traceMatStat = traceMat(statTrialIdx{thisDir}, :);
-                traceMatRun  = traceMat(runTrialIdx{thisDir}, :);
+                fprintf('  Stationary trials per direction: %s\n', mat2str(nTrialsStatPerDir));
+                fprintf('  Running trials per direction:    %s\n', mat2str(nTrialsRunPerDir));
 
-                fullTrace_stat{thisDir} = traceMatStat; % RAW, no baseline subtraction
-                fullTrace_run{thisDir}  = traceMatRun;  % RAW, no baseline subtraction
+                if any(nTrialsStatPerDir == 0) || any(nTrialsRunPerDir == 0)
+                    warning('  At least one direction has zero trials in one state for %s -- skipping session.', thisSessionName);
+                    continue;
+                end
 
-                meanDirResponse_stat(thisDir) = mean(mean(traceMatStat(:, respIdx), 2, 'omitnan'), 'omitnan');
-                meanDirResponse_run(thisDir)  = mean(mean(traceMatRun(:, respIdx), 2, 'omitnan'), 'omitnan');
+                if isempty(sessionStatCounts)
+                    sessionStatCounts = nTrialsStatPerDir;
+                    sessionRunCounts  = nTrialsRunPerDir;
+                elseif size(sessionStatCounts, 2) == nDir
+                    sessionStatCounts = [sessionStatCounts; nTrialsStatPerDir]; %#ok<AGROW>
+                    sessionRunCounts  = [sessionRunCounts; nTrialsRunPerDir]; %#ok<AGROW>
+                else
+                    warning('  nDir (%d) differs from previous sessions -- skipping this session''s counts in the summary table.', nDir);
+                end
 
-                trialRawResp_stat{thisDir} = mean(traceMatStat(:, respIdx), 2, 'omitnan');
-                trialRawResp_run{thisDir}  = mean(traceMatRun(:, respIdx), 2, 'omitnan');
-            end
+                %% per-bouton, RAW (no baseline subtraction), split by state
+                for iBouton = 1:nBoutons
+                    fullTrace_stat = cell(nDir, 1);
+                    fullTrace_run  = cell(nDir, 1);
+                    meanDirResponse_stat = nan(nDir, 1);
+                    meanDirResponse_run  = nan(nDir, 1);
+                    trialRawResp_stat = cell(nDir, 1);
+                    trialRawResp_run  = cell(nDir, 1);
+                    trialBaselineVals_stat = cell(nDir, 1);  % ADDED
+                    trialBaselineVals_run  = cell(nDir, 1);  % ADDED
 
-            allDirTuning(end+1) = struct( ...
-                'fullTrace_stat',       {fullTrace_stat}, ...
-                'fullTrace_run',        {fullTrace_run}, ...
-                'timeVec',              timeVec, ...
-                'stimOnDuration',       stimOnDuration, ...
-                'meanDirResponse_stat', meanDirResponse_stat, ...
-                'meanDirResponse_run',  meanDirResponse_run, ...
-                'trialRawResp_stat',    {trialRawResp_stat}, ...
-                'trialRawResp_run',     {trialRawResp_run}, ...
-                'nTrialsStatPerDir',    nTrialsStatPerDir, ...
-                'nTrialsRunPerDir',     nTrialsRunPerDir, ...
-                'stimValues',           stimVals(:), ...
-                'stimVariant',          stimVariant, ...
-                'sessionLabel',         sprintf('%s_%s', thisMouse, thisSessionName));
-        end
+                    for thisDir = 1:nDir
+                        traceMat = squeeze(response.psthData(thisDir).alignedResponses(iBouton, :, :));
+                        if isvector(traceMat)
+                            traceMat = traceMat(:);
+                        end
+                        traceMat = double(traceMat)'; % [nTrials x nTimepoints]
 
-        sessionLabels = [sessionLabels; repmat({sprintf('%s_%s', thisMouse, thisSessionName)}, nBoutons, 1)];
-        fprintf('  Added %d boutons (running total: %d).\n', nBoutons, numel(allDirTuning));
+                        traceMatStat = traceMat(statTrialIdx{thisDir}, :);
+                        traceMatRun  = traceMat(runTrialIdx{thisDir}, :);
+
+                        fullTrace_stat{thisDir} = traceMatStat; % RAW, no baseline subtraction
+                        fullTrace_run{thisDir}  = traceMatRun;  % RAW, no baseline subtraction
+
+                        meanDirResponse_stat(thisDir) = mean(mean(traceMatStat(:, respIdx), 2, 'omitnan'), 'omitnan');
+                        meanDirResponse_run(thisDir)  = mean(mean(traceMatRun(:, respIdx), 2, 'omitnan'), 'omitnan');
+
+                        trialRawResp_stat{thisDir} = mean(traceMatStat(:, respIdx), 2, 'omitnan');
+                        trialRawResp_run{thisDir}  = mean(traceMatRun(:, respIdx), 2, 'omitnan');
+
+                        trialBaselineVals_stat{thisDir} = mean(traceMatStat(:, baseIdx), 2, 'omitnan');  % ADDED
+                        trialBaselineVals_run{thisDir}  = mean(traceMatRun(:, baseIdx), 2, 'omitnan');   % ADDED
+                    end
+
+                    allDirTuning(end+1) = struct( ...
+                        'fullTrace_stat',       {fullTrace_stat}, ...
+                        'fullTrace_run',        {fullTrace_run}, ...
+                        'timeVec',              timeVec, ...
+                        'stimOnDuration',       stimOnDuration, ...
+                        'meanDirResponse_stat', meanDirResponse_stat, ...
+                        'meanDirResponse_run',  meanDirResponse_run, ...
+                        'trialRawResp_stat',    {trialRawResp_stat}, ...
+                        'trialRawResp_run',     {trialRawResp_run}, ...
+                        'trialBaselineVals_stat', {trialBaselineVals_stat}, ...  % ADDED
+                        'trialBaselineVals_run',  {trialBaselineVals_run}, ...   % ADDED
+                        'nTrialsStatPerDir',    nTrialsStatPerDir, ...
+                        'nTrialsRunPerDir',     nTrialsRunPerDir, ...
+                        'stimValues',           stimVals(:), ...
+                        'stimVariant',          stimVariant, ...
+                        'sessionLabel',         sprintf('%s_%s', thisMouse, thisSessionName));
+                end
+
+                sessionLabels = [sessionLabels; repmat({sprintf('%s_%s', thisMouse, thisSessionName)}, nBoutons, 1)];
+                fprintf('  Added %d boutons (running total: %d).\n', nBoutons, numel(allDirTuning));
     end
 end
 
@@ -255,6 +267,110 @@ if ~isempty(sessionStatCounts)
     fprintf('Min running trials in ANY direction, ANY session:    %d\n', min(sessionRunCounts(:)));
 else
     fprintf('\nNo sessions produced valid trial counts to summarize.\n');
+end
+
+%% ANOVA-based responsiveness (all states combined: stationary + running pooled)  % ADDED SECTION
+
+anovaP_comb           = nan(nBoutonsTotal, 1);
+baseMean_comb         = nan(nBoutonsTotal, 1);
+baseSD_comb           = nan(nBoutonsTotal, 1);
+meanPreferredRaw_comb = nan(nBoutonsTotal, 1);
+prefDirIdx_comb       = nan(nBoutonsTotal, 1);
+isResponsive_comb     = false(nBoutonsTotal, 1);
+
+for b = 1:nBoutonsTotal
+    s    = allDirTuning(b);
+    nDir = numel(s.trialRawResp_stat);
+
+    y = []; grp = [];
+    for thisDir = 1:nDir
+        valsStat = s.trialRawResp_stat{thisDir}(:);
+        valsRun  = s.trialRawResp_run{thisDir}(:);
+        vals     = [valsStat; valsRun];
+        y   = [y;   vals];
+        grp = [grp; repmat(thisDir, numel(vals), 1)];
+    end
+
+    if numel(y) < nDir * 2 || all(isnan(y))
+        continue;
+    end
+
+    validRows = ~isnan(y);
+    anovaP_comb(b) = anova1(y(validRows), grp(validRows), 'off');
+
+    baselinePool = [vertcat(s.trialBaselineVals_stat{:}); vertcat(s.trialBaselineVals_run{:})];
+    baselinePool = baselinePool(~isnan(baselinePool));
+    baseMean_comb(b) = mean(baselinePool);
+    baseSD_comb(b)   = std(baselinePool);
+
+    meanDirResponse_comb = nan(nDir, 1);
+    for thisDir = 1:nDir
+        valsStat = s.trialRawResp_stat{thisDir}(:);
+        valsRun  = s.trialRawResp_run{thisDir}(:);
+        meanDirResponse_comb(thisDir) = mean([valsStat; valsRun], 'omitnan');
+    end
+
+    [~, prefDirIdx_comb(b)] = max(meanDirResponse_comb);
+
+    prefValsStat = s.trialRawResp_stat{prefDirIdx_comb(b)}(:);
+    prefValsRun  = s.trialRawResp_run{prefDirIdx_comb(b)}(:);
+    meanPreferredRaw_comb(b) = mean([prefValsStat; prefValsRun], 'omitnan');
+
+    isResponsive_comb(b) = (anovaP_comb(b) < alpha) && ...
+        (meanPreferredRaw_comb(b) > baseMean_comb(b) + numSD * baseSD_comb(b));
+end
+
+fprintf('\n%d / %d boutons responsive (ANOVA[dirs]+threshold, p<%.2f, >%dSD above baseline, ALL STATES COMBINED).\n', ...
+    sum(isResponsive_comb), nBoutonsTotal, alpha, numSD);
+
+for b = 1:nBoutonsTotal
+    allDirTuning(b).anovaP_comb           = anovaP_comb(b);
+    allDirTuning(b).baseMean_comb         = baseMean_comb(b);
+    allDirTuning(b).baseSD_comb           = baseSD_comb(b);
+    allDirTuning(b).meanPreferredRaw_comb = meanPreferredRaw_comb(b);
+    allDirTuning(b).prefDirIdx_comb       = prefDirIdx_comb(b);
+    allDirTuning(b).isResponsive_comb     = isResponsive_comb(b);
+end
+
+%% ANOVA-protected t-test / Wilcoxon vs pooled baseline (all states combined)  % ADDED SECTION
+ttestP_comb   = nan(nBoutonsTotal, 1);
+ranksumP_comb = nan(nBoutonsTotal, 1);
+isResponsive_ttest_comb   = false(nBoutonsTotal, 1);
+isResponsive_ranksum_comb = false(nBoutonsTotal, 1);
+
+for b = 1:nBoutonsTotal
+    s = allDirTuning(b);
+    if isnan(anovaP_comb(b)) || isnan(prefDirIdx_comb(b))
+        continue;
+    end
+
+    prefValsStat = s.trialRawResp_stat{prefDirIdx_comb(b)}(:);
+    prefValsRun  = s.trialRawResp_run{prefDirIdx_comb(b)}(:);
+    prefTrials   = [prefValsStat; prefValsRun];
+    prefTrials   = prefTrials(~isnan(prefTrials));
+
+    baselineTrials = [vertcat(s.trialBaselineVals_stat{:}); vertcat(s.trialBaselineVals_run{:})];
+    baselineTrials = baselineTrials(~isnan(baselineTrials));
+
+    if numel(prefTrials) < 2 || numel(baselineTrials) < 2
+        continue;
+    end
+
+    [~, ttestP_comb(b)] = ttest2(prefTrials, baselineTrials, 'Vartype', 'unequal');
+    ranksumP_comb(b) = ranksum(prefTrials, baselineTrials);
+
+    isResponsive_ttest_comb(b)   = (anovaP_comb(b) < alpha) && (ttestP_comb(b) < alpha) && (meanPreferredRaw_comb(b) > baseMean_comb(b));
+    isResponsive_ranksum_comb(b) = (anovaP_comb(b) < alpha) && (ranksumP_comb(b) < alpha) && (meanPreferredRaw_comb(b) > baseMean_comb(b));
+end
+
+fprintf('%d / %d boutons responsive (ANOVA-protected Welch t-test, p<%.2f, ALL STATES COMBINED).\n', sum(isResponsive_ttest_comb), nBoutonsTotal, alpha);
+fprintf('%d / %d boutons responsive (ANOVA-protected Wilcoxon, p<%.2f, ALL STATES COMBINED).\n', sum(isResponsive_ranksum_comb), nBoutonsTotal, alpha);
+
+for b = 1:nBoutonsTotal
+    allDirTuning(b).ttestP_comb             = ttestP_comb(b);
+    allDirTuning(b).ranksumP_comb           = ranksumP_comb(b);
+    allDirTuning(b).isResponsive_ttest_comb   = isResponsive_ttest_comb(b);
+    allDirTuning(b).isResponsive_ranksum_comb = isResponsive_ranksum_comb(b);
 end
 
 %% ============================================================
@@ -319,13 +435,124 @@ fprintf('%d / %d boutons attempted (>= %d trials/direction); %d / %d tuned (R^2>
 validIdx_comb = find(isTunedCVR2_comb);
 fprintf('\nTrials/direction actually used after downsampling -- mean: %.1f, min: %d, max: %d\n', ...
     mean(minTrialUsed_comb, 'omitnan'), min(minTrialUsed_comb(~isnan(minTrialUsed_comb))), max(minTrialUsed_comb(~isnan(minTrialUsed_comb))));
-
-figure('Color', 'w', 'Position', [100 100 500 400]);
-histogram(cvR2_comb(~isnan(cvR2_comb)), 20);
-xline(r2_thresh, 'r--', 'LineWidth', 1.2);
-xlabel('Cross-val R^2 (all states combined)'); ylabel('Number of boutons');
-title(sprintf('Combined cvR2 distribution (n=%d attempted, %d tuned)', nAttemptedComb, numel(validIdx_comb)));
+%DirTuning_PlotAllSelectedBoutons_Combined
 
 
-%% 
-DirTuning_PlotAllSelectedBoutons_Combined
+%% Session and mouse distribution of tuned boutons (all states combined)
+
+validIdx_comb = find(isTunedCVR2_comb);
+sessionLabelsAll = {allDirTuning.sessionLabel};
+
+tunedSessions = sessionLabelsAll(validIdx_comb);
+[uniqueTunedSessions, ~, ic] = unique(tunedSessions);
+countsPerSession = accumarray(ic, 1);
+
+[countsSorted, sortIdx] = sort(countsPerSession, 'descend');
+sessionsSorted = uniqueTunedSessions(sortIdx);
+
+fprintf('=== Session distribution of isTunedCVR2_comb boutons ===\n');
+fprintf('%d tuned boutons come from %d distinct sessions (out of %d sessions total in the dataset).\n\n', ...
+    numel(validIdx_comb), numel(uniqueTunedSessions), numel(unique(sessionLabelsAll)));
+
+fprintf('%-30s %10s %10s\n', 'Session', 'N tuned', 'Percent');
+for i = 1:numel(sessionsSorted)
+    fprintf('%-30s %10d %9.1f%%\n', sessionsSorted{i}, countsSorted(i), 100*countsSorted(i)/numel(validIdx_comb));
+end
+
+fprintf('\n%-30s %10s %10s %12s\n', 'Session', 'N tuned', 'N total', 'Tuned rate');
+for i = 1:numel(sessionsSorted)
+    nTotalThisSession = sum(strcmp(sessionLabelsAll, sessionsSorted{i}));
+    fprintf('%-30s %10d %10d %11.1f%%\n', sessionsSorted{i}, countsSorted(i), nTotalThisSession, ...
+        100*countsSorted(i)/nTotalThisSession);
+end
+
+% Mouse-level breakdown (extract mouse ID from sessionLabel, format "MouseID_SessionName")
+mouseIDsAll = cellfun(@(x) strtok(x, '_'), sessionLabelsAll, 'UniformOutput', false);
+tunedMice   = mouseIDsAll(validIdx_comb);
+[uniqueTunedMice, ~, icMouse] = unique(tunedMice);
+countsPerMouse = accumarray(icMouse, 1);
+[countsMouseSorted, sortIdxMouse] = sort(countsPerMouse, 'descend');
+miceSorted = uniqueTunedMice(sortIdxMouse);
+
+fprintf('\n=== Mouse distribution of isTunedCVR2_comb boutons ===\n');
+fprintf('%d tuned boutons come from %d distinct mice (out of %d mice total in the dataset).\n\n', ...
+    numel(validIdx_comb), numel(uniqueTunedMice), numel(unique(mouseIDsAll)));
+
+fprintf('%-15s %10s %10s\n', 'Mouse', 'N tuned', 'Percent');
+for i = 1:numel(miceSorted)
+    fprintf('%-15s %10d %9.1f%%\n', miceSorted{i}, countsMouseSorted(i), 100*countsMouseSorted(i)/numel(validIdx_comb));
+end
+
+
+%% Trials per direction, stationary vs running, pooled across sessions
+
+fprintf('\n=== Trials per direction, pooled across %d sessions ===\n', size(sessionStatCounts,1));
+
+fprintf('Stationary: mean=%.1f, SD=%.1f (across all sessions x directions)\n', ...
+    mean(sessionStatCounts(:)), std(sessionStatCounts(:)));
+
+fprintf('Running:    mean=%.1f, SD=%.1f (across all sessions x directions)\n', ...
+    mean(sessionRunCounts(:)), std(sessionRunCounts(:)));
+
+% Combined (stat+run summed per session x direction), for the pooled analysis
+sessionCombCounts = sessionStatCounts + sessionRunCounts;
+fprintf('Combined:   mean=%.1f, SD=%.1f (across all sessions x directions)\n', ...
+    mean(sessionCombCounts(:)), std(sessionCombCounts(:)));
+
+
+%% Proportion of trials running vs stationary, pooled across sessions
+
+totalStat = sum(sessionStatCounts(:));
+totalRun  = sum(sessionRunCounts(:));
+totalTrials = totalStat + totalRun;
+
+propRunning = 100 * totalRun / totalTrials;
+propStationary = 100 * totalStat / totalTrials;
+
+fprintf('\n=== Proportion of trials running vs stationary (pooled across sessions) ===\n');
+fprintf('Stationary: %d / %d trials (%.1f%%)\n', totalStat, totalTrials, propStationary);
+fprintf('Running:    %d / %d trials (%.1f%%)\n', totalRun, totalTrials, propRunning);
+
+% Per-session breakdown, in case it varies a lot session to session
+fprintf('\n=== Per-session breakdown ===\n');
+for s = 1:size(sessionStatCounts, 1)
+    sessStat = sum(sessionStatCounts(s,:));
+    sessRun  = sum(sessionRunCounts(s,:));
+    sessTotal = sessStat + sessRun;
+    fprintf('Session %d: %.1f%% running (%d/%d trials)\n', s, 100*sessRun/sessTotal, sessRun, sessTotal);
+end
+
+%%
+%% Add a combined (pooled stat+run) meanDirResponse field, needed by computeDirTuningOSI/DSI
+
+for b = 1:numel(allDirTuning)
+    s = allDirTuning(b);
+    nDir = numel(s.meanDirResponse_stat);
+    meanDirResponse_comb = nan(nDir, 1);
+
+    for thisDir = 1:nDir
+        valsStat = s.trialRawResp_stat{thisDir}(:);
+        valsRun  = s.trialRawResp_run{thisDir}(:);
+        meanDirResponse_comb(thisDir) = mean([valsStat; valsRun], 'omitnan');
+    end
+
+    allDirTuning(b).meanDirResponse = meanDirResponse_comb;
+end
+
+%% Build combined fullTraceSub field for plotting (pooled states)
+
+for b = 1:numel(allDirTuning)
+    s = allDirTuning(b);
+    nDir = numel(s.fullTrace_stat);
+    fullTraceSub = cell(nDir, 1);
+
+    for thisDir = 1:nDir
+        traceStat = s.fullTrace_stat{thisDir}; % [nTrials_stat x nTimepoints]
+        traceRun  = s.fullTrace_run{thisDir};  % [nTrials_run x nTimepoints]
+        fullTraceSub{thisDir} = [traceStat; traceRun]; % concatenate along trials
+    end
+
+    allDirTuning(b).fullTraceSub = fullTraceSub;
+end
+
+fprintf('Added combined fullTraceSub field to %d boutons.\n', numel(allDirTuning));

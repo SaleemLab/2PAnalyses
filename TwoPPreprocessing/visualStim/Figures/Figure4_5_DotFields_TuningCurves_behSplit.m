@@ -1,9 +1,12 @@
 % visual speed tuning - behaviour split 
 
 %% run this to load the appropriate data into workspace 
-DotFields_TuningCurveAnalysis_compareStatesV2_2PData
+DotFields_IncTuningCurveAnalysis_compareStatesV2_2PData
 
 %% Post-hoc session exclusion
+
+
+
 
 sessionLabels_all = {allDotUnits.sessionLabel}';
 uniqueSessionsAll  = unique(sessionLabels_all, 'stable');
@@ -43,6 +46,16 @@ validIdx_stat = validIdx_stat(~ismember(validIdx_stat, excludedIdx));
 validIdx_run  = validIdx_run(~ismember(validIdx_run, excludedIdx));
 validIdx_both = validIdx_both(~ismember(validIdx_both, excludedIdx));
 
+
+%%
+sessionLabels_all = {allDotUnits.sessionLabel}';
+uniqueSessionsAll = unique(sessionLabels_all, 'stable');
+fprintf('Total sessions (before exclusion): %d\n', numel(uniqueSessionsAll));
+
+sessionsToExclude = {'M25133_20260224', 'M25132_20260313', 'M25132_20260226'};
+uniqueSessionsIncluded = setdiff(uniqueSessionsAll, sessionsToExclude, 'stable');
+fprintf('Sessions included after exclusion: %d\n', numel(uniqueSessionsIncluded));
+disp(uniqueSessionsIncluded);
  
 %% r2 for running vs stationary
 % - This is per ROI/bouton (one cross-validated R^2 per bouton per state),

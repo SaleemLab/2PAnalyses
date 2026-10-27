@@ -25,8 +25,8 @@
 % 2s on 2s off? 
 
 %%
-mouseList = {'M25132', 'M25133', 'M26003'};
-% mouseList = {'M25126', 'M26004', 'M26005', 'M25131'};
+%mouseList = {'M25132', 'M25133', 'M26003'};
+mouseList = {'M25126', 'M26004', 'M26005', 'M25131'};
 
 stimWindowMask_range = [0.1 3];  % window for extracting per-trial calcium response
 stimFramesMask_range = [-0.2 2.8];  % window for wheel-speed behavior classification
@@ -140,6 +140,15 @@ for iMouse = 1:length(uniqueMice)
         tsd = trialsSpeed2D;
         temp_tsd  = tsd([tsd.numDots1] == 573); % real (non-blank) trials
         blank_tsd = tsd([tsd.numDots1] == 0);   % genuine BLANK trials, ALSO state-classified
+        
+        %% track proportion of running trials, per session
+        if ~exist('sessionRunProportion', 'var')
+            sessionRunProportion = containers.Map('KeyType', 'char', 'ValueType', 'double');
+        end
+        thisSessionKey = sprintf('%s_%s', thisMouse, thisSessionName);
+        propRunningThisSession = mean([tsd.runFlag] == 1);
+        sessionRunProportion(thisSessionKey) = propRunningThisSession;
+        fprintf('    Proportion running trials: %.1f%%\n', 100*propRunningThisSession);
 
         if isempty(temp_tsd)
             warning('    No non-blank trials for %s -- skipping.', thisSessionName);
@@ -255,6 +264,12 @@ fprintf('\nDone pooling. %d boutons total across %d mice.\n', nBoutonsTotal, num
 stateNames  = {'stat', 'run'};
 stateLabels = {'Stationary', 'Locomotion'};
 
+
+%%
+%% summary: mean +/- SD of running-trial proportion across sessions
+allRunProps = cell2mat(values(sessionRunProportion)) * 100; % as percentages
+fprintf('\nRunning trials: %.1f%% +/- %.1f%% (mean +/- SD across %d sessions)\n', ...
+    mean(allRunProps), std(allRunProps), numel(allRunProps));
 %%  ANOVA(speeds+blank) + 2SD-above-blank threshold, PER STATE 
 for si = 1:2
     thisState = stateNames{si};
@@ -312,6 +327,44 @@ for si = 1:2
 end
 
 
+%%
+%% ========================================================================
+%  Responsiveness to visual speed (SD-heuristic, matching RF mapping method)
+%  isResponsive = (ANOVA p < 0.05) AND (preferred response > blank mean + 1 SD)
+% ========================================================================
+
+% --- Per-state responsiveness already computed upstream as: ---
+%   allDotUnits(i).isResponsive_stat
+%   allDotUnits(i).isResponsive_run
+% (col 1 = stationary, col 2 = locomotion, throughout)
+
+isResponsive_stat_all = cat(1, allDotUnits.isResponsive_stat);
+isResponsive_run_all  = cat(1, allDotUnits.isResponsive_run);
+
+nStatResp = sum(isResponsive_stat_all);
+nRunResp  = sum(isResponsive_run_all);
+
+fprintf('[Stationary] %d / %d boutons responsive: %.1f%%\n', ...
+    nStatResp, nBoutonsTotal, 100*nStatResp/nBoutonsTotal);
+fprintf('[Locomotion] %d / %d boutons responsive: %.1f%%\n', ...
+    nRunResp, nBoutonsTotal, 100*nRunResp/nBoutonsTotal);
+
+% --- Responsive in EITHER state (union) ---
+isResponsive_either = isResponsive_stat_all | isResponsive_run_all;
+nEitherResp = sum(isResponsive_either);
+
+fprintf('[Either state] %d / %d boutons responsive: %.1f%%\n', ...
+    nEitherResp, nBoutonsTotal, 100*nEitherResp/nBoutonsTotal);
+
+% --- Responsive in BOTH states (intersection), for reference ---
+isResponsive_both = isResponsive_stat_all & isResponsive_run_all;
+nBothResp = sum(isResponsive_both);
+
+fprintf('[Both states] %d / %d boutons responsive: %.1f%%\n', ...
+    nBothResp, nBoutonsTotal, 100*nBothResp/nBoutonsTotal);
+
+fprintf('[Either state] %d / %d boutons responsive: %.1f%%\n', ...
+    nEitherResp, nBoutonsTotal, 100*nEitherResp/nBoutonsTotal);
 %% check trial counts by states
 %DotFields_CheckTrialCountsByState
 %% are boutons responsive during locmotion also responsive during stationary

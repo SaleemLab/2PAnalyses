@@ -45,6 +45,10 @@ r2opts.validMeans = 1;
 r2opts.nShuffle   = 100;
 seed = 1;
 
+
+
+%%
+
 %%
 DirTuningTable = filterMasterTable_usingNameSessionPairs('MouseID', ...
     {'M25132','M25133', 'M26003'}, 'Exclude', 0, 'HasStimulus', {'DirTuning'});
@@ -481,4 +485,70 @@ for i = 1:numel(sessionsSorted)
         100*countsSorted(i)/nTotalThisSession);
 end
 
+%% Session-level filtering: require >= 10 running trials in EVERY direction
 
+minTrialsPerDirection = 10;
+
+% Check which sessions meet this criterion (all 8 directions must have >= 10 running trials)
+qualifyingSessions = {};
+for s = 1:size(sessionRunCounts, 1)
+    if all(sessionRunCounts(s, :) >= minTrialsPerDirection)
+        qualifyingSessions{end+1} = s; %#ok<AGROW>
+    end
+end
+
+fprintf('\n=== Session-level trial filtering (running-only, >= %d trials/direction required in EVERY direction) ===\n', minTrialsPerDirection);
+fprintf('%d / %d sessions meet this criterion.\n', numel(qualifyingSessions), size(sessionRunCounts,1));
+
+for s = 1:size(sessionRunCounts, 1)
+    meetsThreshold = all(sessionRunCounts(s, :) >= minTrialsPerDirection);
+    if meetsThreshold
+        statusStr = 'PASS';
+    else
+        statusStr = 'FAIL';
+    end
+    fprintf('Session %d: min=%d, max=%d trials/direction -- %s\n', s, ...
+        min(sessionRunCounts(s,:)), max(sessionRunCounts(s,:)), statusStr);
+end
+
+%% Match sessionRunCounts row indices back to actual session labels/mice
+
+uniqueSessionLabels = unique({allDirTuning.sessionLabel}, 'stable');
+
+fprintf('\n=== Session index to label mapping ===\n');
+for s = 1:numel(uniqueSessionLabels)
+    fprintf('Session %d: %s\n', s, uniqueSessionLabels{s});
+end
+
+
+%% Proportion of trials running, per session and per mouse (mean +/- SD)
+
+nSessions = size(sessionRunCounts, 1);
+propRunningPerSession = nan(nSessions, 1);
+
+for s = 1:nSessions
+    totalTrialsThisSession = sum(sessionStatCounts(s,:)) + sum(sessionRunCounts(s,:));
+    propRunningPerSession(s) = 100 * sum(sessionRunCounts(s,:)) / totalTrialsThisSession;
+end
+
+fprintf('\n=== Proportion of trials running, per session ===\n');
+for s = 1:nSessions
+    fprintf('Session %d: %.1f%% running\n', s, propRunningPerSession(s));
+end
+
+fprintf('\nAcross sessions: mean = %.1f%%, SD = %.1f%%\n', ...
+    mean(propRunningPerSession), std(propRunningPerSession));
+
+%% Per-mouse breakdown (requires matching session index to mouse, as before)
+
+uniqueSessionLabels = unique({allDirTuning.sessionLabel}, 'stable');
+mouseIDsPerSession = cellfun(@(x) strtok(x, '_'), uniqueSessionLabels, 'UniformOutput', false);
+
+uniqueMice = unique(mouseIDsPerSession, 'stable');
+fprintf('\n=== Proportion of trials running, per mouse (averaged across that mouse''s sessions) ===\n');
+for m = 1:numel(uniqueMice)
+    sessIdxThisMouse = find(strcmp(mouseIDsPerSession, uniqueMice{m}));
+    propThisMouse = propRunningPerSession(sessIdxThisMouse);
+    fprintf('%s: mean = %.1f%%, SD = %.1f%% (n=%d sessions)\n', ...
+        uniqueMice{m}, mean(propThisMouse), std(propThisMouse), numel(sessIdxThisMouse));
+end

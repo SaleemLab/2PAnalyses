@@ -62,6 +62,27 @@ disp(exampleTable);
 %plotDotFieldsExampleBouton(allDotUnits, bandpassRows.MouseID{1}, bandpassRows.Session{1}, bandpassRows.RoiIdx(1));
 % plotDotFieldsExampleBouton(allDotUnits, bandpassRows.MouseID{1}, bandpassRows.Session{1}, bandpassRows.RoiIdx(1));
 
+
+%%
+classLabels = {'lowpass', 'highpass', 'bandpass', 'trough'};
+classCodes  = [1, 2, 3, 4];
+
+gaussChar_tuned = gaussChar_run(validIdx_run);
+nTuned = numel(gaussChar_tuned);
+
+fprintf('\n--- Tuning class breakdown (n = %d reliably tuned boutons) ---\n', nTuned);
+
+classCounts = nan(1, numel(classCodes));
+for i = 1:numel(classCodes)
+    thisCount = sum(gaussChar_tuned == classCodes(i));
+    thisPct   = 100 * thisCount / nTuned;
+    classCounts(i) = thisCount;
+    fprintf('%-10s: %4d / %d (%.1f%%)\n', classLabels{i}, thisCount, nTuned, thisPct);
+end
+
+% sanity check: counts should sum to nTuned
+fprintf('Sum check: %d (should equal %d)\n', sum(classCounts), nTuned);
+%%
 boutonsToPlot = [1 1 6 3]; 
 
 
@@ -259,6 +280,11 @@ if ~exist(outputDir, 'dir'), mkdir(outputDir); end
 
 fullSavePath = fullfile(outputDir, baseFileName);
 saveFigureFormats(figF, fullSavePath);
+
+
+
+
+
 %% PANEL g equivalent: preferred speed histogram, stacked by category
 nSpeedsTotal = numel(speeds);
 stackedCounts = zeros(nSpeedsTotal, 4);

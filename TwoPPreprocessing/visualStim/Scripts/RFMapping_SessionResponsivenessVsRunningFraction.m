@@ -4,6 +4,9 @@
 % against the fraction of running trials in that session to test for a
 % behavioral bias in your responsive pool yield.
 
+sessionLabels = sessionLabels_rsp;
+allRFMapping  = allRFMapping_rsp;
+
 %% Calculate responsiveness per session
 uniqueSessAll = unique(sessionLabels, 'stable');
 nSessTotal = numel(uniqueSessAll);

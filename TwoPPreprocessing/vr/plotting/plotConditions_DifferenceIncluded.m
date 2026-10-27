@@ -4,6 +4,7 @@ function figHandle = plotConditions_DifferenceIncluded(allData, targetArea, vara
 % Row 2: Relative Delta Change Heatmaps (Red/White/Blue, 5 Columns)
 % Row 3: Mean Delta Change Line Plots (5 Columns)
 % Squeezed layout dimensions to match thin, vertically elongated subplots.
+% Also prints a trial-count summary (mean +/- SD per session, N sessions, n pooled trials).
 
     p = inputParser;
     addRequired(p, 'allData', @isstruct);
@@ -42,6 +43,10 @@ function figHandle = plotConditions_DifferenceIncluded(allData, targetArea, vara
     nDays = length(daysToPlot);
     
     condDataStore = struct('rawMatrices', {}, 'conditionNames', {}, 'condTypes', {}, 'titleColors', {});
+    
+    % One entry per condition: Base, Swap 2-3, Swap 3-4, Omit 2, Omit 3, Omit 4
+    % Each entry collects the number of trials (laps) of every included session.
+    lapCounts = cell(1, 6);
     
     for d = 1:nDays
         day = daysToPlot(d);
@@ -120,6 +125,10 @@ function figHandle = plotConditions_DifferenceIncluded(allData, targetArea, vara
                 
                 nTotalLaps = size(lapActivity, 2);
                 
+                % Record trial (lap) count for this session and condition
+                % c follows orderedConds (1 = base, 2-3 = swaps, 4-6 = omits)
+                lapCounts{c}(end+1) = nTotalLaps;
+                
                 meanOddVals = squeeze(mean(lapActivity(:, 1:2:nTotalLaps, :), 2, 'omitnan'));
                 meanEvenVals = squeeze(mean(lapActivity(:, 2:2:nTotalLaps, :), 2, 'omitnan'));
                 
@@ -153,6 +162,21 @@ function figHandle = plotConditions_DifferenceIncluded(allData, targetArea, vara
     end
     
     if isempty(condDataStore), figHandle = []; disp('No sessions matched.'); return; end
+    
+    %% --- PRINT TRIAL COUNT SUMMARY ---
+    printLabels = {'Base', 'Swap L2-L3', 'Swap L3-L4', 'Omit L2', 'Omit L3', 'Omit L4'};
+    summaryParts = cell(1, 6);
+    for k = 1:6
+        v = lapCounts{k};
+        if isempty(v)
+            summaryParts{k} = sprintf('%s n/a', printLabels{k});
+            continue;
+        end
+        summaryParts{k} = sprintf('%s %.1f $\\pm$ %.1f, $N=$%d, $n=$%d', ...
+            printLabels{k}, mean(v), std(v), numel(v), sum(v));
+    end
+    fprintf('Mean $\\pm$ SD trials per session, $N$ = number of sessions, $n$ = pooled trial count: %s.\n', ...
+        strjoin(summaryParts, '; '));
     
     %% MASTER SORTING & SUBSET ISOLATION 
     fullBaselineOdd = condDataStore(1).rawMatrices;

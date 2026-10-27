@@ -1,78 +1,145 @@
-%% Downsampling control: match lap counts across days before computing cvEV
-% Mirrors getCrossValidatedExplainedVariance / getAllExpVar, but subsamples
-% laps to a common target count first, repeating many times to average out
-% subsampling noise.
+function downsampledResults = downsampleCVR2_ForLearning(RSPDataAcrossDays, varargin)
+% downsampleCVR2_ForLearning_Fast: Matches lap counts across days before
+% computing cross-validated explained variance (cvEV).
+%
+% CHANGED (this version):
+%   - targetNumLaps = (true min lap count) - LapSlack, so every session,
+%     including the one at the original floor, has genuine repeat-to-
+%     repeat resampling variability (a session at exactly the target lap
+%     count would otherwise draw the identical laps every repeat).
+%   - nFolds default changed from 5 to 3, since at ~20 laps a 5-fold
+%     split leaves only ~4 laps per test fold, a noisy estimate; 3-fold
+%     leaves ~7 laps per test fold, more stable, at some cost to
+%     training-set size.
+%   - nRepeats default increased from 50 to 75, since more repeats
+%     directly tightens the averaged EV estimate (reduces noise from
+%     which laps got subsampled); this is independent of the fold-size
+%     fix and complements it.
 
-nFolds     = 5;      % match whatever you used originally
-nShuffles  = 200;    % reduced from 1000 for tractability across repeats -- raise if you can afford the compute
-nRepeats   = 50;     % number of random lap subsamples per session
+    p = inputParser;
+    addRequired(p, 'RSPDataAcrossDays', @isstruct);
+    addParameter(p, 'nFolds', 3, @(x) isnumeric(x) && isscalar(x) && x >= 2 && mod(x,1)==0);
+    addParameter(p, 'nShufflesPerRepeat', 40, @(x) isnumeric(x) && isscalar(x) && x >= 1 && mod(x,1)==0);
+    addParameter(p, 'nRepeats', 75, @(x) isnumeric(x) && isscalar(x) && x >= 1 && mod(x,1)==0);
+    addParameter(p, 'ApplySmoothing', true, @islogical);
+    addParameter(p, 'RandomSeed', 1, @(x) isnumeric(x) && isscalar(x) && x >= 0 && mod(x,1)==0);
+    addParameter(p, 'LapSlack', 1, @(x) isnumeric(x) && isscalar(x) && x >= 0 && mod(x,1)==0);
+    parse(p, RSPDataAcrossDays, varargin{:});
 
-% 1) Find the minimum lap count across ALL sessions you're comparing
-allLaps = arrayfun(@(s) s.ConditionData.Baseline.NumLaps, RSPDataAcrossDays);
-targetNumLaps = min(allLaps);
-fprintf('Downsampling every session to %d laps (min across all sessions/days).\n', targetNumLaps);
+    nFolds     = p.Results.nFolds;
+    nShuffles  = p.Results.nShufflesPerRepeat;
+    nRepeats   = p.Results.nRepeats;
+    applySmooth = p.Results.ApplySmoothing;
+    lapSlack   = p.Results.LapSlack;
 
-nSessions = length(RSPDataAcrossDays);
-downsampledResults = struct();
+    rng(p.Results.RandomSeed);
 
-for s = 1:nSessions
-    thisSession = RSPDataAcrossDays(s);
-    lapActivity = thisSession.ConditionData.Baseline.LapActivity; % [nROIs x nLaps x nPositions] -- confirm field name/shape
-    [nROIs, numLaps, numPositions] = size(lapActivity);
+    allLaps = arrayfun(@(s) s.ConditionData.Baseline.NumLaps, RSPDataAcrossDays);
+    trueMinLaps = min(allLaps);
+    targetNumLaps = trueMinLaps - lapSlack;
+    if targetNumLaps < 2
+        error('True minimum lap count (%d) minus LapSlack (%d) is too small (<2) to run cross-validation. Reduce LapSlack.', trueMinLaps, lapSlack);
+    end
+    fprintf('True minimum laps: %d. Downsampling to %d laps (%d lap(s) slack), %d-fold CV, %d repeats.\n', ...
+        trueMinLaps, targetNumLaps, lapSlack, nFolds, nRepeats);
 
-    if numLaps < targetNumLaps
-        warning('Mouse %s Day %d has fewer laps (%d) than target (%d) -- skipping.', ...
-            thisSession.MouseID, thisSession.Day, numLaps, targetNumLaps);
-        downsampledResults(s).meanExpVar = [];
-        downsampledResults(s).pValues = [];
-        continue;
+    if applySmooth
+        w = gausswin(15); w = w / sum(w);
     end
 
-    meanExpVar_reps = nan(nROIs, nRepeats);
-    pValues_reps    = nan(nROIs, nRepeats);
+    nSessions = length(RSPDataAcrossDays);
+    downsampledResults = struct();
+    totalTicStart = tic;
 
-    for r = 1:nRepeats
-        subLapIdx  = randperm(numLaps, targetNumLaps);
-        subActivity = lapActivity(:, subLapIdx, :);
+    for s = 1:nSessions
+        sessTic = tic;
+        thisSession = RSPDataAcrossDays(s);
+        lapActivity = thisSession.ConditionData.Baseline.LapActivity; % [nROIs x nLaps x nPositions]
+        [nROIs, numLaps, numPositions] = size(lapActivity);
 
-        cvExpVar_thisRep     = nan(nROIs, nFolds);
-        cvExpVarNull_thisRep = nan(nROIs, nShuffles);
+        if numLaps < targetNumLaps
+            warning('Mouse %s Day %d has fewer laps (%d) than target (%d) -- skipping.', ...
+                thisSession.MouseID, thisSession.Day, numLaps, targetNumLaps);
+            downsampledResults(s).meanExpVar = [];
+            downsampledResults(s).pValues = [];
+            continue;
+        end
 
-        for iCell = 1:nROIs
-            cellActivity = squeeze(subActivity(iCell, :, :)); % [Laps x Position]
-            if all(isnan(cellActivity), 'all'); continue; end
-
-            cvExpVar_thisRep(iCell, :) = getAllExpVar(cellActivity, nFolds);
-
-            for thisShuff = 1:nShuffles
-                shuffledActivity = nan(targetNumLaps, numPositions);
-                rs = RandStream('mt19937ar', 'Seed', thisShuff + r*10000);
-                for iLap = 1:targetNumLaps
-                    lapData = cellActivity(iLap, :);
-                    if ~all(isnan(lapData))
-                        randomShift = randi(rs, numPositions);
-                        shuffledActivity(iLap, :) = circshift(lapData, randomShift);
-                    else
-                        shuffledActivity(iLap, :) = lapData;
-                    end
+        if applySmooth
+            for iCell = 1:nROIs
+                for iLap = 1:numLaps
+                    trace = squeeze(lapActivity(iCell, iLap, :));
+                    if all(isnan(trace)), continue; end
+                    nanMask = isnan(trace);
+                    trace(nanMask) = 0;
+                    smoothed = filtfilt(w, 1, trace);
+                    smoothed(nanMask) = NaN;
+                    lapActivity(iCell, iLap, :) = smoothed;
                 end
-                shuffledFolds = getAllExpVar(shuffledActivity, nFolds);
-                cvExpVarNull_thisRep(iCell, thisShuff) = mean(shuffledFolds, 'omitnan');
             end
         end
 
-        meanExpVar_thisRep = mean(cvExpVar_thisRep, 2, 'omitnan');
-        countBetterNulls   = sum(cvExpVarNull_thisRep >= meanExpVar_thisRep, 2, 'omitnan');
-        pValues_thisRep    = (countBetterNulls + 1) / (nShuffles + 1);
+        meanExpVar_reps   = nan(nROIs, nRepeats);
+        pooledNull_perCell = nan(nROIs, nRepeats * nShuffles);
 
-        meanExpVar_reps(:, r) = meanExpVar_thisRep;
-        pValues_reps(:, r)    = pValues_thisRep;
+        for r = 1:nRepeats
+            subLapIdx  = randperm(numLaps, targetNumLaps);
+            subActivity = lapActivity(:, subLapIdx, :);
+
+            cvExpVar_thisRep = nan(nROIs, nFolds);
+            nullVals_thisRep = nan(nROIs, nShuffles);
+
+            for iCell = 1:nROIs
+                cellActivity = squeeze(subActivity(iCell, :, :));
+                if all(isnan(cellActivity), 'all'); continue; end
+
+                cvExpVar_thisRep(iCell, :) = getAllExpVar(cellActivity, nFolds);
+
+                validLapMask = ~all(isnan(cellActivity), 2);
+                randomShifts = randi(numPositions, targetNumLaps, nShuffles);
+
+                shuffledStack = nan(targetNumLaps, numPositions, nShuffles);
+                for iLap = 1:targetNumLaps
+                    if ~validLapMask(iLap)
+                        shuffledStack(iLap, :, :) = repmat(cellActivity(iLap, :)', 1, nShuffles);
+                        continue;
+                    end
+                    lapData = cellActivity(iLap, :);
+                    shiftAmounts = randomShifts(iLap, :);
+                    idxBase = (0:numPositions-1)';
+                    shiftedIdx = mod(idxBase + shiftAmounts - 1, numPositions) + 1;
+                    shuffledStack(iLap, :, :) = reshape(lapData(shiftedIdx), 1, numPositions, nShuffles);
+                end
+
+                for thisShuff = 1:nShuffles
+                    shuffledActivity = shuffledStack(:, :, thisShuff);
+                    shuffledFolds = getAllExpVar(shuffledActivity, nFolds);
+                    nullVals_thisRep(iCell, thisShuff) = mean(shuffledFolds, 'omitnan');
+                end
+            end
+
+            meanExpVar_reps(:, r) = mean(cvExpVar_thisRep, 2, 'omitnan');
+            nullCols = (r-1)*nShuffles + (1:nShuffles);
+            pooledNull_perCell(:, nullCols) = nullVals_thisRep;
+        end
+
+        meanExpVar_avg = mean(meanExpVar_reps, 2, 'omitnan');
+        countBetterNulls = sum(pooledNull_perCell >= meanExpVar_avg, 2, 'omitnan');
+        totalNullCount   = sum(~isnan(pooledNull_perCell), 2);
+        totalNullCount(totalNullCount == 0) = 1;
+        pValues = (countBetterNulls + 1) ./ (totalNullCount + 1);
+
+        downsampledResults(s).meanExpVar = meanExpVar_avg;
+        downsampledResults(s).pValues    = pValues;
+        downsampledResults(s).targetNumLaps = targetNumLaps;
+        downsampledResults(s).nFolds        = nFolds;
+        downsampledResults(s).nShufflesTotal = nRepeats * nShuffles;
+        downsampledResults(s).nRepeats      = nRepeats;
+
+        sessElapsed = toc(sessTic);
+        fprintf('Mouse %s Day %d (%d ROIs): done in %.1f sec. [%d/%d sessions]\n', ...
+            thisSession.MouseID, thisSession.Day, nROIs, sessElapsed, s, nSessions);
     end
 
-    % average across repeats -> stable per-ROI estimate at matched N
-    downsampledResults(s).meanExpVar = mean(meanExpVar_reps, 2, 'omitnan');
-    downsampledResults(s).pValues    = mean(pValues_reps, 2, 'omitnan');
-
-    fprintf('Mouse %s Day %d: downsampled to %d laps (%d repeats) done.\n', ...
-        thisSession.MouseID, thisSession.Day, targetNumLaps, nRepeats);
+    fprintf('Total elapsed: %.1f min\n', toc(totalTicStart)/60);
 end

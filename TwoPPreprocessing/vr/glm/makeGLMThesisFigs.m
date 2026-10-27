@@ -115,7 +115,7 @@ saveFigureFormats(figCDEF, fullfile(outputDirFig1, 'eg_nativeGLMKernel'));
 EXP = load("C:\Users\sonali.sriranga\Desktop\V1\analyzed\M25131\20260318\SpkLin_EXP_M25131_20260318.mat");
 %%
 outputDirFig2 = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_9_Section3';
-
+EXP_rsp = load("C:\Users\sonali.sriranga\Desktop\RSP\batch\SpkLinRSP_batch_SpkLinRSP_VisSpkLinParams.mat")
 % this is the version of the figure in the the thesis:
 plotFinalFigures_Sonali_JF(EXP_all, 'Resp-snake-base-omit2')
 
@@ -271,7 +271,8 @@ saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'SuppFig_Kernel_Residu
 % saveFigureFormats(figKernelResid, fullfile(outputDirFig2, 'Kernel_Residuals_CompleteSnake\Kernel_Residuals_CompleteSnake_omit23_swap23'));
 
 
-%% V2 of the above figure 
+%% V2 of the above figure; this version is used in the thesis 
+
 outputDirFig2 = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_9_Section3';
 
 % this is the version of the figure in the the thesis:
@@ -492,6 +493,27 @@ figB = gcf;
 defaultAxesProperties(gca, 1);
 saveFigureFormats(figB, fullfile(outputDirFig2, 'LLH_improvement\LLH_improvement'));
 
+%% RF centres
+
+
+% plotFinalFigures_Sonali(EXP_all, 'LLHrel-RFposition-spatial-discrete')
+plotFinalFigures_Sonali(EXP_all, 'LLHrel-RFposition-spatialOnly')
+figC = gcf;
+defaultAxesProperties(gca, 1);
+saveFigureFormats(figC, fullfile(outputDirFig2, 'RFcentres_spatialcellsonly\RFcentres_spatialcellsonly'));
+
+%% rf centre vs LLHrel 
+
+plotFinalFigures_Sonali(EXP_all, 'RFposition-SplitViolin-SpatialVsNonspatial')
+figC = gcf;
+defaultAxesProperties(gca, 1);
+saveFigureFormats(figC, fullfile(outputDirFig2, 'RFcentres_spatialAndNonSpatialcells\RFcentres_bothcelltypes'));
+%% latency - compare spatial and non-spatial 
+plotFinalFigures_Sonali(EXP_all, 'Latency-NonspatialVsSpatial-Corrected')
+figD = gcf;
+defaultAxesProperties(gca, 1);
+saveFigureFormats(figD, fullfile(outputDirFig2, 'latency_spatial_non-spatial\latency_spatial_non-spatial'));
+% Corrected Wilcoxon rank-sum test (non-spatial vs spatial latency): p = 2.32e-99
 
 %%
 plotFinalFigures_Sonali(EXP_all, 'RF-LLHrel-summary')
@@ -594,7 +616,17 @@ plotFinalFigures_Sonali(EXP_all, 'ExampleTraces-Kernels-Space')
 FigSpaceKer = gca;
 FigSpaceKer = ancestor(FigSpaceKer, 'figure');
 % defaultAxesProperties(gca, 1);
-saveFigureFormats(FigSpaceKer, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_10_Section4\spaceKernel_withEgs\', 'space_with_measured_kernal_egs'));
+saveFigureFormats(FigSpaceKer, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_10_Section4\spaceKernel_withEgs\', 'space_with_measured_kernal_egs_15'));
+
+
+%% correaltion between fitted kernel and measured responses 
+close all 
+plotFinalFigures_Sonali(EXP_all, 'SpaceKernel-MeasuredVsEstimated-Corr')
+FigcorrSpaceKernel_response = gca;
+FigcorrSpaceKernel_response = ancestor(FigcorrSpaceKernel_response, 'figure');
+
+defaultAxesProperties(gca, 1);
+saveFigureFormats(FigcorrSpaceKernel_response, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_10_Section4\pearsonR_shapecorrelation\shapecorrelation_spacekernel_response'));
 
 
 %% landmark and bg components % change to 10 exampels 
@@ -605,6 +637,51 @@ FigLandBGKer = ancestor(FigLandBGKer, 'figure');
 % defaultAxesProperties(gca, 1);
 saveFigureFormats(FigLandBGKer, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_11_Section4\LandBGKernel_withEgs\', 'landmarks_BG_measured_kernal_egs'));
 
+%% 
+close all 
+plotFinalFigures_Sonali(EXP_all, 'ScaledExamples-Kernels-LLHr-Landmarks-BG')
+FigLandBGKer_withS = gca;
+FigLandBGKer_withS = ancestor(FigLandBGKer_withS, 'figure');
+% defaultAxesProperties(gca, 1);
+saveFigureFormats(FigLandBGKer_withS, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_11_Section4\LandBGKernel_withEgs_withS_NS\', 'landmarks_BG_measured_kernal_egs_withS_NS'));
+
+
+close all; 
+% this
+plotFinalFigures_Sonali(EXP_all, 'ExampleTraces-Kernels-Landmarks-BG')
+% plot examples to comapre estimated vs measured 
+%plotFinalFigures_Sonali(EXP_all, 'LandmarkBGBalance-SpannedExamples')
+FigLandBGKer_withmeasured = gca;
+FigLandBGKer_withmeasured = ancestor(FigLandBGKer_withmeasured, 'figure');
+% defaultAxesProperties(gca, 1);
+saveFigureFormats(FigLandBGKer_withmeasured, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_11_Section4\LandBGKernel_withEgs\', 'landmarks_BG_measured_kernal_egs_Scaled'));
+
+
+% correlation between the landmark and bg kernels and the measured response
+plotFinalFigures_Sonali(EXP_all, 'VisualKernel-MeasuredVsEstimated-Corr')
+FigLandBGKer_corrmeanpresonse= gca;
+FigLandBGKer_corrmeanpresonse = ancestor(FigLandBGKer_corrmeanpresonse, 'figure');
+% defaultAxesProperties(gca, 1);
+saveFigureFormats(FigLandBGKer_corrmeanpresonse, fullfile('Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter1-VISpSomas\Fig2_11_Section4\LandBGKernel_corr_with_measuredresponse\', 'LandBGKernel_corr_with_measuredresponse'));
+
+
+
+% correlation with full model VSP 
+plotFinalFigures_Sonali(EXP_all, 'FullModel-MeasuredVsEstimated-Corr')
+
+
+%% are spatial components correalted with background and landmark components? 
+% Spatial vs landmark kernel shape: median r = 0.043, MAD = 0.172, n = 3184
+% Spatial vs background kernel shape: median r = -0.006, MAD = 0.171, n = 3184
+
+
+plotFinalFigures_Sonali(EXP_all, 'SpatialVsVisual-ShapeCorr_withEgs')
+
+%%
+goodOmit_idx = find(T.goodOmitCells);
+fprintf('Number of goodOmitCells: %d\n', numel(goodOmit_idx));
+cellIDs_toShow = EXP_all.Spk.CellListString(goodOmit_idx(1:5));
+plotFinalFigures_Sonali(EXP_all, 'Resp-singleCell', cellIDs_toShow);
 %% plot the 6 background segments 
 % this plots the 6 bg segments starting from the very beginning - therefore
 % remember to reorder them due to the offset. 
@@ -616,7 +693,7 @@ plotVisualFeatures
 plotVisualFeatures_omittedbackground
 
 %% check for omit cells
-plotFinalFigures_Sonali(EXP_rsp, 'OmitCells-summary')
+plotFinalFigures_Sonali(EXP_all, 'OmitCells-summary')
 
 %% create csv with all cells 
 
@@ -707,6 +784,8 @@ fprintf('Manipulated conditions combined: %.1f +/- %.1f trials/session (N=%d ses
 
 
 %%
+
+% count number of cells imaged in each session 
 baseDir = 'C:\Users\sonali.sriranga\Desktop\V1\analyzed';
 
 fprintf('%-10s %-12s %-10s\n', 'Animal', 'Series', 'nCells');
@@ -726,6 +805,13 @@ for a = 1:numel(expt)
         fprintf('%-10s %-12d %-10d\n', animal, seriesID, nCells);
     end
 end
+
+
+%% landmark and bg kernel metrics
+
+plotFinalFigures_Sonali(EXP_all, 'VisualKernel-MeasuredVsEstimated-Corr');
+plotFinalFigures_Sonali(EXP_all,'VisualKernel-Amplitude-Compare');
+plotFinalFigures_Sonali(EXP_all,'VisualKernel-Amplitude-Compare-Violin');
 
 %% pca and cluserting test 
 % shows Landmarks + BG + Data (measured response), all THREE panels,

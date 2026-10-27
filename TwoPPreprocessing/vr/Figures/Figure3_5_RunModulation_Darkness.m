@@ -1,6 +1,3 @@
-%% RSP speed tuning in darkness
-
-%% Parameters
 pairs = struct();
 pairs.M25132 = {'20260219','20260223','20260226','20260228','20260303','20260313','20260306'};
 pairs.M25133 = {'20260219','20260223','20260221'};
@@ -8,60 +5,70 @@ pairs.M26003 = {'20260316','20260322','20260324','20260325'};
 
 targetStruct          = 'tuningCurve';
 useField              = 'dFFNeuropilCorrected';
-minR2Threshold        = 0.5;
-pval_shuffleThreshold = 0.01;
-saveFolder            = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section3_Fig3.5\';
-
-colors.highpass        = [0.89, 0.10, 0.11];   % red
-colors.bandpass        = [0.99, 0.60, 0.17];   % orange
-colors.lowpass         = [0.12, 0.47, 0.71];   % blue
-colors.trough_inverted = [0.20, 0.63, 0.17];   % green
+minR2Threshold        = -Inf; %0.5;
+pval_shuffleThreshold = 0.01; % Decide if using 0.01 or 0.001?
+minBins               = 5;
+onlyBoutons           = true;   % set false to include soma sessions
+binFraction           = 0.07;   % Saleem et al. (2013) minimum occupancy per bin
 
 %% Filter and load session info
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'Darkness', 'GrayScreen'});
 mouseInfo     = sessionsToProcess(filteredTable);
 
-%% accumulators — must be before session loop
-tuningTypesPlot    = {'highpass', 'bandpass', 'lowpass', 'trough_inverted', 'unclassified'};
-faceColors_fig     = {colors.highpass, colors.bandpass, colors.lowpass, colors.trough_inverted, [0.75 0.75 0.75]};
-labelNames         = {'High-pass', 'Band-pass', 'Low-pass', 'Trough-inv', 'Unclassified'};
-allSessionPcts_fig = [];
+%% colours and categories
+colors.highpass        = [0.89, 0.10, 0.11];   % red
+colors.bandpass        = [0.99, 0.60, 0.17];   % orange
+colors.lowpass         = [0.12, 0.47, 0.71];   % blue
+colors.trough_inverted = [0.20, 0.63, 0.17];   % green
 
+% Same order as tuningTypesPlot = {'highpass','bandpass','lowpass','trough_inverted','unclassified'}
+faceColors_fig = {colors.highpass, colors.bandpass, colors.lowpass, colors.trough_inverted, [0.75 0.75 0.75]};
+labelNames     = {'High-pass', 'Band-pass', 'Low-pass', 'Trough-inv', 'Unclassified'};
+
+saveFolder = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section3_Fig4_6\';
+
+%% Accumulators
+tuningTypesPlot    = {'highpass', 'bandpass', 'lowpass', 'trough_inverted', 'unclassified'};
+allSessionPcts_fig = [];
 allTypes      = {};
 allPrefSpeeds = [];
 allR2s        = [];
-allOccupancy = zeros(0, 4); 
+allBinDurations = [];      % every bin's running time (s), included sessions only
 
-sessionsProcessedCount = 0;
-totalSessionsToProcess = sum(cellfun(@length, mouseInfo(:, 2)));
-fprintf('Parsing %d mouse cohorts for tuned ROIs...\n', size(mouseInfo, 1));
+% Session log: one row per session, with the reason if skipped
+logFields = {'Mouse', 'Session', 'Type', 'Status', 'RecDur_s', 'RunTime_s', 'RunFrac', 'nBins', ...
+    'BinMean_s', 'BinMin_s', 'BinMax_s', 'Target7pct_s', 'nROIs', ...
+    'MedSpeed', 'FastSpeed', 'MaxSpeed', ...                         % running speed (cm/s)
+    'nTunedMoving', 'nModFull', 'nBoth'};                            % tuning counts
+sessionLog = cell2struct(cell(numel(logFields), 0), logFields, 1);
+newEntry = @(m, s, t, status) cell2struct([{string(m); string(s); string(t); string(status)}; ...
+    num2cell(nan(numel(logFields) - 4, 1))], logFields, 1);
 
 %% Load data across sessions
 for thisMouse = 1:size(mouseInfo, 1)
     mousenumber  = mouseInfo{thisMouse, 1};
     sessionNames = mouseInfo{thisMouse, 2};
-    fprintf('Processing Mouse: %s\n', mousenumber);
 
     for thisSession = 1:length(sessionNames)
-        sessionName            = sessionNames{thisSession};
-        sessionsProcessedCount = sessionsProcessedCount + 1;
-
-        fprintf('  Processing Session [%d/%d]: %s  %s\n', ...
-            sessionsProcessedCount, totalSessionsToProcess, mousenumber, sessionName);
+        sessionName = sessionNames{thisSession};
 
         infoPath = findSessionFileInfoFilePath(mousenumber, sessionName);
         if isempty(infoPath) || ~isfile(infoPath)
-            fprintf('    WARNING: File path missing or invalid for %s - %s. Skipping.\n', mousenumber, sessionName);
+            sessionLog(end+1) = newEntry(mousenumber, sessionName, "", "skipped: no session info file"); %#ok<SAGROW>
             continue;
         end
 
         matchRow = find(strcmp(filteredTable.MouseID, mousenumber) & strcmp(filteredTable.Session, sessionName), 1);
         if isempty(matchRow)
-            fprintf('    WARNING: Failed to find matched row: %s - %s. Skipping.\n', mousenumber, sessionName);
+            sessionLog(end+1) = newEntry(mousenumber, sessionName, "", "skipped: not in metadata table"); %#ok<SAGROW>
             continue;
         end
+        typeImaged = filteredTable.TypeImaged{matchRow};
 
-        fprintf('    Imaged structure: %s\n', filteredTable.TypeImaged{matchRow});
+        if onlyBoutons && ~strcmpi(typeImaged, 'Boutons')
+            sessionLog(end+1) = newEntry(mousenumber, sessionName, typeImaged, "skipped: not a bouton session"); %#ok<SAGROW>
+            continue;
+        end
 
         try
             loadedInfo      = load(infoPath, 'sessionFileInfo');
@@ -69,8 +76,10 @@ for thisMouse = 1:size(mouseInfo, 1)
             stimNames       = {sessionFileInfo.stimFiles.name};
             targetIdx       = find(contains(stimNames, 'Darkness'));
 
-            if ~any(targetIdx), continue; end
-            fprintf('    Found %d target stimulus file(s).\n', length(targetIdx));
+            if isempty(targetIdx)
+                sessionLog(end+1) = newEntry(mousenumber, sessionName, typeImaged, "skipped: no darkness stimulus"); %#ok<SAGROW>
+                continue;
+            end
 
             for thisStim = 1:length(targetIdx)
                 thisStimName = stimNames{targetIdx(thisStim)};
@@ -78,30 +87,65 @@ for thisMouse = 1:size(mouseInfo, 1)
                 fileFullPath = fullfile(sessionFileInfo.Directories.save_folder, stimFileName);
 
                 if ~isfile(fileFullPath)
-                    warning('Could not find response file: %s. Skipping.', stimFileName);
+                    sessionLog(end+1) = newEntry(mousenumber, sessionName, typeImaged, "skipped: no response file"); %#ok<SAGROW>
                     continue;
                 end
 
                 loadedData = load(fileFullPath, 'response');
                 resp       = loadedData.response;
 
-                if ~isfield(resp, targetStruct) || ...
-                   ~isfield(resp.(targetStruct), useField) || ...
+                if ~isfield(resp, targetStruct) || ~isfield(resp.(targetStruct), useField) || ...
                    ~isfield(resp.(targetStruct).(useField), 'classification')
+                    sessionLog(end+1) = newEntry(mousenumber, sessionName, typeImaged, "skipped: not classified"); %#ok<SAGROW>
                     continue;
                 end
 
+                % --- Occupancy and recording duration ---
+                occ     = resp.(targetStruct).occupancy.moving;       % running time per bin (s)
+                statT   = resp.(targetStruct).occupancy.stationary;   % stationary time (s)
+                runT    = sum(occ);
+                recDur  = statT + runT;                               % excludes artefact frames (>150 cm/s)
+                nBins   = numel(occ);
+                edges   = resp.(targetStruct).speedBins;              % quantiles of running speed
+
+                entry = newEntry(mousenumber, sessionName, typeImaged, "");
+                entry.RecDur_s     = recDur;
+                entry.RunTime_s    = runT;
+                entry.RunFrac      = runT / recDur;
+                entry.nBins        = nBins;
+                entry.BinMean_s    = mean(occ);
+                entry.BinMin_s     = min(occ);
+                entry.BinMax_s     = max(occ);
+                entry.Target7pct_s = binFraction * recDur;
+                entry.MedSpeed     = median(edges);                   % middle edge ~ median running speed
+                entry.FastSpeed    = edges(end-1);                    % second-to-last edge ~ 93rd percentile
+                entry.MaxSpeed     = edges(end);
+
+                % --- Exclusion BEFORE any pooling ---
+                if nBins < minBins
+                    entry.Status = sprintf("excluded: only %d bin(s)", nBins);
+                    sessionLog(end+1) = entry; %#ok<SAGROW>
+                    continue;
+                end
+
+                % --- Classification and tuning counts ---
                 cls        = resp.(targetStruct).(useField).classification;
                 pvalMoving = resp.(targetStruct).(useField).pValMoving;
+                pvalFull   = resp.(targetStruct).(useField).pValFull;
 
                 classifiedIdx   = find(cls.R2 >= minR2Threshold & pvalMoving <= pval_shuffleThreshold);
                 unclassifiedIdx = find(cls.R2 <  minR2Threshold & pvalMoving <= pval_shuffleThreshold);
                 untunedIdx      = find(pvalMoving > pval_shuffleThreshold);
 
-                fprintf('    ROIs — classified: %d | unclassified: %d | untuned: %d\n', ...
-                    numel(classifiedIdx), numel(unclassifiedIdx), numel(untunedIdx));
+                entry.Status       = "included";
+                entry.nROIs        = numel(pvalMoving);
+                entry.nTunedMoving = sum(pvalMoving <= pval_shuffleThreshold);                               % tuned during running
+                entry.nModFull     = sum(pvalFull   <= pval_shuffleThreshold);                               % modulated, incl. stationary
+                entry.nBoth        = sum(pvalFull   <= pval_shuffleThreshold & pvalMoving <= pval_shuffleThreshold);
+                sessionLog(end+1) = entry; %#ok<SAGROW>
+                allBinDurations = [allBinDurations; occ(:)]; %#ok<AGROW>
 
-                % --- Per-session percentages for figure ---
+                % Per-session percentages for figure (included sessions only)
                 totalSig = numel(classifiedIdx) + numel(unclassifiedIdx);
                 if totalSig > 0
                     sessionCounts = zeros(1, numel(tuningTypesPlot));
@@ -112,76 +156,122 @@ for thisMouse = 1:size(mouseInfo, 1)
                     allSessionPcts_fig = [allSessionPcts_fig; sessionCounts / totalSig * 100]; %#ok<AGROW>
                 end
 
-                % Check occupancy
-                occ = resp.(targetStruct).occupancy.moving;
-                nBins = numel(occ);
-                fprintf('    Occupancy — min=%.1f  max=%.1f  mean=%.1f seconds | nBins=%d\n', ...
-                    min(occ), max(occ), mean(occ), nBins);
-                allOccupancy = [allOccupancy; min(occ), max(occ), mean(occ), nBins];
-                if any(occ == 0)
-                    fprintf('    WARNING: session has empty speed bins — tuning curves unreliable!\n');
-                end
+                % Pool ROIs
+                allTypes      = [allTypes;      cls.tuningType(classifiedIdx)]; %#ok<AGROW>
+                allPrefSpeeds = [allPrefSpeeds; cls.preferredSpeed(classifiedIdx)]; %#ok<AGROW>
+                allR2s        = [allR2s;        cls.R2(classifiedIdx)]; %#ok<AGROW>
 
-                if nBins < 5
-                    warning('    WARNING: only %d speed bin(s) — skipping session.\n', nBins);
-                    continue;
-                end
-                % pool info 
-                if ~isempty(classifiedIdx)
-                    allTypes      = [allTypes;      cls.tuningType(classifiedIdx)];            
-                    allPrefSpeeds = [allPrefSpeeds; cls.preferredSpeed(classifiedIdx)];        
-                    allR2s        = [allR2s;        cls.R2(classifiedIdx)];                    
-                end
-                if ~isempty(unclassifiedIdx)
-                    allTypes      = [allTypes;      repmat({'unclassified'}, numel(unclassifiedIdx), 1)]; %#ok<AGROW>
-                    allPrefSpeeds = [allPrefSpeeds; cls.preferredSpeed(unclassifiedIdx)];                 %#ok<AGROW>
-                    allR2s        = [allR2s;        cls.R2(unclassifiedIdx)];                            %#ok<AGROW>
-                end
-                if ~isempty(untunedIdx)
-                    allTypes      = [allTypes;      repmat({'untuned'}, numel(untunedIdx), 1)]; %#ok<AGROW>
-                    allPrefSpeeds = [allPrefSpeeds; nan(numel(untunedIdx), 1)];                 %#ok<AGROW>
-                    allR2s        = [allR2s;        cls.R2(untunedIdx)];                        %#ok<AGROW>
-                end
+                allTypes      = [allTypes;      repmat({'unclassified'}, numel(unclassifiedIdx), 1)]; %#ok<AGROW>
+                allPrefSpeeds = [allPrefSpeeds; cls.preferredSpeed(unclassifiedIdx)]; %#ok<AGROW>
+                allR2s        = [allR2s;        cls.R2(unclassifiedIdx)]; %#ok<AGROW>
 
-            end % thisStim
+                allTypes      = [allTypes;      repmat({'untuned'}, numel(untunedIdx), 1)]; %#ok<AGROW>
+                allPrefSpeeds = [allPrefSpeeds; nan(numel(untunedIdx), 1)]; %#ok<AGROW>
+                allR2s        = [allR2s;        cls.R2(untunedIdx)]; %#ok<AGROW>
+            end
         catch ME
-            fprintf('    ERROR on %s-%s: %s\n', mousenumber, sessionName, ME.message);
+            sessionLog(end+1) = newEntry(mousenumber, sessionName, typeImaged, "error: " + string(ME.message)); %#ok<SAGROW>
         end
-    end % thisSession
-end % thisMouse
+    end
+end
 
-%% Summary
-tuningTypes      = {'lowpass', 'trough_inverted', 'bandpass', 'highpass'};
-tuningLabels     = {'Low-pass', 'Trough-inverted', 'Band-pass', 'High-pass'};
-totalROIsCounted = numel(allTypes);
-nClassified      = sum(~strcmp(allTypes, 'untuned') & ~strcmp(allTypes, 'unclassified'));
-nUnclassified    = sum(strcmp(allTypes, 'unclassified'));
-nUntuned         = sum(strcmp(allTypes, 'untuned'));
+%% ================= SUMMARY FOR THE RESULTS =================
+S   = sessionLog;
+st  = [S.Status];
+inc = st == "included";
+Si  = S(inc);
+fprintf('\n===== SESSIONS =====\n');
+fprintf('Listed: %d | included: %d | excluded (<%d bins): %d | skipped/error: %d\n', ...
+    numel(S), sum(inc), minBins, sum(startsWith(st, "excluded")), sum(startsWith(st, "skipped") | startsWith(st, "error")));
+disp(table([S.Mouse]', [S.Session]', st', 'VariableNames', {'Mouse', 'Session', 'Status'}));
+fprintf('Mice included: %d (%s)\n', numel(unique([Si.Mouse])), strjoin(unique([Si.Mouse]), ', '));
 
-fprintf('\nTotal ROIs: %d | Classified: %d | Sessions: %d\n', ...
-    totalROIsCounted, nClassified, size(allSessionPcts_fig,1));
-fprintf('Classified (sig + R2 pass):  %d  (%.1f%%)\n', nClassified,   100*nClassified/totalROIsCounted);
-fprintf('Unclassified (sig, low R2):  %d  (%.1f%%)\n', nUnclassified, 100*nUnclassified/totalROIsCounted);
-fprintf('Untuned (not sig):           %d  (%.1f%%)\n', nUntuned,      100*nUntuned/totalROIsCounted);
-fprintf('Classified breakdown:\n');
+fprintf('\n===== BEHAVIOUR (included sessions, mean +/- SD) =====\n');
+fprintf('Recording duration:   %.1f +/- %.1f min (range %.1f to %.1f)\n', mean([Si.RecDur_s])/60, std([Si.RecDur_s])/60, min([Si.RecDur_s])/60, max([Si.RecDur_s])/60);
+fprintf('Fraction running:     %.0f +/- %.0f%% (range %.0f to %.0f%%)\n', 100*mean([Si.RunFrac]), 100*std([Si.RunFrac]), 100*min([Si.RunFrac]), 100*max([Si.RunFrac]));
+fprintf('Median running speed: %.1f +/- %.1f cm/s\n', mean([Si.MedSpeed]), std([Si.MedSpeed]));
+fprintf('Fast running (~93rd percentile): %.1f +/- %.1f cm/s | maximum %.1f to %.1f cm/s\n', ...
+    mean([Si.FastSpeed]), std([Si.FastSpeed]), min([Si.MaxSpeed]), max([Si.MaxSpeed]));
+fprintf('Speed bins per session: %d to %d | running time per bin: %.1f s (range %.1f to %.1f)\n', ...
+    min([Si.nBins]), max([Si.nBins]), mean(allBinDurations), min(allBinDurations), max(allBinDurations));
+
+fprintf('\n===== TUNING =====\n');
+nR = sum([Si.nROIs]);
+pctPerFOV = 100 * [Si.nTunedMoving] ./ [Si.nROIs];
+fprintf('Boutons: %d\n', nR);
+fprintf('Modulated incl. stationary (pValFull): %d (%.1f%%)\n', sum([Si.nModFull]), 100*sum([Si.nModFull])/nR);
+fprintf('  of these, also tuned during running:  %d (%.1f%%)\n', sum([Si.nBoth]), 100*sum([Si.nBoth])/max(sum([Si.nModFull]), 1));
+fprintf('Tuned during running (pValMoving):     %d (%.1f%%) | per FOV %.1f +/- %.1f%% (mean +/- SD)\n', ...
+    sum([Si.nTunedMoving]), 100*sum([Si.nTunedMoving])/nR, mean(pctPerFOV), std(pctPerFOV));
+fprintf('Tuned during running only (not in pValFull): %d\n', sum([Si.nTunedMoving]) - sum([Si.nBoth]));
+
+fprintf('\n===== SHAPES (speed-tuned boutons) =====\n');
+sigTypes = allTypes(~strcmp(allTypes, 'untuned'));
+for k = 1:numel(tuningTypesPlot)
+    n = sum(strcmp(sigTypes, tuningTypesPlot{k}));
+    fprintf('  %-16s %4d (%.1f%%)\n', tuningTypesPlot{k}, n, 100*n/max(numel(sigTypes), 1));
+end
+for t = {'bandpass', 'trough_inverted'}
+    ps = allPrefSpeeds(strcmp(allTypes, t{1}));
+    if ~isempty(ps)
+        fprintf('  %s preferred speed: median %.1f cm/s | range %.1f to %.1f cm/s\n', t{1}, median(ps), min(ps), max(ps));
+    end
+end
+
+%% Session report
+logTable = struct2table(sessionLog);
+fprintf('\n===== SESSION LOG =====\n');
+disp(logTable(:, {'Mouse','Session','Type','Status','RecDur_s','RunFrac','nBins','BinMean_s','BinMin_s','BinMax_s','Target7pct_s','nROIs'}));
+
+inc = logTable.Status == "included";
+fprintf('\nSessions listed: %d | included: %d | excluded (<%d bins): %d | skipped: %d\n', ...
+    height(logTable), sum(inc), minBins, sum(startsWith(logTable.Status, "excluded")), ...
+    sum(startsWith(logTable.Status, "skipped") | startsWith(logTable.Status, "error")));
+fprintf('Mice included: %d (%s)\n', numel(unique(logTable.Mouse(inc))), strjoin(unique(logTable.Mouse(inc)), ', '));
+
+fprintf('\n===== INCLUDED SESSIONS ONLY =====\n');
+fprintf('Recording duration: mean %.1f s | range %.1f to %.1f s\n', ...
+    mean(logTable.RecDur_s(inc)), min(logTable.RecDur_s(inc)), max(logTable.RecDur_s(inc)));
+fprintf('Fraction of time running: mean %.2f | range %.2f to %.2f\n', ...
+    mean(logTable.RunFrac(inc)), min(logTable.RunFrac(inc)), max(logTable.RunFrac(inc)));
+fprintf('Speed bins per session: range %d to %d\n', min(logTable.nBins(inc)), max(logTable.nBins(inc)));
+fprintf('Running time per bin (all bins pooled): mean %.1f s | range %.1f to %.1f s\n', ...
+    mean(allBinDurations), min(allBinDurations), max(allBinDurations));
+fprintf('7%% target per bin: range %.1f to %.1f s\n', ...
+    min(logTable.Target7pct_s(inc)), max(logTable.Target7pct_s(inc)));
+
+%% ROI summary
+tuningTypes  = {'lowpass', 'trough_inverted', 'bandpass', 'highpass'};
+tuningLabels = {'Low-pass', 'Trough-inverted', 'Band-pass', 'High-pass'};
+totalROIs     = numel(allTypes);
+nClassified   = sum(~strcmp(allTypes, 'untuned') & ~strcmp(allTypes, 'unclassified'));
+nUnclassified = sum(strcmp(allTypes, 'unclassified'));
+nUntuned      = sum(strcmp(allTypes, 'untuned'));
+
+fprintf('\n===== ROIs =====\n');
+fprintf('Total: %d\n', totalROIs);
+fprintf('Significant (p <= %.3f): %d (%.1f%%)\n', pval_shuffleThreshold, nClassified + nUnclassified, 100*(nClassified + nUnclassified)/totalROIs);
+fprintf('  Classified (R2 >= %.2f): %d (%.1f%% of all)\n', minR2Threshold, nClassified, 100*nClassified/totalROIs);
+fprintf('  Unclassified: %d (%.1f%% of all)\n', nUnclassified, 100*nUnclassified/totalROIs);
+fprintf('Untuned: %d (%.1f%%)\n', nUntuned, 100*nUntuned/totalROIs);
 for k = 1:numel(tuningTypes)
     n = sum(strcmp(allTypes, tuningTypes{k}));
-    fprintf('  %-20s %d  (%.1f%% of classified)\n', tuningLabels{k}, n, 100*n/nClassified);
+    fprintf('  %-16s %d (%.1f%% of classified)\n', tuningLabels{k}, n, 100*n/nClassified);
 end
-fprintf('\nPreferred speeds:\n');
-for k = 1:numel(tuningTypes)
-    speeds = allPrefSpeeds(strcmp(allTypes, tuningTypes{k}));
-    fprintf('  %-20s min=%.1f  max=%.1f  median=%.1f\n', tuningLabels{k}, min(speeds), max(speeds), median(speeds));
+fprintf('\nPreferred speed (band-pass and trough only):\n');
+for k = [2 3]
+    sp = allPrefSpeeds(strcmp(allTypes, tuningTypes{k}));
+    fprintf('  %-16s median %.1f | range %.1f to %.1f cm/s\n', tuningLabels{k}, median(sp), min(sp), max(sp));
 end
+%%
+totalROIsCounted = numel(allTypes);
 
-
-fprintf('\nOccupancy across all sessions:\n');
-fprintf('  Mean of means: %.1f seconds\n', mean(allOccupancy(:,3)));
-fprintf('  Overall min:   %.1f seconds\n', min(allOccupancy(:,1)));
-fprintf('  Overall max:   %.1f seconds\n', max(allOccupancy(:,2)));
-fprintf('  Bin counts:    ');
-fprintf('%d ', allOccupancy(:,4)');
-fprintf('\n');
+%%
+inc = strcmp([sessionLog.Status], "included");
+recDur  = [sessionLog(inc).RecDur_s];
+runFrac = [sessionLog(inc).RunFrac];
+fprintf('Recording duration: %.1f +/- %.1f min (mean +/- SD, n = %d sessions)\n', mean(recDur)/60, std(recDur)/60, sum(inc));
+fprintf('Fraction of time running: %.0f +/- %.0f%%\n', 100*mean(runFrac), 100*std(runFrac));
 %% Figure A: Running speed and dF/F example
 proc2PData   = load("Z:\ibn-vision\DATA\SUBJECTS\M26003\Analysis\20260322\M26003_20260322_processed2PData_M26003_Darkness_20260322_00001.mat");
 peripheraleg = load("Z:\ibn-vision\DATA\SUBJECTS\M26003\Analysis\20260322\M26003_20260322_PeripheralData_M26003_Darkness_20260322_00001.mat");
@@ -305,23 +395,57 @@ subtitle(sprintf('%d rois out of %d (sig + R2 pass) | n=%d sessions', ...
 defaultAxesProperties(ax_c1, 0);
 offsetAxes(ax_c1);
 
-saveFigureFormats(figC1, fullfile(saveFolder, 'speedModulated_histogram_darkness\category_counts_darkness'));
+saveFigureFormats(figC1, fullfile(saveFolder, 'speedModulated_histogram_darkness\category_counts_darkness_v2'));
 
 %% Figure D: Band-pass preferred speed histogram
-prefSpeedBins = [2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5];
-binCentres    = [5, 10, 15, 20, 25, 30];
+% prefSpeedBins = [2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5];
+% binCentres    = [5, 10, 15, 20, 25, 30];
+% bp_speeds     = allPrefSpeeds(strcmp(allTypes, 'bandpass'));
+% histBP        = histcounts(bp_speeds, prefSpeedBins);
+% 
+% figC2 = figure('Position', [100, 100, 380, 360], 'Color', 'w');
+% ax_c2 = gca;
+% hold on;
+% 
+% bar(binCentres, histBP, 'FaceColor', colors.bandpass, 'EdgeColor', 'none', 'BarWidth', 0.5);
+% 
+% xlim([prefSpeedBins(1), prefSpeedBins(end)]);
+% ax_c2.XTick      = binCentres;
+% ax_c2.XTickLabel = {'5','10','15','20','25','30'};
+% ylim([0, max(histBP) * 1.2]);
+% ax_c2.FontSize   = 8;
+% ax_c2.FontName   = 'Arial';
+% ax_c2.TickDir    = 'out';
+% ax_c2.LineWidth  = 0.75;
+% ax_c2.Layer      = 'top';
+% ax_c2.Position   = [0.18, 0.22, 0.75, 0.65];
+% box off;
+% 
+% xlabel('Preferred speed (cm s^{-1})', 'FontSize', 9, 'FontName', 'Arial');
+% ylabel('Number of boutons',           'FontSize', 9, 'FontName', 'Arial');
+% title('RSP — Band-pass',              'FontSize', 10, 'FontWeight', 'bold', 'FontName', 'Arial');
+% subtitle(sprintf('n = %d boutons', numel(bp_speeds)), ...
+%     'FontSize', 8, 'Color', [0.45 0.45 0.45], 'FontName', 'Arial');
+% 
+% defaultAxesProperties(ax_c2, 0);
+% offsetAxes(ax_c2);
+% 
+% saveFigureFormats(figC2, fullfile(saveFolder, 'speedModulated_histogram_darkness\preferred_speed_bandpass_darkness_v2'));
+
+
+binWidth      = 2;                                      % cm/s; try 1 or 2.5 too
+prefSpeedBins = 14:binWidth:28;                         % edges covering 15.6 to 27.0 cm/s
+binCentres    = prefSpeedBins(1:end-1) + binWidth/2;
 bp_speeds     = allPrefSpeeds(strcmp(allTypes, 'bandpass'));
 histBP        = histcounts(bp_speeds, prefSpeedBins);
 
 figC2 = figure('Position', [100, 100, 380, 360], 'Color', 'w');
 ax_c2 = gca;
 hold on;
-
-bar(binCentres, histBP, 'FaceColor', colors.bandpass, 'EdgeColor', 'none', 'BarWidth', 0.5);
-
+bar(binCentres, histBP, 1, 'FaceColor', colors.bandpass, 'EdgeColor', 'w', 'LineWidth', 0.5);   % bars fill each bin
+xline(ax_c2, mean([Si.FastSpeed]), '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.75);           % fastest running speeds
 xlim([prefSpeedBins(1), prefSpeedBins(end)]);
-ax_c2.XTick      = binCentres;
-ax_c2.XTickLabel = {'5','10','15','20','25','30'};
+ax_c2.XTick      = prefSpeedBins(1):4:prefSpeedBins(end);
 ylim([0, max(histBP) * 1.2]);
 ax_c2.FontSize   = 8;
 ax_c2.FontName   = 'Arial';
@@ -330,18 +454,14 @@ ax_c2.LineWidth  = 0.75;
 ax_c2.Layer      = 'top';
 ax_c2.Position   = [0.18, 0.22, 0.75, 0.65];
 box off;
-
 xlabel('Preferred speed (cm s^{-1})', 'FontSize', 9, 'FontName', 'Arial');
 ylabel('Number of boutons',           'FontSize', 9, 'FontName', 'Arial');
-title('RSP — Band-pass',              'FontSize', 10, 'FontWeight', 'bold', 'FontName', 'Arial');
+title('RSP, band-pass',               'FontSize', 10, 'FontWeight', 'bold', 'FontName', 'Arial');
 subtitle(sprintf('n = %d boutons', numel(bp_speeds)), ...
     'FontSize', 8, 'Color', [0.45 0.45 0.45], 'FontName', 'Arial');
-
 defaultAxesProperties(ax_c2, 0);
 offsetAxes(ax_c2);
-
-saveFigureFormats(figC2, fullfile(saveFolder, 'speedModulated_histogram_darkness\preferred_speed_bandpass_darkness'));
-
+saveFigureFormats(figC2, fullfile(saveFolder, 'speedModulated_histogram_darkness\preferred_speed_bandpass_darkness_v2'));
 %% Figure E: Preferred speed histogram — stacked (all categories)
 prefSpeedBins = [2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5];
 binCentres    = [5, 10, 15, 20, 25, 30];

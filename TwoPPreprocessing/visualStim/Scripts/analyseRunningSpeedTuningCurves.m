@@ -13,21 +13,21 @@ pairs = struct;
 % pairs.M25133 = {'20260224'};
 
 % missing unique rsp fovs
-% pairs.M25132 = {'20260219', '20260220', '20260221', '20260223', '20260228', '20260303', '20260306', '20260312'};
-% pairs.M26003 = {'20260316', '20260317', '20260320', '20260321'};
-% pairs.M25133 = {'20260219', '20260220', '20260221', '20260223'};
-pairs.M25132 = {'20260306', '20260219'};
+pairs.M25132 = {'20260219', '20260220', '20260221', '20260223', '20260228', '20260303', '20260306', '20260312'};
+pairs.M26003 = {'20260316', '20260317', '20260320', '20260321'};
+pairs.M25133 = {'20260219', '20260220', '20260221', '20260223'};
+%pairs.M25132 = {'20260306', '20260219'};
 
 paramsBoutons.signalName = 'dFFNeuropilCorrected';
 paramsBoutons.useZScoredProcessedSignals = false; 
 
-paramsSomas.signalName = 'spks'; 
+paramsSomas.signalName = 'dFFNeuropilCorrected'; 
 paramsSomas.useZScoredProcessedSignals = false; 
 
 filteredTable = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0, 'HasStimulus', {'Darkness', 'GrayScreen'});
 mouseInfo = sessionsToProcess(filteredTable);
 
-logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'DarkGary_20260617_RSPmissingsessions.csv');
+logFilePath = fullfile('Z:\ibn-vision\USERS\Sonali\errorLogs', 'DarkGary_20260926_RSPallsessions.csv');
 logHeaders = {'Timestamp', 'Mouse', 'Session', 'ErrorMessage', 'Function', 'LineNumber'};
 
 % If the log file doesn't exist, create it with headers

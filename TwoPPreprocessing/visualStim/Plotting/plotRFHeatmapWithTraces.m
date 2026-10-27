@@ -274,6 +274,7 @@ function plotRFHeatmapWithTraces(ax, boutonData, uAz, uEl_plot, timeVector, vara
     cb.FontSize = 7;
 end
 
+
 % function plotRFHeatmapWithTraces(ax, boutonData, uAz, uEl_plot, timeVector, varargin)
 % % plotRFHeatmapWithTraces: Draws the spatial tuning heatmap for a single
 % % bouton, with the mean temporal trace at each Az/El position overlaid

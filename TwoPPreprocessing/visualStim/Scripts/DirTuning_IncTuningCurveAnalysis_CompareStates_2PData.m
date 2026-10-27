@@ -368,3 +368,35 @@ if nCompared > 0
 end
 
 % DirTuning_PlotStatVsRunExampleBoutons
+
+%% Proportion of trials running, per session and per mouse (mean +/- SD)
+
+nSessions = size(sessionRunCounts, 1);
+propRunningPerSession = nan(nSessions, 1);
+
+for s = 1:nSessions
+    totalTrialsThisSession = sum(sessionStatCounts(s,:)) + sum(sessionRunCounts(s,:));
+    propRunningPerSession(s) = 100 * sum(sessionRunCounts(s,:)) / totalTrialsThisSession;
+end
+
+fprintf('\n=== Proportion of trials running, per session ===\n');
+for s = 1:nSessions
+    fprintf('Session %d: %.1f%% running\n', s, propRunningPerSession(s));
+end
+
+fprintf('\nAcross sessions: mean = %.1f%%, SD = %.1f%%\n', ...
+    mean(propRunningPerSession), std(propRunningPerSession));
+
+%% Per-mouse breakdown (requires matching session index to mouse, as before)
+
+uniqueSessionLabels = unique({allDirTuning.sessionLabel}, 'stable');
+mouseIDsPerSession = cellfun(@(x) strtok(x, '_'), uniqueSessionLabels, 'UniformOutput', false);
+
+uniqueMice = unique(mouseIDsPerSession, 'stable');
+fprintf('\n=== Proportion of trials running, per mouse (averaged across that mouse''s sessions) ===\n');
+for m = 1:numel(uniqueMice)
+    sessIdxThisMouse = find(strcmp(mouseIDsPerSession, uniqueMice{m}));
+    propThisMouse = propRunningPerSession(sessIdxThisMouse);
+    fprintf('%s: mean = %.1f%%, SD = %.1f%% (n=%d sessions)\n', ...
+        uniqueMice{m}, mean(propThisMouse), std(propThisMouse), numel(sessIdxThisMouse));
+end

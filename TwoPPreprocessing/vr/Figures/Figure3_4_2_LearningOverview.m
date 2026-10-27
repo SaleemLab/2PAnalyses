@@ -1,14 +1,17 @@
 pairs=struct;
-pairs.M25132 = ['20260219','20260220','20260221','20260223', '20260226','20260228', '20260313']; %
-pairs.M25133 = ['20260220','20260221','20260223''20260219','20260224'];
-pairs.M26003 = ['20260316','20260317', '20260320','20260321','20260322', '20260324', '20260325']; %
+pairs.M25132 = ['20260219','20260220','20260221','20260223', '20260226']; %,'20260228', '20260313'
+%pairs.M25133 = ['20260220','20260221','20260223''20260219','20260224'];
+pairs.M26003 = ['20260316','20260317', '20260320','20260321','20260322', ]; % '20260324', '20260325'
 
 
 RSPSessions = filterMasterTable_usingNameSessionPairs('MousePairs', pairs, 'Exclude', 0);
 RSPDataAcrossDays = getTuningDataByCondition(RSPSessions);
 
-RSPData = appendFilteredROIs(RSPDataAcrossDays,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI', true);
-daysToPlot      = [1 2 3 4 5 200]; 
+%RSPDataAcrossDays = appendFilteredROIs(RSPDataAcrossDays,'UseExpVar_SigNullDist', true,'ExpVarSigThreshold', 0.01, 'UseExpVar', true, 'cvExpvarThreshold', 0.1, 'FilterEdgeSMI',false);
+highly_corrstats = summarizeHighlyCorrelatedROIs(RSPDataAcrossDays);
+
+
+daysToPlot      = [1 2 3 4 5]; 
 daysToPlot(daysToPlot == 200) = 5;
 daysToPlot = unique(daysToPlot, 'stable');
 nDays           = numel(daysToPlot);
@@ -100,21 +103,19 @@ saveFigureFormats(figA3, fullfile(outputDir, 'runBeh_m25132_day5'));
 
 
 %%
-% %downsampleCVR2_ForLearning
-% 
-% 
-% for s = 1:nSessions
-%     RSPDataAcrossDays(s).cvExpVar_downsampled.meanExpVar     = downsampledResults(s).meanExpVar;
-%     RSPDataAcrossDays(s).cvExpVar_downsampled.pValues        = downsampledResults(s).pValues;
-%     RSPDataAcrossDays(s).cvExpVar_downsampled.targetNumLaps  = targetNumLaps;
-%     RSPDataAcrossDays(s).cvExpVar_downsampled.nFolds         = nFolds;
-%     RSPDataAcrossDays(s).cvExpVar_downsampled.nShuffles      = nShuffles;
-%     RSPDataAcrossDays(s).cvExpVar_downsampled.nRepeats       = nRepeats;
-% end
-% 
-% savePath = 'Z:\ibn-vision\USERS\Sonali\Figures\downsampled_cvev\RSPDataAcrossDays_withDownsampledCV.mat';
-% save(savePath, 'RSPDataAcrossDays', '-v7.3');
-% fprintf('Saved RSPDataAcrossDays (with downsampled cvEV) to %s\n', savePath);
+% downsampledResults = downsampleCVR2_ForLearning(RSPDataAcrossDays);
+
+% Or with custom params, e.g. fewer repeats for a quick test run:
+% downsampledResults = downsampleCVR2_ForLearning(RSPDataAcrossDays); % using the dafult values 
+
+
+for s = 1:length(RSPDataAcrossDays)
+    RSPDataAcrossDays(s).cvExpVar_downsampled = downsampledResults(s);
+end
+
+savePath = 'Z:\ibn-vision\USERS\Sonali\Figures\downsampled_cvev\RSPDataAcrossDays_withDownsampledCV_final.mat';
+save(savePath, 'RSPDataAcrossDays', '-v7.3');
+
 
 %% Pool DOWNSAMPLED true EV by day (same day grouping as before)
 % pooledDownsampledEV_byDay = cell(1, nDays);
@@ -132,6 +133,71 @@ saveFigureFormats(figA3, fullfile(outputDir, 'runBeh_m25132_day5'));
 %     end
 %     pooledDownsampledEV_byDay{d} = theseVals;
 % end
+
+%%
+%% Plot cumulative distribution of downsampled cvEV across days
+
+daysToPlot      = [1 2 3 4 5];
+daysToPlot(daysToPlot == 200) = 5;
+daysToPlot = unique(daysToPlot, 'stable');
+nDays = numel(daysToPlot);
+trueEVThreshold = 0.1;
+
+dayColorPalette = {'r','m', [0.4 0.7 0.2],'k', 'b'};
+dayColors = cell(1, nDays);
+for d = 1:nDays
+    dayColors{d} = dayColorPalette{daysToPlot(d)};
+end
+
+
+pooledDownsampledEV_byDay = cell(1, nDays);
+for d = 1:nDays
+    thisDay = daysToPlot(d);
+    if thisDay == 5
+        dayIdx = find([RSPDataAcrossDays.Day] == 5 | [RSPDataAcrossDays.Day] == 200);
+    else
+        dayIdx = find([RSPDataAcrossDays.Day] == thisDay);
+    end
+
+    theseVals = [];
+    for s = dayIdx
+        if isfield(RSPDataAcrossDays(s), 'cvExpVar_downsampled') && ...
+                ~isempty(RSPDataAcrossDays(s).cvExpVar_downsampled.meanExpVar)
+            theseVals = [theseVals; RSPDataAcrossDays(s).cvExpVar_downsampled.meanExpVar(:)]; %#ok<AGROW>
+        end
+    end
+    pooledDownsampledEV_byDay{d} = theseVals;
+end
+
+fig8 = figure('Color', 'w', 'Position', [200, 200, 600, 450]);
+hold on;
+
+hCDF      = gobjects(1, nDays);
+dayLabels = cell(1, nDays);
+
+for d = 1:nDays
+    if isempty(pooledDownsampledEV_byDay{d}); continue; end
+    [f, x]   = ecdf(pooledDownsampledEV_byDay{d});
+    hCDF(d)  = plot(x, f, 'LineWidth', 1.8, 'Color', dayColors{d});
+    dayLabels{d} = sprintf('Day %d (n=%d)', daysToPlot(d), length(pooledDownsampledEV_byDay{d}));
+end
+
+xline(trueEVThreshold, 'k--', 'LineWidth', 1.2);
+xlabel('Downsampled explained variance (R^2)');
+ylabel('Cumulative probability');
+xlim([-0.8, 1.0]);
+ylim([0, 1]);
+title('Downsampled cvEV across days (matched lap count)', 'FontWeight', 'normal');
+
+validDays = isgraphics(hCDF);
+legend(hCDF(validDays), dayLabels(validDays), 'Location', 'SouthEast');
+legend boxoff;
+defaultAxesProperties(gca, true);
+hold off;
+
+saveFigureFormats(fig8, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.1_Learning\allVersions\downsampled_cvEV_cdf');
+
+
 %% Pool cvExpVar data by Day, then plot % ROIs passing threshold across days,
 
 pctPassingByDay      = nan(1, nDays);   % pooled (all ROIs, all mice) % passing per day
@@ -143,9 +209,9 @@ for d = 1:nDays
 
     % Day 200 is an alias for Day 5 — pool its sessions in with day 5's.
     if thisDay == 5
-        dayIdx = find([RSPData.Day] == 5 | [RSPData.Day] == 200);
+        dayIdx = find([RSPDataAcrossDays.Day] == 5 | [RSPDataAcrossDays.Day] == 200);
     else
-        dayIdx = find([RSPData.Day] == thisDay);
+        dayIdx = find([RSPDataAcrossDays.Day] == thisDay);
     end
 
     pooled_true_EV          = [];
@@ -153,7 +219,7 @@ for d = 1:nDays
     pooled_null_max_per_ROI  = [];
     mousePct                 = [];
     for iSess = dayIdx
-        current_cv = RSPData(iSess).cvExpVar;
+        current_cv = RSPDataAcrossDays(iSess).cvExpVar;
         if isempty(current_cv) || isempty(current_cv.meanExpVar)
             continue;
         end
@@ -190,6 +256,65 @@ for d = 1:nDays
     pooledTrueEV_byDay{d} = pooled_true_EV;
     pooledNullEV_byDay{d}  = pooled_null_EV;
 end
+
+%% Per-mouse ECDFs of true cvEV, faceted by day (check whether one mouse drives the pooled CDF)
+
+mouseIDs = unique({RSPDataAcrossDays.MouseID});
+nMice    = numel(mouseIDs);
+mouseLineStyles = {'-', '--', ':', '-.'};  % cycles if >4 mice
+
+figMouseCDF = figure('Color', 'w', 'Position', [200, 200, 1400, 400]);
+for d = 1:nDays
+    thisDay = daysToPlot(d);
+    if thisDay == 5
+        dayIdx = find([RSPDataAcrossDays.Day] == 5 | [RSPDataAcrossDays.Day] == 200);
+    else
+        dayIdx = find([RSPDataAcrossDays.Day] == thisDay);
+    end
+
+    subplot(1, nDays, d);
+    hold on;
+    legendHandles = gobjects(0);
+    legendLabels  = {};
+
+    for m = 1:nMice
+        thisMouseEV = [];
+        for iSess = dayIdx
+            if ~strcmp(RSPDataAcrossDays(iSess).MouseID, mouseIDs{m})
+                continue;
+            end
+            current_cv = RSPDataAcrossDays(iSess).cvExpVar;
+            if isempty(current_cv) || isempty(current_cv.meanExpVar)
+                continue;
+            end
+            thisMouseEV = [thisMouseEV; current_cv.meanExpVar(:)]; %#ok<AGROW>
+        end
+        if isempty(thisMouseEV)
+            continue;
+        end
+        [f, x] = ecdf(thisMouseEV);
+        ls = mouseLineStyles{mod(m-1, numel(mouseLineStyles)) + 1};
+        h = plot(x, f, ls, 'LineWidth', 1.8);
+        legendHandles(end+1) = h; %#ok<AGROW>
+        legendLabels{end+1}  = sprintf('%s (n=%d)', mouseIDs{m}, numel(thisMouseEV)); %#ok<AGROW>
+    end
+
+    xline(trueEVThreshold, 'k--', 'LineWidth', 1);
+    xlabel('True EV (R^2)');
+    ylabel('Cumulative probability');
+    xlim([-0.8, 1.0]);
+    ylim([0, 1]);
+    title(sprintf('Day %d', thisDay), 'FontWeight', 'normal');
+    if ~isempty(legendHandles)
+        legend(legendHandles, legendLabels, 'Location', 'SouthEast');
+        legend boxoff;
+    end
+    defaultAxesProperties(gca, true);
+    hold off;
+end
+sgtitle('Per-mouse ECDFs of true cvEV, by day');
+
+% saveFigureFormats(figMouseCDF, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.1_Learning\allVersions\trueEV_cdf_byMouse');
 
 %% EV: Plot 1: % ROIs passing threshold across days 
 fig2 = figure('Color', 'w', 'Position', [200, 200, 500, 400]);
@@ -275,7 +400,6 @@ hold off;
 % saveFigureFormats(fig4, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.2\EVHistogram\evDistAcrossDays');
 
 
-%%
 %% Compute mean EV per day: original vs downsampled, then plot as lines across days
 
 meanEV_orig_byDay = nan(1, nDays);
@@ -341,3 +465,71 @@ fig5=plotPooledSMI_CDF(pooledRSP, 'RSP', 'Days', [1 3 5]);
 defaultAxesProperties(gca, true);
 
 saveFigureFormats(fig5, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.1_Learning\allVersions\smi_3mice_135200_cdf');
+
+
+
+%% distribution of downsampled z-scored SI across days
+
+downsampledSIResults = downsampleSI_ForLearning(RSPDataAcrossDays);
+
+for s = 1:length(RSPDataAcrossDays)
+        RSPDataAcrossDays(s).siMetric_downsampled = downsampledSIResults(s);
+end
+
+%
+daysToPlot      = [1 2 3 4 5];
+daysToPlot(daysToPlot == 200) = 5;
+daysToPlot = unique(daysToPlot, 'stable');
+nDays = numel(daysToPlot);
+
+dayColorPalette = {'r','m', [0.4 0.7 0.2],'k', 'b'};
+dayColors = cell(1, nDays);
+for d = 1:nDays
+    dayColors{d} = dayColorPalette{daysToPlot(d)};
+end
+
+% Pool downsampled zSI by day
+pooledZSI_byDay = cell(1, nDays);
+for d = 1:nDays
+    thisDay = daysToPlot(d);
+    if thisDay == 5
+        dayIdx = find([RSPDataAcrossDays.Day] == 5 | [RSPDataAcrossDays.Day] == 200);
+    else
+        dayIdx = find([RSPDataAcrossDays.Day] == thisDay);
+    end
+
+    theseVals = [];
+    for s = dayIdx
+        if isfield(RSPDataAcrossDays(s), 'siMetric_downsampled') && ...
+                ~isempty(RSPDataAcrossDays(s).siMetric_downsampled.zSI)
+            theseVals = [theseVals; RSPDataAcrossDays(s).siMetric_downsampled.zSI(:)]; %#ok<AGROW>
+        end
+    end
+    pooledZSI_byDay{d} = theseVals;
+end
+
+% Plot: superimposed CDFs of downsampled z-scored SI across days
+fig9 = figure('Color', 'w', 'Position', [200, 200, 600, 450]);
+hold on;
+
+hCDF      = gobjects(1, nDays);
+dayLabels = cell(1, nDays);
+
+for d = 1:nDays
+    if isempty(pooledZSI_byDay{d}); continue; end
+    [f, x]   = ecdf(pooledZSI_byDay{d});
+    hCDF(d)  = plot(x, f, 'LineWidth', 1.8, 'Color', dayColors{d});
+    dayLabels{d} = sprintf('Day %d (n=%d)', daysToPlot(d), length(pooledZSI_byDay{d}));
+end
+
+xlabel('Downsampled z-scored spatial information (SI)');
+ylabel('Cumulative probability');
+title('Downsampled SI across days (matched lap count)', 'FontWeight', 'normal');
+
+validDays = isgraphics(hCDF);
+legend(hCDF(validDays), dayLabels(validDays), 'Location', 'SouthEast');
+legend boxoff;
+defaultAxesProperties(gca, true);
+hold off;
+
+saveFigureFormats(fig9, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.1_Learning\allVersions\downsampled_SI_cdf');

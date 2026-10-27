@@ -123,7 +123,8 @@ function [alignedFull, fig] = alignToPeakTuningCurvePosition_Pooled(RegionData, 
     ylabel(ax2, 'Number of ROIs', 'FontName', 'Arial', 'FontSize', 11);  
     xlim(ax2, [-100, 100]); 
     xticks(ax2, [-80, -40, 0, 40, 80]);
-    ylim(ax2, [min(popMean)*0.95, max(popMean)*1.15]);
+%     ylim(ax2, [min(popMean)*0.95, max(popMean)*1.15]);
+    ylim(ax2, [0.2, 1]);
     
     hold(ax2, 'off');
     drawnow; 

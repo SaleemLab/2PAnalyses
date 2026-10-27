@@ -1,7 +1,7 @@
 % RFMapping_Gaussian2DFit_current.m
 %
 % Fits an anisotropic 2D Gaussian (no rotation, no baseline term) to each
-% bouton's mean response across the RF mapping grid -- matching
+% bouton's mean response across the RF mapping grid - matching
 % Timplalexi et al.:
 %
 %   G(x,y) = A * exp( -( (x-x0)^2/(2*sigmaX^2) + (y-y0)^2/(2*sigmaY^2) ) )
@@ -104,7 +104,7 @@ edgeTolFrac = 0.5; % fraction of one grid-step counted as "at/near boundary" for
                     % (reporting only -- a real preference for the most peripheral tested
                     % position should not be excluded just for landing there)
 
-respWin = [0.1 3];
+respWin = [0.1 3]; % same as dot fields... 
 if ~exist('timeVector', 'var')
     error('timeVector not found -- run the main pooling script first (needed to compute respIdx from respWin).');
 end
@@ -346,6 +346,15 @@ y0All = [gaussFitResults.y0];
 isWallClippedAz = (abs(x0All - ub(2)) < tol) | (abs(x0All - lb(2)) < tol);
 isWallClippedEl = (abs(y0All - ub(3)) < tol) | (abs(y0All - lb(3)) < tol);
 isWallClipped   = isWallClippedAz | isWallClippedEl;
+
+% tolWall = 2;   % degrees from the fitting limit counted as "at the limit"
+% x0All = [gaussFitResults.x0];
+% y0All = [gaussFitResults.y0];
+% isWallClippedAz = (x0All <= lb(2) + tolWall) | (x0All >= ub(2) - tolWall);
+% isWallClippedEl = (y0All <= lb(3) + tolWall) | (y0All >= ub(3) - tolWall);
+% isWallClipped   = isWallClippedAz | isWallClippedEl;
+% fprintf('Centre at the limit (within %g deg): %d / %d fits\n', tolWall, sum(isWallClipped), numel(gaussFitResults));
+
 
 ciLevel = 0.95; % one-sided confidence level for the bootstrap lower bound
 lowerPct = 100 * (1 - ciLevel);

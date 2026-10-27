@@ -100,7 +100,39 @@ saveFigureFormats(figMid, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\Results
 figHigh = plotRoiSpatialTuning(RSPData, 1, 81, 'High_Significant');
 saveFigureFormats(figHigh, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section3_Fig3.3\exampleROIs\ExampleTuning_High');
 
+figOnsetLand = plotRoiSpatialTuning(RSPData, 3, 20, 'Onset_landmarks');
+saveFigureFormats(figOnsetLand, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.3\exampleROIs\ExampleTuning_Onset_Landmarks');
+
+figOnsetonly = plotRoiSpatialTuning(RSPData, 4, 68, 'Onset_landmarks');
+saveFigureFormats(figOnsetLand, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.3\exampleROIs\ExampleTuning_Onset_Landmarks');
 
 
 %%  smi for v1 only 
 compareAndPlot_SMI_RSP_vs_VISp(VISpDataSpks, VISpDataSpks)
+
+
+dataToUse=RSPData
+sessIdx = 4;
+condName = 'Baseline';
+
+% Determine number of ROIs from the LapActivity array (dim 1 = ROIs)
+numROIs = size(dataToUse(sessIdx).ConditionData.(condName).LapActivity, 1);
+
+outDir = fullfile('Z:\ibn-vision\DATA\SUBJECTS\M26004\Analysis\20260318\Figures', sprintf('RoiSpatialTuning_Sess%d_%s_boutons', sessIdx, condName));
+if ~exist(outDir, 'dir')
+    mkdir(outDir);
+end
+
+for roiIdx = 1:numROIs
+    try
+        figLow = plotRoiSpatialTuning(dataToUse, sessIdx, roiIdx, 'spks');
+
+        % Save each figure, then close it to avoid piling up open windows
+        figName = fullfile(outDir, sprintf('ROI_%03d.png', roiIdx));
+        exportgraphics(figLow, figName, 'Resolution', 150);
+        close(figLow);
+
+    catch ME
+        fprintf('Skipping ROI %d (session %d): %s\n', roiIdx, sessIdx, ME.message);
+    end
+end

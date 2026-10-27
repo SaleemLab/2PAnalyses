@@ -204,6 +204,7 @@ function [alignedFull, fig] = plotSMI_PeakDistributions_VISP_RSP(RegionData, reg
         delete(findobj(h_listeners(idx), '-class', 'event.listener'));
     end
     
+    
 %     % save
     baseFileName = sprintf('%s_PeakAlignedTuning.png', regionName);
     outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4\tuningCurved_PeakAlignedTuning_RSP_VISp_160';
@@ -213,6 +214,65 @@ function [alignedFull, fig] = plotSMI_PeakDistributions_VISP_RSP(RegionData, reg
     saveFigureFormats(fig, fullSavePath);
 end
 
+
+function printSMISummaryStats(RSPData, VISpData)
+% printSMISummaryStats: Prints median SMI, median absolute deviation (MAD),
+% the percentage (and count) of cells with SMI above their own region's
+% median, and a Wilcoxon rank-sum test comparing RSP vs VISp SMI
+% distributions, for both RSP boutons and VISp somata.
+
+    [rspSMI, rspN]   = poolSMIValues(RSPData);
+    [vispSMI, vispN] = poolSMIValues(VISpData);
+
+    if isempty(rspSMI) || isempty(vispSMI)
+        error('One or both regions returned no valid SMI values.');
+    end
+
+    % RSP stats
+    medianRSP = median(rspSMI);
+    madRSP    = mad(rspSMI, 1); % flag = 1 -> median absolute deviation
+    nAboveRSP = sum(rspSMI > medianRSP);
+    pctAboveRSP = (nAboveRSP / length(rspSMI)) * 100;
+
+    % VISp stats
+    medianVISp = median(vispSMI);
+    madVISp    = mad(vispSMI, 1);
+    nAboveVISp = sum(vispSMI > medianVISp);
+    pctAboveVISp = (nAboveVISp / length(vispSMI)) * 100;
+
+    % CHANGED: cross-region comparison
+    pRankSum = ranksum(rspSMI, vispSMI);
+
+    fprintf('\n=== SMI Summary Statistics ===\n');
+    fprintf('RSP boutons:  n = %d cells\n', rspN);
+    fprintf('  Median SMI = %.3f +/- %.3f MAD\n', medianRSP, madRSP);
+    fprintf('  %d/%d cells (%.1f%%) had SMI above the RSP median (%.3f)\n', ...
+        nAboveRSP, length(rspSMI), pctAboveRSP, medianRSP);
+
+    fprintf('\nVISp somas:  n = %d cells\n', vispN);
+    fprintf('  Median SMI = %.3f +/- %.3f MAD\n', medianVISp, madVISp);
+    fprintf('  %d/%d cells (%.1f%%) had SMI above the VISp median (%.3f)\n', ...
+        nAboveVISp, length(vispSMI), pctAboveVISp, medianVISp);
+
+    fprintf('\nCross-region comparison:\n');
+    fprintf('  Wilcoxon rank-sum test (RSP vs VISp SMI): p = %.3e\n', pRankSum);
+    fprintf('\n');
+end
+
+%% Pool SMI values (with NaNs removed) across all sessions for a region
+function [pooledSMI, nCells] = poolSMIValues(RegionData)
+    pooledSMI = [];
+    for s = 1:length(RegionData)
+        sess = RegionData(s);
+        if isfield(sess, 'SMI') && isfield(sess, 'FilteredROIs') && ~isempty(sess.FilteredROIs)
+            rawSMI = sess.SMI.SMI;
+            cleanSMI = rawSMI(sess.FilteredROIs);
+            cleanSMI = cleanSMI(~isnan(cleanSMI));
+            pooledSMI = [pooledSMI; cleanSMI(:)]; %#ok<AGROW>
+        end
+    end
+    nCells = length(pooledSMI);
+end
 % function plotSMI_PeakDistributions_VISP_RSP(RSPData, VISpData)
 %    
 %     fprintf('Processing RSP Peak Positions from saved data...\n');

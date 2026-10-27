@@ -39,15 +39,15 @@ fprintf('prefAz = %.2f +/- %.2f (SD), n = %d\n', mean(prefAz), std(prefAz), nume
 fprintf('prefEl = %.2f +/- %.2f (SD), n = %d\n', mean(prefEl), std(prefEl), numel(prefEl));
 
 
-% sigAz  = 14.74 +/- 8.52 (SD), n = 62
-% sigEl  = 8.40 +/- 3.63 (SD), n = 62
-% prefAz = -27.53 +/- 26.04 (SD), n = 62
-% prefEl = 11.33 +/- 12.63 (SD), n = 62
+%sigAz  = 13.93 +/- 7.64 (SD), n = 63
+%sigEl  = 7.94 +/- 2.80 (SD), n = 63
+%prefAz = -29.32 +/- 27.17 (SD), n = 63
+%prefEl = 12.47 +/- 15.94 (SD), n = 63
 
 
 %%
 
-% Among the CURRENT trusted set (n=82)
+% Among the CURRENT trusted set (n=63)
 nBeyondTrusted = sum([gaussFitResults(trustedGI).isBeyondRange]);
 fprintf('%d / %d trusted boutons have a center beyond the stimulus-extended range.\n', ...
     nBeyondTrusted, numel(trustedGI));
@@ -83,8 +83,13 @@ end
 
 fprintf('\nFor reference, azRangeExt = [%.1f, %.1f], elRangeExt = [%.1f, %.1f]\n', ...
     azRangeExt(1), azRangeExt(2), elRangeExt(1), elRangeExt(2));
+
+
+azLims = [min(uAz) - azStep/2, max(uAz) + azStep/2];
+elLims = [min(uEl_plot) - elStep/2, max(uEl_plot) + elStep/2];
+
 %%  Panel A: example bouton traces + Gaussian fits 
-exampleBoutons = [1408 5518 1642 3406]; %3406
+exampleBoutons = [1408 5518 1642 1440]; %3406
 % exampleBoutons = [301 303 326 335];
 exampleLabels  = {'Narrow RF', 'Medium RF', 'Broad RF', 'Broad RF 2'};
 
@@ -188,10 +193,10 @@ for r = 1:nRows
     set(axFit, 'Box', 'off', 'TickDir', 'out', 'FontName', 'Arial', 'FontSize', 9);
 end
 
-% outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\eg_rfs';
-% if ~exist(outputDir, 'dir'), mkdir(outputDir); end
-% saveFigureFormats(figABC, fullfile(outputDir, 'RF_profiles_and_2Dfits_grid'));
-% close(figABC);
+outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\eg_rfs';
+if ~exist(outputDir, 'dir'), mkdir(outputDir); end
+saveFigureFormats(figABC, fullfile(outputDir, 'RF_profiles_and_2Dfits_grid'));
+close(figABC);
 
 
 

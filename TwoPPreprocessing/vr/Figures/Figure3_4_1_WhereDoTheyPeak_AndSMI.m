@@ -45,6 +45,33 @@ alignToPeakTuningCurvePosition_Pooled(VISpData, 'VISp');
 outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\smi_RSP_VISP_dff';
 compareAndPlot_SMI_RSP_vs_VISp(RSPData, VISpData, outputDir)
 
+
+
+%% EXAMPLES FOR smi rsp and v1 
+
+figLow = plotSMIExampleROI(RSPData,'Percentile', 25);
+% figLow = plotRoiSpatialTuning(VISpDataSpks, 22, 11, 'Low_SMI');
+saveFigureFormats(figLow, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SMI\ExampleTuning_25th_RSP');
+
+figMid = plotSMIExampleROI(RSPData,'Percentile', 50 ); % good but slightly lower than the 50th
+saveFigureFormats(figMid, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SMI\ExampleTuning_50th_RSP');
+
+figHigh = plotSMIExampleROI(RSPData,'Percentile', 75 );
+saveFigureFormats(figHigh, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SMI\ExampleTuning_75th_RSP');
+
+
+figLowV1 = plotSMIExampleROI(VISpData,'Percentile', 25);
+% figLow = plotRoiSpatialTuning(VISpDataSpks, 22, 11, 'Low_SMI');
+saveFigureFormats(figLowV1, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SMI\ExampleTuning_25th_V1');
+
+figMidV1 = plotSMIExampleROI(VISpData,'Percentile', 50 ); % good but slightly lower than the 50th
+saveFigureFormats(figMidV1, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SMI\ExampleTuning_50th_V1');
+
+figHighV1 = plotSMIExampleROI(VISpData,'Percentile', 75 );
+saveFigureFormats(figHighV1, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SMI\ExampleTuning_75th_V1');
+
+%%
+
 % plot smr cumulative and histogram 
 outputDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\smr_RSP_VISP_dffNeu';
 compareAndPlot_SMR_RSP_vs_VISp(RSPData, VISpData, outputDir)
@@ -58,6 +85,15 @@ plotSMI_PeakDistributions_VISP_RSP(RSPData, 'RSP')
 % Splits corridor into two segments (30-100; 101-170) and finds the
 % preferred peak location. plots as histograms and runs stats 
 plotPeaksCorridorSplit(RSPData, VISpData)
+
+% Original behavior, all cells with a valid peak (no SMI filtering):
+plotPeaksCorridorSplit(RSPData, VISpData);
+
+% Restrict to modulated cells only, e.g. SMI > 0.25:
+plotPeaksCorridorSplit(RSPData, VISpData, 'SMIThreshold', 0.25);
+
+% Or the stricter cutoff, matching Diamanti's paper:
+plotPeaksCorridorSplit(RSPData, VISpData, 'SMIThreshold', 0.5);
 
 % do they have a preference for one or the other landmark identity? 
 % this function computs a new index: 
@@ -73,18 +109,45 @@ plotPeaksCorridorSplit(RSPData, VISpData)
 
 plotLandmarkIdentityPreference(RSPData, VISpData)
 
+lRSP = plotSIExampleROI(RSPData,'Percentile', 25);
+saveFigureFormats(lRSP, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SI\ExampleTuning_25th_RSP');
 
+MRSP = plotSIExampleROI(RSPData,'Percentile', 50 ); % good but slightly lower than the 50th
+saveFigureFormats(MRSP, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SI\ExampleTuning_50th_RSP');
+
+HRSP = plotSIExampleROI(RSPData,'Percentile', 75 );
+saveFigureFormats(HRSP, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SI\ExampleTuning_75th_RSP');
+
+
+lV1 = plotSIExampleROI(VISpData,'Percentile', 25);
+% figLow = plotRoiSpatialTuning(VISpDataSpks, 22, 11, 'Low_SMI');
+saveFigureFormats(lV1, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SI\ExampleTuning_25th_V1');
+
+MV1 = plotSIExampleROI(VISpData,'Percentile', 50 ); % good but slightly lower than the 50th
+saveFigureFormats(MV1, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SI\ExampleTuning_50th_V1');
+
+HV1 = plotSIExampleROI(VISpData,'Percentile', 75 );
+saveFigureFormats(HV1, 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter2-RSP-PostExp\Section2_Fig3.4.0\exampleROIs_SI\ExampleTuning_75th_V1');
+
+
+
+landmarkCentres  = [40, 80, 120, 160];
+gratingLandmarks = [40, 120];
+plaidLandmarks   = [80, 160];
+tolerance = 15;        % Max distance from center to count as a landmark peak (+/- 15cm)
+windowRadius = 15;     % Radius around centers to measure activity (+/- 15cm)
+plotExampleLandmarkTraces(RSPData, landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius, 'RSP');
+plotExampleLandmarkTraces(VISpData, landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius, 'VISp');
+plotExampleLandmarkTraces(RSPData, landmarkCentres, gratingLandmarks, plaidLandmarks, tolerance, windowRadius, 'RSP', [0 0 0 0.5 1], 1);
 % autocorrelation across position bins
 plotSpatialAutocorrelation_Pooled(RSPData, VISpData);
-
-%
 
 %% test- where are they suppressed? 
 
 
 
 [suppROIs, suppTable, fig] = findLandmarkSuppressedROIs(RSPData, 'RSP', ...
-    'zThresh', -1, 'windowCm', 10);
+    'zThresh', -0.5, 'windowCm', 15);
 
 % Check a specific bouton
 row = suppTable(suppTable.suppLM4 == 1, :);
@@ -98,3 +161,36 @@ disp(row)
 % VISp - dff 
 [suppROIs_v1_df, suppTable_v1_df, fig3] = findLandmarkSuppressedROIs(VISpData, 'V1', ...
 'zThresh', -1, 'windowCm', 10, 'TypeToPlot', 'Somas', 'daysToPlot',  200 );
+
+
+%%
+pooledSMI = [];
+pooledRp  = [];
+pooledRn  = [];
+
+for s = 1:length(VISpData)
+    sess = VISpData(s);
+    if isfield(sess, 'SMI') && isfield(sess, 'FilteredROIs') && ~isempty(sess.FilteredROIs)
+        smiVals = sess.SMI.SMI(sess.FilteredROIs);
+        rpVals  = sess.SMI.Rp(sess.FilteredROIs);   % <-- check this field name
+        rnVals  = sess.SMI.Rn(sess.FilteredROIs);   % <-- check this field name
+
+        validMask = ~isnan(smiVals);
+        pooledSMI = [pooledSMI; smiVals(validMask)];
+        pooledRp  = [pooledRp;  rpVals(validMask)];
+        pooledRn  = [pooledRn;  rnVals(validMask)];
+    end
+end
+
+nTotal = length(pooledSMI);
+nNegRp = sum(pooledRp < 0);
+nNegRn = sum(pooledRn < 0);
+
+fprintf('RSP boutons pooled: n = %d\n', nTotal);
+fprintf('Negative Rp: %d/%d (%.1f%%)\n', nNegRp, nTotal, nNegRp/nTotal*100);
+fprintf('Negative Rn: %d/%d (%.1f%%)\n', nNegRn, nTotal, nNegRn/nTotal*100);
+
+outOfRange = abs(pooledSMI) > 1;
+fprintf('SMI outside [-1,1]: %d/%d (%.1f%%)\n', sum(outOfRange), nTotal, sum(outOfRange)/nTotal*100);
+fprintf('SMI actual range: %.3f to %.3f\n', min(pooledSMI), max(pooledSMI));
+

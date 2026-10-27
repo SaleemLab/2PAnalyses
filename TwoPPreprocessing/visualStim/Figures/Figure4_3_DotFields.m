@@ -1,5 +1,5 @@
 % run this to load all the data from another script; warning this lauches
-% many figures; close all ofter inspection 
+% many figures; close all ofter inspection  
 DotFields_IncTuningCurveAnalysis_2PData 
 
 %% panel a - plot example bouton traces with heatmaps (showing trials) and tuning curves

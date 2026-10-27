@@ -10,6 +10,34 @@
 % panel D - within-FOV deviation (az/el separate, and joint 2D density)
 % panel E - population RF coverage map
 
+
+
+saveDir = 'Z:\ibn-vision\USERS\Sonali\Figures\ThesisFigs\ResultsChapter4-RSP-VisualStim\Section1_Fig4_1\data';
+if ~exist(saveDir, 'dir'), mkdir(saveDir); end
+
+% Trusted set with the final criteria (R2 >= 0.1, bootstrap >= 0.1, resolvable width, centre within stimulated area)
+isRobust = false(1, numel(gaussFitResults));
+for gi = 1:numel(gaussFitResults)
+    validBoot = gaussFitResults(gi).bootR2(~isnan(gaussFitResults(gi).bootR2));
+    if ~isempty(validBoot)
+        isRobust(gi) = prctile(validBoot, 5) >= 0.1;
+    end
+end
+trustedMask_rsp = ([gaussFitResults.R2] >= 0.1) & isRobust ...
+    & ~[gaussFitResults.isDegenerateSigma] & ~[gaussFitResults.isBeyondRange];
+
+gaussFitResults_rsp = gaussFitResults;
+allRFMapping_rsp    = allRFMapping;
+sessionLabels_rsp   = sessionLabels;
+uAz_rsp             = uAz;
+uEl_rsp             = uEl_plot;
+
+save(fullfile(saveDir, 'RF_rsp_bouton.mat'), 'gaussFitResults_rsp', 'allRFMapping_rsp', ...
+    'sessionLabels_rsp', 'uAz_rsp', 'uEl_rsp', 'trustedMask_rsp', 'timeVector', '-v7.3');
+
+fprintf('Saved. RSP trusted: %d\n', sum(trustedMask_rsp));
+
+
 %% run to load all processed data; include the 2d gaussian fits
 analyse_RFBoutons_current % change session and run for bouton 
 % then save the fit results
@@ -53,6 +81,13 @@ nTrusted    = numel(trustedGI);
 
 fprintf('Using %d / %d trusted boutons for all figure panels.\n', nTrusted, numel(gaussFitResults));
 gaussFitResultsTrusted = gaussFitResults(trustedGI);
+
+% trustedMask = [gaussFitResults.isTrusted];
+% trustedGI   = find(trustedMask);
+% trustedIROI = [gaussFitResults(trustedGI).iROI];
+% nTrusted    = numel(trustedGI);
+% fprintf('Using %d / %d trusted boutons for all figure panels.\n', nTrusted, numel(gaussFitResults));
+% gaussFitResultsTrusted = gaussFitResults(trustedGI);
 %% boutons
 
 isRobustB = false(1, numel(gaussFitResults_boutons));

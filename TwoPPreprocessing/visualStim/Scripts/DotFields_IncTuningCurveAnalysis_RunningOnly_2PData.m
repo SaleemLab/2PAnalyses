@@ -10,8 +10,8 @@
 % Requires calc_kfold_R2.m and fitGaussianTemplates_tuning.m
 
 %%
-mouseList = {'M25132', 'M25133', 'M26003'};
-
+%mouseList = {'M25132', 'M25133', 'M26003'}; % this runs rsp mice 
+mouseList = {'M25133', 'M26004', 'M26005', 'M25126'}; % this is v1
 stimWindowMask_range  = [0.1 3];
 stimFramesMask_range  = [-0.2 2.8];
 
@@ -450,3 +450,62 @@ if ~isempty(validIdx_run)
     end
     sgtitle('Gaussian Model Fits (Locomotion only, cross-validated cohort)', 'FontSize', 13, 'FontWeight', 'bold');
 end
+
+
+%
+%% Summary: R^2-tuned boutons and responsive heuristics, with session/mouse counts
+
+% --- R^2-tuned boutons ---
+nTunedR2 = numel(validIdx_run);
+pctTunedR2 = 100 * nTunedR2 / nBoutonsTotal;
+
+sessionsAll_R2 = {allDotUnits(validIdx_run).sessionLabel};
+miceAll_R2     = {allDotUnits(validIdx_run).mouseID};
+nSessions_R2   = numel(unique(sessionsAll_R2));
+nMice_R2       = numel(unique(miceAll_R2));
+
+fprintf('\n--- Cross-validated R^2 tuning (R^2>%.2f, p<%.2f) ---\n', r2_thresh, r2p_thresh);
+fprintf('%d / %d boutons tuned (%.1f%%)\n', nTunedR2, nBoutonsTotal, pctTunedR2);
+fprintf('From %d sessions, %d mice\n', nSessions_R2, nMice_R2);
+
+% --- Responsive heuristic (ANOVA + threshold) ---
+idxResponsive = find(isResponsive);
+nResponsive   = numel(idxResponsive);
+pctResponsive = 100 * nResponsive / nBoutonsTotal;
+
+sessionsAll_resp = {allDotUnits(idxResponsive).sessionLabel};
+miceAll_resp     = {allDotUnits(idxResponsive).mouseID};
+nSessions_resp   = numel(unique(sessionsAll_resp));
+nMice_resp       = numel(unique(miceAll_resp));
+
+fprintf('\n--- Responsive heuristic (ANOVA[speeds+blank] + %dSD above blank, p<%.2f) ---\n', NSD, ALPHA);
+fprintf('%d / %d boutons responsive (%.1f%%)\n', nResponsive, nBoutonsTotal, pctResponsive);
+fprintf('From %d sessions, %d mice\n', nSessions_resp, nMice_resp);
+
+% --- Responsive heuristic (ANOVA-protected Welch t-test) ---
+idxRespTtest = find(isResp_ttest);
+nRespTtest   = numel(idxRespTtest);
+pctRespTtest = 100 * nRespTtest / nBoutonsTotal;
+
+sessionsAll_ttest = {allDotUnits(idxRespTtest).sessionLabel};
+miceAll_ttest     = {allDotUnits(idxRespTtest).mouseID};
+nSessions_ttest   = numel(unique(sessionsAll_ttest));
+nMice_ttest       = numel(unique(miceAll_ttest));
+
+fprintf('\n--- Responsive heuristic (ANOVA-protected Welch t-test, p<%.2f) ---\n', ALPHA);
+fprintf('%d / %d boutons responsive (%.1f%%)\n', nRespTtest, nBoutonsTotal, pctRespTtest);
+fprintf('From %d sessions, %d mice\n', nSessions_ttest, nMice_ttest);
+
+% --- Responsive heuristic (ANOVA-protected Wilcoxon) ---
+idxRespRanksum = find(isResp_ranksum);
+nRespRanksum   = numel(idxRespRanksum);
+pctRespRanksum = 100 * nRespRanksum / nBoutonsTotal;
+
+sessionsAll_ranksum = {allDotUnits(idxRespRanksum).sessionLabel};
+miceAll_ranksum     = {allDotUnits(idxRespRanksum).mouseID};
+nSessions_ranksum   = numel(unique(sessionsAll_ranksum));
+nMice_ranksum       = numel(unique(miceAll_ranksum));
+
+fprintf('\n--- Responsive heuristic (ANOVA-protected Wilcoxon, p<%.2f) ---\n', ALPHA);
+fprintf('%d / %d boutons responsive (%.1f%%)\n', nRespRanksum, nBoutonsTotal, pctRespRanksum);
+fprintf('From %d sessions, %d mice\n', nSessions_ranksum, nMice_ranksum);
