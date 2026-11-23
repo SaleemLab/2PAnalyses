@@ -14,8 +14,9 @@ for iS = sessions
     if exist(f,'file'), fprintf('%s exists, skipping\n', tag); continue; end
     t = T(T.sessionid == C.sessions{iS,3} & T.spatialcells == 1, :);
     t0 = tic;
-    Rf = sk_refit_session(iS, sort(t.cellNum)');
-    writetable(Rf, f);
+    [Rf, Ex] = sk_refit_session(iS, sort(t.cellNum)');
+    save(strrep(f, '.csv', '.mat'), 'Ex');
+    writetable(Rf, f);                                   % written last: marks the session done
     fprintf('%s: %d cells in %.1f h (%s)\n', tag, height(Rf), toc(t0)/3600, datestr(now));
 end
 % combine
@@ -27,5 +28,21 @@ R.CellIdx = T.CellIdx(ia); R.LLHrel_table = T.LLHrel(ia);
 R.LLHi_vis_table = T.LLHi_vis(ia); R.LLHi_pos_table = T.LLHi_pos(ia);
 R = movevars(sortrows(R, 'CellIdx'), 'CellIdx', 'Before', 1);
 writetable(R, fullfile(C.outRoot, 'refit_spatialcells.csv'));
+
+% kernels and per-fold scores, in the same CellIdx order as the CSV
+E = arrayfun(@(x) load(fullfile(od, strrep(x.name,'.csv','.mat'))), d);
+sidc = arrayfun(@(e) repmat(e.Ex.sessionid, numel(e.Ex.cellNum), 1), E, 'UniformOutput', false);
+key = [vertcat(sidc{:}), cell2mat(arrayfun(@(e) e.Ex.cellNum, E, 'UniformOutput', false))];
+[~, ord] = ismember([R.sessionid R.cellNum], key, 'rows');
+cat1 = @(f) cell2mat(arrayfun(@(e) e.Ex.kernels.(f), E, 'UniformOutput', false));
+K = struct('CellIdx', R.CellIdx, 'sessionid', R.sessionid, 'cellNum', R.cellNum, ...
+    'gauss_VSP', [], 'pois_VSP', [], 'pois_VSIP', [], 'binCentres', E(1).Ex.binCentres, ...
+    'models', {E(1).Ex.models}, 'dists', {E(1).Ex.dists});
+for fn = {'gauss_VSP','pois_VSP','pois_VSIP'}
+    A = cat1(fn{1}); K.(fn{1}) = A(ord,:);
+end
+F = cell2mat(arrayfun(@(e) reshape(e.Ex.foldLL, size(e.Ex.foldLL,1), []), E, 'UniformOutput', false));
+K.foldLL = reshape(F(ord,:), [height(R), size(E(1).Ex.foldLL, 2:4)]);
+save(fullfile(C.outRoot, 'refit_kernels.mat'), '-struct', 'K');
 fprintf('combined %d cells from %d sessions\n', height(R), numel(d));
 end
