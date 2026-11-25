@@ -26,6 +26,10 @@ function [Rf, Ex] = sk_refit2_session(iSess, cellSel, opts)
 %   lam_<pen>_<model>
 %   LLHrel_<pen> (VSP/VS), LLHrelI_<pen> (VSIP/VSI)
 %   p_<pen>_pos, p_<pen>_posI   one-sided paired t over the 10 folds
+%   LR_<pen>_pos(I), pLR_*      likelihood-ratio test as in Julien's RunGLMs
+%                               (2 x summed held-out LL gain, chi2, dof = nPosBins)
+%   phi_<pen>_pos(I), pLRq_*    same divided by the Pearson dispersion (quasi-
+%                               likelihood; needed because activity is deconvolved)
 %   LLHi_<pen>_VSPO, LLHi_<pen>_VSIPO, p_<pen>_omitI (omit adds to VSIP)
 % Ex: foldLL [cells x K x models x pens], kernels.<pen>_VSP/_VSIP [cells x 100]
 %     (log gain), onoff.<pen>_VSIP [cells x nBasis] coefficients and the basis.
@@ -113,8 +117,11 @@ for gi = 1:numel(dlys)
     fprintf('[%s] delay %d samples: %d cells, %d rows -> %d aggregated, %d columns\n', ...
         tag, dly, numel(grp), numel(g), size(U,1), size(XU,2));
     Y = Yall(:, cellSel(grp));
-    SY = zeros(size(U,1), numel(grp));
-    for c = 1:numel(grp), SY(:,c) = accumarray(g, Y(:,c)); end
+    SY = zeros(size(U,1), numel(grp)); SY2 = SY;
+    for c = 1:numel(grp)
+        SY(:,c)  = accumarray(g, Y(:,c));
+        SY2(:,c) = accumarray(g, Y(:,c).^2);     % for the Pearson dispersion
+    end
     inM = cell(nM,1); posIdx = cell(nM,1);
     for m = 1:nM
         inM{m} = ismember(bAll, models(m).blocks);
@@ -122,24 +129,24 @@ for gi = 1:numel(dlys)
     end
     onIdx = 1 + find(bAll(inM{4}) == 1);
     GD{gi} = struct('XU',XU,'inM',{inM},'inO',bAll == 6,'posIdx',{posIdx},'onIdx',onIdx, ...
-        'posBin',posBin,'nU',nU,'foldU',foldU,'SY',SY);
+        'posBin',posBin,'nU',nU,'foldU',foldU,'SY',SY,'SY2',SY2);
 end
 
 nOut = nM + 2;                                   % + VSP+O, VSIP+O
 resAll = nan(nSel, nOut, nP); lbAll = resAll; foldAll = nan(nSel, K, nOut, nP);
 kP = nan(nSel, nPosBins, 2, nP); kOn = nan(nSel, 2*opts.nOnOffBasis, nP);
-t0 = tic; tCell = nan(nSel,1);
+t0 = tic; tCell = nan(nSel,1); phiAll = nan(nSel, nM, nP);
 if opts.useParfor
     dq = parallel.pool.DataQueue;
     afterEach(dq, @(v) fprintf('[%s] cell %d done in %.0f s (%s)\n', tag, v(1), v(2), datestr(now, 'HH:MM:SS')));
     parfor c = 1:nSel
-        [resAll(c,:,:), lbAll(c,:,:), foldAll(c,:,:,:), kP(c,:,:,:), kOn(c,:,:), tCell(c)] = ...
+        [resAll(c,:,:), lbAll(c,:,:), foldAll(c,:,:,:), kP(c,:,:,:), kOn(c,:,:), tCell(c), phiAll(c,:,:)] = ...
             fitCellAll(GD{grpOf(c)}, colOf(c), K, opts, nM, nPosBins); %#ok<PFBNS>
         send(dq, [cellSel(c) tCell(c)]);
     end
 else
     for c = 1:nSel
-        [resAll(c,:,:), lbAll(c,:,:), foldAll(c,:,:,:), kP(c,:,:,:), kOn(c,:,:), tCell(c)] = ...
+        [resAll(c,:,:), lbAll(c,:,:), foldAll(c,:,:,:), kP(c,:,:,:), kOn(c,:,:), tCell(c), phiAll(c,:,:)] = ...
             fitCellAll(GD{grpOf(c)}, colOf(c), K, opts, nM, nPosBins);
         fprintf('[%s] cell %d done in %.0f s\n', tag, cellSel(c), tCell(c));
     end
@@ -148,7 +155,9 @@ fprintf('[%s] %d cells fitted in %.0f s (median %.0f s per cell per worker)\n', 
 LLHi = resAll ./ nSpk / log(2);
 
 outNames = [{models.name}, {'VSPO','VSIPO'}];
-Rf = table(repmat(sid,nSel,1), cellSel(:), nSpk, delaySmp(:), 'VariableNames', {'sessionid','cellNum','nSpikes','visDelaySamples'});
+nPosFit = cellfun(@(g) numel(g.posBin), GD); nPosFit = nPosFit(grpOf);   % dof of the LR test
+Rf = table(repmat(sid,nSel,1), cellSel(:), nSpk, delaySmp(:), nPosFit, ...
+    'VariableNames', {'sessionid','cellNum','nSpikes','visDelaySamples','nPosBins'});
 for p = 1:nP
     for m = 1:nOut
         Rf.(sprintf('LLHi_%s_%s', pens{p}, outNames{m})) = LLHi(:,m,p);
@@ -159,6 +168,19 @@ for p = 1:nP
     Rf.(sprintf('p_%s_pos', pens{p}))   = foldTest(foldAll(:,:,2,p) - foldAll(:,:,1,p));
     Rf.(sprintf('p_%s_posI', pens{p}))  = foldTest(foldAll(:,:,4,p) - foldAll(:,:,3,p));
     Rf.(sprintf('p_%s_omitI', pens{p})) = foldTest(foldAll(:,:,6,p) - foldAll(:,:,4,p));
+    % Likelihood-ratio test as in Julien's RunGLMs: summed held-out LL of the
+    % model with vs without position, chi2 with dof = number of position
+    % bins. Raw (as for true Poisson counts) and divided by the Pearson
+    % dispersion of the model with position (quasi-likelihood; deconvolved
+    % activity is not in count units, so the raw test is not calibrated).
+    for q = 1:2                                   % q=1: VSP vs VS, q=2: VSIP vs VSI
+        sfx = ternary(q == 1, 'pos', 'posI'); mB = 2*q - 1; mP = 2*q;
+        st = 2 * sum(foldAll(:,:,mP,p) - foldAll(:,:,mB,p), 2);
+        Rf.(sprintf('LR_%s_%s', pens{p}, sfx))     = st;
+        Rf.(sprintf('phi_%s_%s', pens{p}, sfx))    = phiAll(:,mP,p);
+        Rf.(sprintf('pLR_%s_%s', pens{p}, sfx))    = chi2cdf(max(st,0), nPosFit, 'upper');
+        Rf.(sprintf('pLRq_%s_%s', pens{p}, sfx))   = chi2cdf(max(st,0) ./ phiAll(:,mP,p), nPosFit, 'upper');
+    end
 end
 Ex = struct('sessionid', sid, 'cellNum', cellSel(:), 'foldLL', foldAll, 'models', {outNames}, ...
     'pens', {pens}, 'binCentres', C.binCentres, 'onOffBasis', Bas, 'onOffLagS', lagAx/fs);
@@ -202,11 +224,11 @@ n = sum(~isnan(dF),2); m = mean(dF,2,'omitnan'); s = std(dF,0,2,'omitnan');
 p = 1 - tcdf(m ./ (s ./ sqrt(n)), n-1);
 end
 
-function [res, lb, foldLL, kP, kOn, tCell] = fitCellAll(G, j, K, opts, nM, nPosBins)
+function [res, lb, foldLL, kP, kOn, tCell, phi] = fitCellAll(G, j, K, opts, nM, nPosBins)
 t0 = tic;
 nOut = nM + 2; res = nan(1, nOut, 2); lb = res; foldLL = nan(1, K, nOut, 2);
-kP = nan(1, nPosBins, 2, 2); kOn = nan(1, numel(G.onIdx), 2);
-sy = G.SY(:,j);
+kP = nan(1, nPosBins, 2, 2); kOn = nan(1, numel(G.onIdx), 2); phi = nan(1, nM, 2);
+sy = G.SY(:,j); sy2 = G.SY2(:,j); N = sum(G.nU);
 Xm = cell(nM,1);
 for m = opts.models, Xm{m} = [ones(size(G.XU,1),1), G.XU(:, G.inM{m})]; end
 XO = G.XU(:, G.inO);
@@ -218,6 +240,11 @@ for p = 1:2
         if p == 1, lams = opts.lamRidge; else, lams = []; end
         [res(1,m,p), lb(1,m,p), foldLL(1,:,m,p), B{m}, bAll{m}] = ...
             cvPath(Xm{m}, G.nU, sy, G.foldU, K, lams, pen, opts.patience);
+        % Pearson dispersion of the all-data fit: sum over samples of
+        % (y - mu)^2 / mu, from the per-row sums of y and y^2, over N - df
+        mu = exp(Xm{m} * bAll{m});
+        pear = sum((sy2 - 2*mu.*sy + G.nU.*mu.^2) ./ mu);
+        phi(1,m,p) = pear / (N - nnz(bAll{m}));
     end
     % omit fitted after VSP (model 2) and VSIP (model 4): fold betas fixed as offset
     for q = 1:2
