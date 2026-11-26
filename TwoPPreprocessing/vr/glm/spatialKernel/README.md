@@ -17,11 +17,30 @@ produce such a kernel:
    anticipation of a landmark. An additive model can only describe a gain as a
    position kernel, because it has no way to multiply.
 
-The code in this folder tests whether the GLM1 position kernels survive when the
-model is allowed to be **multiplicative**. That means a Poisson log-link model,
-where every term scales the others, plus an explicit vision × speed interaction.
-If position still improves the held-out fit in that model, it is more than a
-gain on vision.
+The code in this folder asks two related questions:
+
+- **Does the position effect survive a multiplicative model?** The refits use a
+  Poisson log-link model, where every term multiplies the others, and add an
+  explicit vision × speed interaction. If position still improves the held-out
+  fit, there is a place-dependent change in activity that vision and speed
+  (and their interaction) don't explain.
+- **Is it additive or a gain?** The swap/omit analysis (step 3) tests this
+  directly by comparing additive and gain predictions.
+
+**Note on what the Poisson refits can and cannot show.** In a log-link model,
+position also enters multiplicatively:
+
+rate = exp(vision + speed + …) × exp(position)
+
+So in every Poisson model here, including VSP, the position kernel is a gain
+(in log units) that scales the whole predicted rate, the visual drive included.
+These refits therefore test whether a place-dependent gain remains once
+vision × speed is in the model. They do not, on their own, separate "a
+position signal added to the visual response" from "a gain on the visual
+response". That needs either step 3 or a model where position is added to the
+rate under the same Poisson likelihood (not yet implemented). The only fits
+here where position is additive are GLM1 and the refit-1 Gaussian fits, which
+use an identity link.
 
 ## Data
 
@@ -59,8 +78,11 @@ Each model is built from blocks of predictors, using the same predictors as GLM1
 
 Two comparisons come out of these models:
 
-- **Additive position gain:** VSP vs VS (`LLHrel`).
-- **Multiplicative position gain:** VSIP vs VSI (`LLHrelI`). This is the main test.
+- **Position without vision × speed:** VSP vs VS (`LLHrel`).
+- **Position with vision × speed:** VSIP vs VSI (`LLHrelI`). This is the main test.
+
+In the Poisson fits both comparisons treat position as a multiplicative gain;
+they differ only in whether vision × speed is in the base model.
 
 All refits keep as much of GLM1 as possible:
 - the same sample subset;
@@ -142,7 +164,7 @@ Refit 2 fixes three problems found in refit 1:
 
 | File | What it does |
 |---|---|
-| `sk_refit2_session.m` | The refit-2 fit for one session, with both tests (t-test and dispersion-corrected likelihood ratio). By default it fits only VSI and VSIP, because the additive models were already done in refit 1 and fitting them would double the run time. Set `opts.models = 1:4` to fit all four. |
+| `sk_refit2_session.m` | The refit-2 fit for one session, with both tests (t-test and dispersion-corrected likelihood ratio). By default it fits only VSI and VSIP, because the models without vision × speed were already done in refit 1 and fitting them would double the run time. Set `opts.models = 1:4` to fit all four. |
 | `sk_run_refit2.m` | Runs refit 2 over sessions in parallel and combines them into `refit2_spatialcells.csv` and `refit2_kernels.mat`. It is resumable: sessions with an existing CSV are skipped. It defaults to 4 workers, because the fits are limited by memory bandwidth and 8 or 16 workers were no faster on this machine. |
 
 ### Comparisons and figures
@@ -152,8 +174,8 @@ Refit 2 fixes three problems found in refit 1:
 | `sk_plot_session_kernels.m` | Example kernels for one session: summary panels, the top cells that pass both tests, and the top cells that pass only the corrected likelihood-ratio test. |
 | `sk_plot_session_kernel_images.m` | Sorted kernel images for one session (cells as rows): GLM1, refit 1 and refit 2. |
 | `sk_plot_refit2_progress.m` | Counts and kernel images for every session refit 2 has finished, for checking on the run as it goes. |
-| `sk_add_vs_mult.m` | Additive vs multiplicative: which cells keep a significant position term in each, and how much position improves the fit (refit 1, all four models). |
-| `sk_kernel_shapes.m` | Whether the kernels change shape between additive and multiplicative models: depth, peak height and width, number of peaks, main peak position, and where peaks fall relative to the texture and 24 cm background landmarks. |
+| `sk_position_vxs.m` | Position without vs with vision × speed in the base model (Poisson VSP vs VS against VSIP vs VSI, refit 1): which cells keep a significant position term in each, and how much position improves the fit. Position is a multiplicative gain in both. |
+| `sk_kernel_shapes.m` | Whether the Poisson position kernels change shape when vision × speed is added (VSP vs VSIP kernels, GLM1 for reference): depth, peak height and width, number of peaks, main peak position, and where peaks fall relative to the texture and 24 cm background landmarks. |
 
 ## Typical order
 
@@ -163,7 +185,7 @@ sk_run_steps34                            % model-free checks (steps 3-4)
 sk_run_refit; sk_summarise_refit          % refit 1 (Gaussian + Poisson, ridge)
 sk_run_refit2                             % refit 2 (Poisson, ridge + elastic net); ~3-4 days for all cells
 sk_plot_refit2_progress                   % while refit 2 runs
-sk_add_vs_mult; sk_kernel_shapes          % additive vs multiplicative
+sk_position_vxs; sk_kernel_shapes         % position without vs with vision x speed
 ```
 
 ## Results so far (26 Nov 2026)
@@ -173,24 +195,26 @@ These are provisional. Refit 2 is still running.
 - **Steps 3–4.** Swap and omit trials sit between the two predictions (population
   β = 0.41, where 0 = additive and 1 = gain). On simulated data the same measure
   gives 0.01 for additive and 0.66 for gain. So the GLM1 position signal is
-  partly a gain on vision and partly not.
-- **Additive vs multiplicative (refit 1, 892 cells).**
-  - Position remains significant in 74% of cells in the additive model and 59%
-    in the multiplicative model (59% and 48% by the corrected likelihood-ratio test).
-  - Almost all multiplicative cells are also additive cells.
+  partly a gain on vision and partly not. This is so far the only direct test of
+  additive against gain.
+- **Position without vs with vision × speed (refit 1, Poisson, 892 cells).**
+  Position is a multiplicative gain in both models here.
+  - Position remains significant in 74% of cells without vision × speed and 59%
+    with it (59% and 48% by the corrected likelihood-ratio test).
+  - Almost all cells significant with vision × speed are also significant without it.
   - Position adds about half as much once vision × speed is in the model (median
     0.0038 vs 0.0019 bits per unit activity).
-- **Kernel shape.**
-  - Multiplicative kernels are very similar to additive ones (median correlation
-    0.92) and about 15% shallower.
+- **Kernel shape (Poisson, without vs with vision × speed).**
+  - The kernels are very similar (median correlation 0.92); with vision × speed
+    they are about 15% shallower.
   - The peaks are just as sharp. More main peaks fall in the first 10 cm, as an
     onset effect.
-  - In both models, peaks cluster just before the textures (around 75, 120 and
-    160 cm) rather than on them.
-  - Peaks also repeat with the 24 cm background period; this is weaker in the
-    multiplicative model.
+  - In both, and in GLM1, peaks cluster just before the textures (around 75, 120
+    and 160 cm) rather than on them.
+  - Peaks also repeat with the 24 cm background period; this is weaker once
+    vision × speed is in the model.
 - **Refit 2 so far (2 of 12 sessions).**
-  - The fraction of cells with significant multiplicative position varies a lot
+  - The fraction of cells where position stays significant with vision × speed varies a lot
     between sessions: 35% in M25126_20260313 and 66% in M26004_20260318
     (elastic net, corrected likelihood-ratio test).
 

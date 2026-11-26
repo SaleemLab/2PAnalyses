@@ -1,5 +1,8 @@
 function sk_kernel_shapes()
-% Position-kernel shapes: additive (Poisson VSP) vs multiplicative (Poisson VSIP), same 892 cells, earlier refit
+% Position-kernel shapes without (Poisson VSP) and with (Poisson VSIP) vision x speed in the
+% model, same 892 cells, refit 1, with the GLM1 kernels for reference. GLM1 is identity-link,
+% so its position kernel is additive (activity units); both Poisson kernels are log-link,
+% i.e. multiplicative gains (log units).
 C = sk_config(); od = C.outRoot; rng(1);
 R = readtable(fullfile(od, 'refit_spatialcells.csv'));
 K = load(fullfile(od, 'refit_kernels.mat')); assert(isequal(K.CellIdx, R.CellIdx));
@@ -7,7 +10,7 @@ Korig = h5read('D:\DATA\Sonali\GLM\ForAS\V1_GLMData.mat', '/Kernels/PosKernel');
 x = K.binCentres;                                   % 1:2:199 cm
 texLM = [40 80 120 160];                            % wall textures pass the animal (37-43, 77-83, 117-123, 157-163 cm)
 sigM = R.p_pois_posI < 0.05 & R.LLHrelI_pois > 1;
-sets = {'GLM1 (additive, Gaussian)', Korig; 'Poisson additive (VSP)', K.pois_VSP; 'Poisson multiplicative (VSIP)', K.pois_VSIP};
+sets = {'GLM1 (Gaussian, additive)', Korig; 'Poisson, no VxS (VSP)', K.pois_VSP; 'Poisson, with VxS (VSIP)', K.pois_VSIP};
 ns = size(sets,1); n = height(R);
 
 % per-cell metrics
@@ -28,7 +31,6 @@ for s = 1:ns
         [~, loc] = findpeaks([min(k) k min(k)], 'MinPeakProminence', 0.5*rg); pk{c} = x(loc - 1);
         f.nPk(c) = numel(loc);
     end
-    g = exp(Kk - max(Kk,[],2)); f.sparse = 1 - (mean(g,2).^2 ./ mean(g.^2,2));    % 0 flat, ->1 one sharp peak
     f.pk = pk; F(s).f = f; %#ok<SAGROW>
 end
 rAM = arrayfun(@(c) corr(K.pois_VSP(c,:)', K.pois_VSIP(c,:)', 'rows','complete'), (1:n)');
@@ -40,26 +42,26 @@ uni = near(x, texLM, 4);                                            % expected f
 vs = @(p, P) abs(mean(exp(2i*pi*p(:)/P)));                          % vector strength at period P
 fid = fopen(fullfile(od, 'kernel_shapes_summary.txt'), 'w');
 out = @(varargin) cellfun(@(h) fprintf(h, varargin{:}), {1, fid}, 'UniformOutput', false);
-out('Position-kernel shape, %d GLM1 spatial cells (sig = multiplicative position significant, n = %d)\n', n, nnz(sigM));
+out('Position-kernel shape, %d GLM1 spatial cells (sig = position significant with VxS, n = %d)\n', n, nnz(sigM));
 out('Texture landmarks at %s cm; background elements repeat every 24 cm\n\n', mat2str(texLM));
-hdr = '%-31s %7s %7s %7s %7s %7s %7s %8s %8s %8s %8s\n';
-out(hdr, 'set', 'depth', 'peakZ', 'FWHMcm', 'nPeaks', 'multi%', 'sparse', 'pk<10cm', 'nearTex', 'VS24cm', 'VS40cm');
+hdr = '%-31s %7s %7s %7s %7s %7s %8s %8s %8s %8s\n';
+out(hdr, 'set', 'depth', 'peakZ', 'FWHMcm', 'nPeaks', 'multi%', 'pk<10cm', 'nearTex', 'VS24cm', 'VS40cm');
 for sub = 1:2
-    if sub == 1, m = true(n,1); out('All cells\n'); else, m = sigM; out('Multiplicative-significant cells\n'); end
+    if sub == 1, m = true(n,1); out('All cells\n'); else, m = sigM; out('Cells with position significant with VxS\n'); end
     for s = 1:ns
         f = F(s).f; p = [f.pk{m}]; p = p(p > 10);                    % ignore onset-edge peaks for landmark tests
-        out('%-31s %7.2f %7.2f %7.1f %7.2f %7.0f %7.2f %8.2f %8.2f %8.3f %8.3f\n', sets{s,1}, median(f.depth(m)), median(f.peakZ(m)), ...
-            median(f.fwhm(m)), mean(f.nPk(m)), 100*mean(f.nPk(m) > 1), median(f.sparse(m)), mean(f.mainPeak(m) < 10), ...
+        out('%-31s %7.2f %7.2f %7.1f %7.2f %7.0f %8.2f %8.2f %8.3f %8.3f\n', sets{s,1}, median(f.depth(m)), median(f.peakZ(m)), ...
+            median(f.fwhm(m)), mean(f.nPk(m)), 100*mean(f.nPk(m) > 1), mean(f.mainPeak(m) < 10), ...
             near(p, texLM, 4), vs(p, 24), vs(p, 40));
     end
 end
 out('\nUniform expectation: nearTex %.2f; vector strength null (n peaks ~%d) ~%.3f\n', uni, numel([F(3).f.pk{:}]), sqrt(pi/(4*numel([F(3).f.pk{:}]))));
-out('Additive vs multiplicative kernel, same cell: median corr %.2f (sig cells %.2f); main peak moves >10 cm in %.0f%% (sig %.0f%%)\n', ...
+out('Kernel without vs with VxS, same cell: median corr %.2f (sig cells %.2f); main peak moves >10 cm in %.0f%% (sig %.0f%%)\n', ...
     median(rAM,'omitnan'), median(rAM(sigM),'omitnan'), 100*mean(shift > 10), 100*mean(shift(sigM) > 10));
 pw = @(a,b) signrank(a, b);
-out('Paired additive vs multiplicative (Poisson, all cells), signrank p: depth %.1g, peakZ %.1g, FWHM %.1g, nPeaks %.1g, sparse %.1g\n', ...
-    pw(F(2).f.depth, F(3).f.depth), pw(F(2).f.peakZ, F(3).f.peakZ), pw(F(2).f.fwhm, F(3).f.fwhm), pw(F(2).f.nPk, F(3).f.nPk), pw(F(2).f.sparse, F(3).f.sparse));
-% where did the gain go: mean kernel difference along the track (additive - multiplicative), mean-centred per cell
+out('Paired no VxS vs with VxS (Poisson, all cells), signrank p: depth %.1g, peakZ %.1g, FWHM %.1g, nPeaks %.1g\n', ...
+    pw(F(2).f.depth, F(3).f.depth), pw(F(2).f.peakZ, F(3).f.peakZ), pw(F(2).f.fwhm, F(3).f.fwhm), pw(F(2).f.nPk, F(3).f.nPk));
+% where did the gain go: mean kernel difference along the track (no VxS - with VxS), mean-centred per cell
 dK = (K.pois_VSP - mean(K.pois_VSP,2,'omitnan')) - (K.pois_VSIP - mean(K.pois_VSIP,2,'omitnan'));
 fclose(fid);
 
@@ -95,7 +97,7 @@ for L = texLM, patch([L-3 L+3 L+3 L-3], [-.05 -.05 .15 .15], [.95 .85 .3], 'Edge
 plot(x, mA, 'Color', cs(2,:), 'LineWidth', 1.5); plot(x, mM, 'Color', cs(3,:), 'LineWidth', 1.5);
 plot(x, median(dK,1,'omitnan'), 'k', 'LineWidth', 1);
 xlabel('position (cm)'); ylabel('median log gain re cell median'); box off; ylim([-.05 .15]);
-legend({'','','','','additive','multiplicative','add - mult'},'Box','off'); title('Population kernel');
-title(tl, sprintf('Position-kernel shape: additive vs multiplicative (Poisson ridge refit, %d GLM1 spatial cells)', n));
-exportgraphics(fig, fullfile(C.figRoot, 'kernel_shapes_add_vs_mult.png'), 'Resolution', 140);
+legend({'','','','','no VxS','with VxS','difference'},'Box','off'); title('Population kernel');
+title(tl, sprintf('Position-kernel shape without vs with vision x speed (Poisson ridge refit, %d GLM1 spatial cells)', n));
+exportgraphics(fig, fullfile(C.figRoot, 'kernel_shapes_vxs.png'), 'Resolution', 140);
 end
