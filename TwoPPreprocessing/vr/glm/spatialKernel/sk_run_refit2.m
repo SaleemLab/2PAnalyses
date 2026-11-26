@@ -1,4 +1,4 @@
-function sk_run_refit2(sessions)
+function sk_run_refit2(sessions, nWorkers)
 % Run sk_refit2_session (Poisson; ridge and elastic net; omit fitted after
 % position; 1.5 s onset/offset temporal kernels) on the spatial cells of each
 % session. One CSV + MAT per session in <outRoot>\refit2\, skipped if the CSV
@@ -8,7 +8,10 @@ C = sk_config();
 if nargin < 1, sessions = 1:size(C.sessions,1); end
 T = readtable(C.tablePath);
 od = fullfile(C.outRoot, 'refit2'); if ~exist(od,'dir'), mkdir(od); end
-if isempty(gcp('nocreate')), parpool(16); end
+% 4 workers: the fits are memory-bandwidth bound, and throughput was the same
+% (~60 cells/h) with 4, 8 or 16 workers on this machine (i7-13700)
+if nargin < 2, nWorkers = 4; end
+if isempty(gcp('nocreate')), parpool(nWorkers); end
 for iS = sessions
     tag = sprintf('%s_%d', C.sessions{iS,1}, C.sessions{iS,2});
     f = fullfile(od, ['refit2_' tag '.csv']);
