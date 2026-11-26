@@ -177,6 +177,20 @@ Refit 2 fixes three problems found in refit 1:
 | `sk_position_vxs.m` | Position without vs with vision × speed in the base model (Poisson VSP vs VS against VSIP vs VSI, refit 1): which cells keep a significant position term in each, and how much position improves the fit. Position is a multiplicative gain in both. |
 | `sk_kernel_shapes.m` | Whether the Poisson position kernels change shape when vision × speed is added (VSP vs VSIP kernels, GLM1 for reference): depth, peak height and width, number of peaks, main peak position, and where peaks fall relative to the texture and 24 cm background landmarks. |
 
+### Kernel-shape analysis (any kernel set)
+
+These describe what the position kernels look like and how they relate to the rest
+of each cell's activity, in a way that doesn't depend on which fit made them. When
+improved kernels arrive (e.g. Julien's model), add a case to `sk_kernelset` and rerun;
+every observation below can then be checked on the new kernels.
+
+| File | What it does |
+|---|---|
+| `sk_cell_components.m` | Builds, once, a cache of per-cell quantities along the track that don't depend on the kernel fit, for all 6,473 cells: the measured map (and odd/even halves), GLM1's full, vision + speed and position predictions, GLM1's background, landmark and end-of-corridor contributions, the mean running speed per bin, and speed tuning. The refits only save position kernels, so GLM1 provides the vision and speed reference for every kernel set. |
+| `sk_kernelset.m` | Loads a kernel set in one standard form: kernels, SEs where available, significance, cell information and the matching components. It also puts every kernel on a common scale, `G`: the fractional change in activity relative to the track mean (log kernels: exp(k − mean) − 1; additive kernels: (k − mean) / mean predicted activity). GLM1 kernels are stored per second and are converted to the per-sample scale of the maps. |
+| `sk_kernel_features.m` | One row of features per cell: depth, main peak and trough, width and asymmetry of the main peak, number of peaks and troughs, roughness, onset and end effects, power at the 24 and 40 cm periods, peaks just before or after textures, and correlation/lag with the measured map, GLM1's vision and position predictions, and the speed profile. |
+| `sk_run_kernel_features.m` | Runs the features on several kernel sets and writes `kernelFeatures/<set>.csv` and a side-by-side `kernel_features_summary.txt`. |
+
 ## Typical order
 
 ```matlab
@@ -186,6 +200,7 @@ sk_run_refit; sk_summarise_refit          % refit 1 (Gaussian + Poisson, ridge)
 sk_run_refit2                             % refit 2 (Poisson, ridge + elastic net); ~3-4 days for all cells
 sk_plot_refit2_progress                   % while refit 2 runs
 sk_position_vxs; sk_kernel_shapes         % position without vs with vision x speed
+sk_cell_components; sk_run_kernel_features % kernel features for any kernel set
 ```
 
 ## Results so far (26 Nov 2026)
@@ -209,14 +224,45 @@ These are provisional. Refit 2 is still running.
     they are about 15% shallower.
   - The peaks are just as sharp. More main peaks fall in the first 10 cm, as an
     onset effect.
-  - In both, and in GLM1, peaks cluster just before the textures (around 75, 120
-    and 160 cm) rather than on them.
+  - In both, and in GLM1, pooled peak positions cluster around 75, 120 and 160 cm,
+    near the textures. Counted peak by peak, though, peaks are about as common just
+    after a texture as just before it (see the kernel-shape observations below).
   - Peaks also repeat with the 24 cm background period; this is weaker once
     vision × speed is in the model.
 - **Refit 2 so far (2 of 12 sessions).**
   - The fraction of cells where position stays significant with vision × speed varies a lot
     between sessions: 35% in M25126_20260313 and 66% in M26004_20260318
     (elastic net, corrected likelihood-ratio test).
+
+## Kernel-shape observations to re-test on new kernels
+
+Medians over cells where position is significant in each fit
+(`kernel_features_summary.txt`). GLM1: 3,184 cells; refit 1 Poisson without / with
+vision × speed: 656 / 527 of 892; refit 2 elastic net with vision × speed: 158 of 463
+(2 sessions). Each row should be rechecked when a new kernel set is added.
+
+| Observation | GLM1 | Refit 1, no VxS | Refit 1, VxS | Refit 2 EN, VxS |
+|---|---|---|---|---|
+| Kernels are nearly uncorrelated with GLM1's vision + speed prediction (median r) | 0.09 | 0.07 | 0.09 | 0.06 |
+| Kernels follow the measured map moderately (median r) | 0.68 | 0.64 | 0.59 | 0.60 |
+| Kernels are anticorrelated with the mean running-speed profile (median r) | −0.07 | −0.12 | −0.19 | −0.28 |
+| Peaks within 8 cm of a texture fall before : after it | 1207 : 1356 | 445 : 510 | 362 : 372 | 71 : 64 |
+| Onset effect (0–10 cm vs 10–190 cm, fractional change) | 0.03 | 0.05 | 0.09 | 0.31 |
+| Peaks per kernel | 2 | 4 | 4 | 2 |
+| Main peak width at half height (cm) | 8 | 4 | 4 | 4 |
+
+Notes:
+- Counted peak by peak, peaks near textures are about as common just after as just
+  before. This doesn't support the earlier "just before the landmarks" impression,
+  which came from pooled peak positions; texture-aligned averages with a shuffle null
+  are the next check.
+- Kernels are larger relative to the mean activity in GLM1 (median depth 1.04)
+  than in the Poisson refits (0.47–0.56), and much smoother (roughness 0.2 vs 2.5–2.8).
+  The 4 cm Poisson peak widths are at the bin resolution, so peak width is not
+  yet a reliable feature there.
+- The anticorrelation with running speed grows as vision × speed is added and in
+  the elastic net. The kernel may be partly absorbing where the animal slows down;
+  this needs the behaviour controls.
 
 ## Relation to Julien's code
 
