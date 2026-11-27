@@ -23,6 +23,7 @@ function F = sk_kernel_features(ks)
 %   lagVis                  shift (cm) maximising corr of G(x) with vision(x + lag), |lag| <= 20;
 %                           > 0: the kernel feature comes before the matching visual feature
 %   corrSpeedMap            correlation of G with the session's mean speed profile
+%   corrSpeedMap10          the same beyond 10 cm (the animal is slowest at trial onset)
 %   speedCorr               correlation of activity with running speed (trial x bin samples)
 %   visDepth, posShare      range of GLM1 vision prediction / its mean; share of GLM1 track
 %                           modulation from position: var(pos) / (var(pos) + var(vision))
@@ -59,6 +60,7 @@ cr = @(A, B) arrayfun(@(i) corr(A(i,:)', B(i,:)', 'rows', 'complete'), (1:n)');
 V = ks.comp.mapVS; Pp = ks.comp.mapPos;
 F.corrObs = cr(ks.G, ks.comp.mapObs); F.corrVis = cr(ks.G, V); F.corrPos = cr(ks.G, Pp);
 F.corrSpeedMap = cr(ks.G, ks.comp.speedMap);
+F.corrSpeedMap10 = cr(ks.G(:, late), ks.comp.speedMap(:, late));    % without the onset bins
 lags = -10:10; F.lagVis = nan(n,1);
 for c = 1:n
     rr = nan(size(lags));

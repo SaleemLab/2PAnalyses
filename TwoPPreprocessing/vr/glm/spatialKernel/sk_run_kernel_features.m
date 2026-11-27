@@ -10,7 +10,7 @@ for i = 1:numel(sets)
     writetable(F, fullfile(od, [sets{i} '.csv'])); S.(sets{i}) = F;
 end
 cols = {'depth','fwhm','asym','nPeaks','nTroughs','rough','onset','endEff','pow24','pow40','pkTexDist', ...
-    'corrObs','corrVis','corrPos','lagVis','corrSpeedMap','speedCorr','posShare','relMap'};
+    'corrObs','corrVis','corrPos','lagVis','corrSpeedMap','corrSpeedMap10','speedCorr','posShare','relMap'};
 fid = fopen(fullfile(od, 'kernel_features_summary.txt'), 'w');
 out = @(varargin) cellfun(@(h) fprintf(h, varargin{:}), {1, fid}, 'UniformOutput', false);
 out('Median over cells with position significant in that fit (n); pkTexDist over peaks within 20 cm\n');

@@ -190,6 +190,10 @@ every observation below can then be checked on the new kernels.
 | `sk_kernelset.m` | Loads a kernel set in one standard form: kernels, SEs where available, significance, cell information and the matching components. It also puts every kernel on a common scale, `G`: the fractional change in activity relative to the track mean (log kernels: exp(k − mean) − 1; additive kernels: (k − mean) / mean predicted activity). GLM1 kernels are stored per second and are converted to the per-sample scale of the maps. |
 | `sk_kernel_features.m` | One row of features per cell: depth, main peak and trough, width and asymmetry of the main peak, number of peaks and troughs, roughness, onset and end effects, power at the 24 and 40 cm periods, peaks just before or after textures, and correlation/lag with the measured map, GLM1's vision and position predictions, and the speed profile. |
 | `sk_run_kernel_features.m` | Runs the features on several kernel sets and writes `kernelFeatures/<set>.csv` and a side-by-side `kernel_features_summary.txt`. |
+| `sk_landmark_aligned.m` | Cuts each kernel (z-scored) in ±20 cm windows around the four textures and compares the mean with a null in which each kernel is shifted circularly over 10–200 cm. It shows GLM1's vision + speed prediction, the measured map and running speed in the same windows, folds the kernels modulo 24 cm away from the textures (background period), and compares peak-to-texture distances with the null. Writes `landmark_aligned.png` and a summary. |
+| `sk_plot_kernelset.m` | Population images for one kernel set: kernel, measured map, GLM1 vision + speed and GLM1 position prediction, z-scored, in the same row order (by peak, session or cluster). |
+| `sk_plot_cell_cards.m` | One card per cell: measured map (with odd/even halves), GLM1 predictions, the kernel as a fractional change (± SE where available) and the mean speed. By default it shows the 16 significant cells with the deepest kernels beyond 10 cm. |
+| `sk_kernel_clusters.m` | Recurring shapes: PCA and k-means (k = 6) on z-scored kernels beyond 10 cm. It reports each cluster's mean kernel with the matching measured map, vision prediction and speed, how clusters spread over sessions, and stability (centroids matched between random halves of cells and between mouse groups). |
 
 ## Typical order
 
@@ -201,6 +205,9 @@ sk_run_refit2                             % refit 2 (Poisson, ridge + elastic ne
 sk_plot_refit2_progress                   % while refit 2 runs
 sk_position_vxs; sk_kernel_shapes         % position without vs with vision x speed
 sk_cell_components; sk_run_kernel_features % kernel features for any kernel set
+sk_landmark_aligned                       % kernels around the textures, with shuffle null
+sk_kernel_clusters('glm1')                % recurring shapes (also draws the sorted images)
+sk_plot_cell_cards('refit1_vsip', 16)     % example cells
 ```
 
 ## Results so far (26 Nov 2026)
@@ -246,23 +253,42 @@ vision × speed: 656 / 527 of 892; refit 2 elastic net with vision × speed: 158
 | Kernels are nearly uncorrelated with GLM1's vision + speed prediction (median r) | 0.09 | 0.07 | 0.09 | 0.06 |
 | Kernels follow the measured map moderately (median r) | 0.68 | 0.64 | 0.59 | 0.60 |
 | Kernels are anticorrelated with the mean running-speed profile (median r) | −0.07 | −0.12 | −0.19 | −0.28 |
+| ... but hardly at all beyond 10 cm, i.e. it is the onset (median r) | −0.04 | −0.03 | −0.03 | −0.08 |
+| Texture-aligned mean kernel (textures 2–4) peaks ~6 cm before the texture, dips at it, and peaks again ~4 cm after; all above the shuffle null | yes | yes | yes | yes |
+| Kernel peaks 6–8 cm before a texture are over-represented (peak histogram vs null) | yes | yes | yes | yes |
+| Kernels vary with a 24 cm period away from the textures (phase fold vs null) | p < 0.002 | p < 0.002 | p < 0.002 | p < 0.002 |
+| Kernel clusters (beyond 10 cm) reproduce in random halves of cells (matched centroid r) | 0.90–0.99 | 0.59–0.89 | 0.54–0.88 | 0.08–0.73 |
+| ... and between mouse groups (matched centroid r) | −0.10–0.88 | −0.14–0.54 | −0.18–0.50 | −0.10–0.42 |
 | Peaks within 8 cm of a texture fall before : after it | 1207 : 1356 | 445 : 510 | 362 : 372 | 71 : 64 |
 | Onset effect (0–10 cm vs 10–190 cm, fractional change) | 0.03 | 0.05 | 0.09 | 0.31 |
 | Peaks per kernel | 2 | 4 | 4 | 2 |
 | Main peak width at half height (cm) | 8 | 4 | 4 | 4 |
 
 Notes:
-- Counted peak by peak, peaks near textures are about as common just after as just
-  before. This doesn't support the earlier "just before the landmarks" impression,
-  which came from pooled peak positions; texture-aligned averages with a shuffle null
-  are the next check.
+- Around the textures the kernels have a consistent biphasic shape in every fit:
+  a peak about 6 cm before the texture, a dip just where GLM1's vision prediction
+  starts to rise, and a smaller peak about 4 cm after. Counting all peaks within
+  ±8 cm gives similar numbers before and after, but the strongest over-representation
+  is 6–8 cm before. Because the dip sits exactly at the visual rise, this could be
+  the position term correcting the timing or width of the visual response rather than
+  anticipation; the simulation control (cells with no position term) is needed to
+  tell these apart.
+- The onset transient (first 10 cm) is the largest single feature: about half the
+  significant Poisson kernels have their main peak there. The animal is slowest at
+  onset, which explains the negative correlation with the speed profile.
+- GLM1 kernels fall into six stable shape groups beyond 10 cm (`clusters_glm1.png`):
+  high at the start of the track, repeated peaks ~6 cm before each texture, a ramp
+  along the track, the track end, and peaks just after the 2nd or 4th texture that
+  coincide with the visual response there. How common each group is differs a lot
+  between sessions and mice (e.g. the 167 cm group is mostly M26004), so the shapes
+  are partly session-specific. The refit kernels are noisier and their clusters
+  don't reproduce across mice (only 2 mice, 3 sessions).
+- In the example cards, many large kernel peaks sit where the measured map has a peak
+  that GLM1's vision + speed prediction under-predicts.
 - Kernels are larger relative to the mean activity in GLM1 (median depth 1.04)
   than in the Poisson refits (0.47–0.56), and much smoother (roughness 0.2 vs 2.5–2.8).
   The 4 cm Poisson peak widths are at the bin resolution, so peak width is not
   yet a reliable feature there.
-- The anticorrelation with running speed grows as vision × speed is added and in
-  the elastic net. The kernel may be partly absorbing where the animal slows down;
-  this needs the behaviour controls.
 
 ## Relation to Julien's code
 
