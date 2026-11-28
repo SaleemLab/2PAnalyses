@@ -194,6 +194,12 @@ every observation below can then be checked on the new kernels.
 | `sk_plot_kernelset.m` | Population images for one kernel set: kernel, measured map, GLM1 vision + speed and GLM1 position prediction, z-scored, in the same row order (by peak, session or cluster). |
 | `sk_plot_cell_cards.m` | One card per cell: measured map (with odd/even halves), GLM1 predictions, the kernel as a fractional change (± SE where available) and the mean speed. By default it shows the 16 significant cells with the deepest kernels beyond 10 cm. |
 | `sk_kernel_clusters.m` | Recurring shapes: PCA and k-means (k = 6) on z-scored kernels beyond 10 cm. It reports each cluster's mean kernel with the matching measured map, vision prediction and speed, how clusters spread over sessions, and stability (centroids matched between random halves of cells and between mouse groups). |
+| `sk_simulate_null.m` | Simulated activity with no position term: GLM1's vision + speed prediction, optionally shifted in time (the simulated cell responds later or earlier than the model's visual timing), with overdispersed Poisson noise at each cell's own dispersion. |
+| `sk_run_sim_refit.m` | Fits the simulated cells of one session with the refit-1 pipeline at several timing shifts; writes `simrefit/sim0_*`, `simlag6_*`, `simlead6_*` (100 ms later / earlier). Load them as `sk_kernelset('sim0_vsip')` etc. |
+
+Kernel-set names accept modifiers: `':all'` treats every cell as selected and `':s33'`
+keeps one session, e.g. `'refit1_vsip:s33:all'`. `sk_run_kernel_features` and
+`sk_landmark_aligned` take an output name, so comparisons don't overwrite the main outputs.
 
 ## Typical order
 
@@ -208,6 +214,9 @@ sk_cell_components; sk_run_kernel_features % kernel features for any kernel set
 sk_landmark_aligned                       % kernels around the textures, with shuffle null
 sk_kernel_clusters('glm1')                % recurring shapes (also draws the sorted images)
 sk_plot_cell_cards('refit1_vsip', 16)     % example cells
+sk_run_sim_refit(9, [0 6 -6])             % simulation control, one session (~0.5 h per shift, 8 workers)
+sets = {'refit1_vsip:s33:all', 'sim0_vsip:all', 'simlag6_vsip:all', 'simlead6_vsip:all'};
+sk_landmark_aligned(sets, [], 'landmark_aligned_sim'); sk_run_kernel_features(sets, 'kernel_features_sim')
 ```
 
 ## Results so far (26 Nov 2026)
@@ -271,8 +280,8 @@ Notes:
   ±8 cm gives similar numbers before and after, but the strongest over-representation
   is 6–8 cm before. Because the dip sits exactly at the visual rise, this could be
   the position term correcting the timing or width of the visual response rather than
-  anticipation; the simulation control (cells with no position term) is needed to
-  tell these apart.
+  anticipation. The simulation control below argues against a pure artefact: the
+  pipeline alone gives a weak before > after asymmetry but not the strong peaks.
 - The onset transient (first 10 cm) is the largest single feature: about half the
   significant Poisson kernels have their main peak there. The animal is slowest at
   onset, which explains the negative correlation with the speed profile.
@@ -289,6 +298,41 @@ Notes:
   than in the Poisson refits (0.47–0.56), and much smoother (roughness 0.2 vs 2.5–2.8).
   The 4 cm Poisson peak widths are at the bin resolution, so peak width is not
   yet a reliable feature there.
+
+### Simulation control: cells with no position term (27 Nov 2026)
+
+The 126 GLM1 spatial cells of M25126_20260313 were simulated from GLM1's vision + speed
+prediction alone (with each cell's own overdispersion) and refitted with refit 1.
+Three timings: the model's own, the cell responding 100 ms later, and 100 ms earlier.
+Outputs: `kernelFeatures/kernel_features_sim.txt`, `landmark_aligned_sim.png` and summary.
+One session, one noise seed.
+
+| | Real | No position | 100 ms later | 100 ms earlier |
+|---|---|---|---|---|
+| Position significant, Poisson without VxS | 52/126 | 11 | 12 | 31 |
+| Position significant, Poisson with VxS | 45/126 | 11 | 9 | 22 |
+| Position significant, Gaussian | 33/126 | 3 | 2 | 23 |
+| Kernel depth, all cells (median fractional change) | 0.34 | 0.18 | 0.19 | 0.21 |
+| Correlation with the measured map (median r) | 0.56 | 0.06 | 0.07 | 0.14 |
+| Same cell, simulated vs real kernel beyond 10 cm (median r) | | 0.01 | 0.03 | 0.05 |
+| Textures 2–4: mean 0–8 cm before minus after (z), p vs null | 0.09, p = 0.03 | 0.11, p = 0.01 | 0.05, p = 0.12 | 0.12, p < 0.001 |
+| Largest texture-aligned peak (z; null upper 95% ~0.15) | 0.37–0.75, 6–10 cm before | 0.14–0.20 | 0.14–0.29 | 0.12–0.26 |
+| 24 cm phase fold: range, p vs null | 0.36, p < 0.002 | 0.20, p = 0.06 | 0.22, p = 0.01 | 0.20, p = 0.02 |
+
+- With correct timing the pipeline gives about 9% false positives (Poisson), against
+  36–41% significant in the real data. A cell responding earlier than the model's
+  visual timing inflates this to 17–25%, and to 18% for the Gaussian fit; a later
+  response does not. Some real "position" cells may therefore be visual-timing misfits.
+- The before > after asymmetry around textures appears even with no position term, so
+  on its own it is not evidence of a position signal. The strong peaks 6–10 cm before
+  each texture (2–5 times the null bound) are not reproduced by any simulation.
+- A weaker 24 cm structure also appears from the pipeline alone, at a different phase
+  (0–8 cm vs 22 cm in the real kernels), so the 24 cm result needs this comparison
+  rather than the shuffle null.
+- Simulated kernels are about 60% as deep as the real ones and unrelated to each cell's
+  real kernel, which follows the measured map. The real kernels are mostly not
+  produced by the fitting procedure.
+- To do: more sessions and seeds; repeat on Julien's improved model.
 
 ## Relation to Julien's code
 

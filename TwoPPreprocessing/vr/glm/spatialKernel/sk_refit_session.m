@@ -15,6 +15,7 @@ function [Rf, Ex] = sk_refit_session(iSess, cellSel, opts)
 % chosen by CV per model. Poisson: lambda chosen by CV on VSP and shared by all
 % four models. Samples are aggregated over identical design rows within each
 % fold (exact for both likelihoods, since all predictors are discrete).
+% opts.Y replaces the recorded activity (e.g. simulated cells from sk_simulate_null).
 %
 % Rf (table, one row per selected cell, Spk column order):
 %   LLHi_<dist>_<model> : CV log-likelihood gain over a constant-rate model, bits/spike
@@ -40,6 +41,7 @@ C = sk_config();
 mouse = C.sessions{iSess,1}; date = C.sessions{iSess,2}; sid = C.sessions{iSess,3};
 tag = sprintf('%s_%d', mouse, date);
 L = load(fullfile(C.outRoot, [tag '_samples.mat']));
+if isfield(opts, 'Y'), L.Y = opts.Y; end         % simulated activity (sk_simulate_null), same size as L.Y
 fit = L.fit; keep = fit.inGLM; bi = fit.blockIdx;
 Xfull = L.X; Yall = double(L.Y(keep,:));
 trial = fit.trialID(keep);

@@ -1,4 +1,4 @@
-function A = sk_landmark_aligned(sets, nShuf)
+function A = sk_landmark_aligned(sets, nShuf, outName)
 % Are position kernels systematically higher just before or after the textures, or at a
 % fixed phase of the 24 cm background period? For each kernel set (significant cells):
 %   - each kernel (G) is z-scored and cut in a +-20 cm window around each texture
@@ -9,13 +9,14 @@ function A = sk_landmark_aligned(sets, nShuf)
 %   - the kernels folded modulo 24 cm (phase of the background period), away from the
 %     textures, against the same null
 %   - signed distances of all kernel peaks to the nearest texture against the null
-% Writes figures/landmark_aligned.png and landmark_aligned_summary.txt.
+% Writes figures/<outName>.png and <outName>_summary.txt (default 'landmark_aligned').
 if nargin < 1, sets = {'glm1', 'refit1_vsp', 'refit1_vsip', 'refit2_en_vsip'}; end
-if nargin < 2, nShuf = 500; end
+if nargin < 2 || isempty(nShuf), nShuf = 500; end
+if nargin < 3, outName = 'landmark_aligned'; end
 C = sk_config(); rng(1); tex = [40 80 120 160]; w = 10;           % window +-10 bins = +-20 cm
 lagX = 2*(-w:w); ns = numel(sets); A = struct();
 fig = figure('Position', [20 20 1900 330*ns], 'Color', 'w'); tl = tiledlayout(ns, 5, 'TileSpacing', 'compact');
-fid = fopen(fullfile(C.outRoot, 'landmark_aligned_summary.txt'), 'w');
+fid = fopen(fullfile(C.outRoot, [outName '_summary.txt']), 'w');
 out = @(varargin) cellfun(@(h) fprintf(h, varargin{:}), {1, fid}, 'UniformOutput', false);
 out('Texture-aligned kernels (z-scored G), significant cells; null: circular shifts over 10-200 cm, %d shuffles\n', nShuf);
 for s = 1:ns
@@ -52,7 +53,7 @@ for s = 1:ns
     out('  24 cm phase fold: range %.3f (null p = %.3f), peak at phase %d cm\n', range(fr), pF, 2*(find(fr == max(fr), 1) - 1));
     out('  peaks within 8 cm before / after a texture: %.1f%% / %.1f%% of peaks (null %.1f%% / %.1f%%)\n', ...
         100*mean(pkReal >= -8 & pkReal < 0), 100*mean(pkReal > 0 & pkReal <= 8), 100*mean(pkNull >= -8 & pkNull < 0), 100*mean(pkNull > 0 & pkNull <= 8));
-    A.(sets{s}) = struct('real', real, 'lo', lo, 'hi', hi, 'vis', rv, 'obs', ro, 'speed', rs, 'fold', fr, 'pDiff', pDiff, 'pFold', pF);
+    A.(matlab.lang.makeValidName(sets{s})) = struct('real', real, 'lo', lo, 'hi', hi, 'vis', rv, 'obs', ro, 'speed', rs, 'fold', fr, 'pDiff', pDiff, 'pFold', pF);
 
     % figure row
     cols = lines(4);
@@ -77,7 +78,7 @@ for s = 1:ns
 end
 fclose(fid);
 title(tl, 'Position kernels aligned to textures (significant cells; textures pass the animal at 37-43, 77-83, 117-123, 157-163 cm)');
-exportgraphics(fig, fullfile(C.figRoot, 'landmark_aligned.png'), 'Resolution', 120);
+exportgraphics(fig, fullfile(C.figRoot, [outName '.png']), 'Resolution', 120);
 end
 
 function f = foldp(M, x)
